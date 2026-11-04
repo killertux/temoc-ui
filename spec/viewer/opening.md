@@ -53,3 +53,13 @@ temoc-ui prints a message and exits without opening.
 | --------------- | --------- | --------- | ----------- | ----------------------------- |
 | Missing path    | docs      | nope.md   | no          | Path not found: nope.md       |
 | Not markdown    | docs      | data.txt  | no          | Not a markdown file: data.txt |
+
+## Arguments that make no sense
+
+[//]: # "decisionTable Tui"
+
+| # situation      | workspace | arguments             | still open? | status?                       |
+| ---------------- | --------- | --------------------- | ----------- | ----------------------------- |
+| Unknown option   | docs      | --nope                | no          | Unknown option: --nope        |
+| Config without a file | docs | --config              | no          | --config needs a file         |
+| Two paths        | docs      | README.md reference.md | no         | Only one path can be opened   |

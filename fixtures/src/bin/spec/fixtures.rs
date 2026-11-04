@@ -1,7 +1,7 @@
 //! The fixtures used by the pages in `spec/`.
 
 use crate::clipboard;
-use crate::session::{NOT_IMPLEMENTED, Outcome, Session};
+use crate::session::{Outcome, Session};
 use rust_slim::fixture;
 use std::path::Path;
 use temoc_ui::app::{AppState, GraphState};
@@ -76,6 +76,15 @@ impl Tui {
     #[must_use]
     pub fn visible(&self) -> String {
         self.read_session(|session| yes_no(session.shows(&self.look_for)))
+    }
+
+    #[must_use]
+    pub fn highlight(&self) -> String {
+        self.read_session(|session| {
+            session
+                .highlight(&self.look_for)
+                .map_or_else(|problem| problem, String::from)
+        })
     }
 
     #[must_use]
@@ -248,7 +257,6 @@ impl Tui {
     fn read_session(&self, read: impl FnOnce(&Session) -> String) -> String {
         match &self.outcome {
             None => "scenario did not run".into(),
-            Some(Outcome::NotBuilt) => NOT_IMPLEMENTED.into(),
             Some(Outcome::Refused(_)) => "temoc-ui did not open".into(),
             Some(Outcome::Broken(problem)) => problem.clone(),
             Some(Outcome::Finished(session)) => read(session),

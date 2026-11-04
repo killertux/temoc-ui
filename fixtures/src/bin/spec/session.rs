@@ -12,7 +12,7 @@ use std::env;
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
-use temoc_ui::app::{App, AppState, Launch, StartError};
+use temoc_ui::app::{App, AppState, Launch};
 
 const WIDTH: u16 = 80;
 const HEIGHT: u16 = 24;
@@ -25,8 +25,6 @@ pub const NOT_IMPLEMENTED: &str = "not implemented";
 
 /// What happened when a scenario ran.
 pub enum Outcome {
-    /// The application has not been built yet.
-    NotBuilt,
     /// temoc-ui refused to open, with its message.
     Refused(String),
     /// The scenario itself could not be carried out.
@@ -51,8 +49,7 @@ impl Outcome {
             extra_path: example_binaries().into_iter().collect(),
         };
         match App::start(&launch) {
-            Err(StartError::NotImplemented) => Self::NotBuilt,
-            Err(StartError::Refused(message)) => Self::Refused(message),
+            Err(message) => Self::Refused(message),
             Ok(app) => match Session::play(app, keys) {
                 Ok(session) => Self::Finished(Box::new(session)),
                 Err(problem) => Self::Broken(problem),
@@ -175,6 +172,12 @@ impl Session {
     /// Whether `text` is on screen.
     pub fn shows(&self, text: &str) -> bool {
         screen::find(self.buffer(), self.buffer().area, text).is_some()
+    }
+
+    /// How `text` is highlighted on screen.
+    pub fn highlight(&self, text: &str) -> Result<&'static str, String> {
+        let found = self.locate(text)?;
+        Ok(screen::highlight(self.buffer(), found))
     }
 
     /// Whether `text` is inside `area` of the screen.

@@ -7,7 +7,7 @@ use std::io::{self, Write};
 use std::process::ExitCode;
 use std::time::Duration;
 use temoc_ui::NotImplemented;
-use temoc_ui::app::{App, Launch, StartError};
+use temoc_ui::app::{App, Launch};
 
 /// How often background work is picked up while no input arrives.
 const TICK: Duration = Duration::from_millis(100);
@@ -28,10 +28,7 @@ fn run() -> Result<(), String> {
         arguments: env::args().skip(1).collect(),
         extra_path: Vec::new(),
     };
-    let mut app = App::start(&launch).map_err(|error| match error {
-        StartError::Refused(message) => message,
-        StartError::NotImplemented => "That option is not built yet".to_owned(),
-    })?;
+    let mut app = App::start(&launch)?;
     let mut terminal = ratatui::try_init().map_err(|error| error.to_string())?;
     let result = show(&mut app, &mut terminal);
     let restored = ratatui::try_restore();

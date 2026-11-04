@@ -61,6 +61,7 @@ on screen, searching from the top, so that they do not depend on the layout.
 | ----------------- | ------------------------------------------------------------- |
 | `document?`       | Path of the open document within the workspace, or `none`.    |
 | `visible?`        | `yes` if the `look for` text is on screen, otherwise `no`.    |
+| `highlight?`      | How the `look for` text is highlighted: `red`, `yellow`, `reversed`, or `none`. |
 | `status?`         | The status bar message, or `none`.                            |
 | `still open?`     | `yes` while temoc-ui is running, `no` after it exits.         |
 | `focused link?`   | The text of the focused link, or `none`.                      |

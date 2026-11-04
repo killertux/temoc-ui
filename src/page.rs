@@ -1,9 +1,11 @@
 //! A document on screen: how far it is scrolled and what is focused.
 
 use crate::render::{Document, Link, Rendered};
+use crate::run::FileResults;
 use crate::temoc::TestTable;
 use ratatui::layout::Size;
 use ratatui::text::Line;
+use std::collections::HashMap;
 use std::ops::Range;
 
 /// How many columns one step sideways moves.
@@ -15,7 +17,10 @@ pub struct Page {
     file: String,
     document: Document,
     rendered: Rendered,
+    is_test_file: bool,
     tables: Vec<TestTable>,
+    /// The results shown on the page.
+    results: Option<FileResults>,
     size: Size,
     scroll: usize,
     /// How far wide tables and code blocks are scrolled sideways.
@@ -28,13 +33,16 @@ impl Page {
     /// Shows a document from the top, with its first test table focused.
     #[must_use]
     pub fn new(file: String, document: Document, size: Size) -> Self {
-        let tables = document.tests().tables;
+        let tests = document.tests();
+        let tables = tests.tables;
         Self {
             file,
-            rendered: document.render(size.width),
+            rendered: document.render(size.width, &HashMap::new()),
             document,
+            is_test_file: tests.is_test_file,
             focused_table: (!tables.is_empty()).then_some(0),
             tables,
+            results: None,
             size,
             scroll: 0,
             left: 0,
@@ -48,12 +56,48 @@ impl Page {
         &self.file
     }
 
+    /// Whether temoc would treat this file as a test file.
+    #[must_use]
+    pub fn is_test_file(&self) -> bool {
+        self.is_test_file
+    }
+
+    /// The tables that can run, in document order.
+    #[must_use]
+    pub fn tables(&self) -> &[TestTable] {
+        &self.tables
+    }
+
     /// Adapts to the size of the screen.
     pub fn fit(&mut self, size: Size) {
-        if size.width != self.size.width {
-            self.rendered = self.document.render(size.width);
-        }
+        let width_changed = size.width != self.size.width;
         self.size = size;
+        if width_changed {
+            self.lay_out();
+        }
+        self.stay_on_the_page();
+    }
+
+    /// Shows these results on the page, if they are not there yet.
+    pub fn show_results(&mut self, results: Option<&FileResults>) {
+        if self.results.as_ref() != results {
+            self.results = results.cloned();
+            self.lay_out();
+            self.stay_on_the_page();
+        }
+    }
+
+    fn lay_out(&mut self) {
+        let results = self.results.as_ref().map_or_else(HashMap::new, |results| {
+            self.tables
+                .iter()
+                .filter_map(|table| Some((table.line, results.table(table)?)))
+                .collect()
+        });
+        self.rendered = self.document.render(self.size.width, &results);
+    }
+
+    fn stay_on_the_page(&mut self) {
         self.scroll = self.scroll.min(self.last_scroll());
         self.left = self.left.min(self.rendered.last_left());
     }
@@ -66,6 +110,7 @@ impl Page {
             self.screen_height(),
             self.left,
             self.focused_link(),
+            self.focused_table_row(),
         )
     }
 
@@ -168,11 +213,16 @@ impl Page {
         self.reveal(&rows);
     }
 
-    /// The name of the focused test table.
+    /// The focused test table.
     #[must_use]
-    pub fn focused_table(&self) -> Option<&str> {
-        let table = self.tables.get(self.focused_table?)?;
-        Some(&table.name)
+    pub fn focused_table(&self) -> Option<&TestTable> {
+        self.tables.get(self.focused_table?)
+    }
+
+    /// The row holding the header of the focused test table.
+    fn focused_table_row(&self) -> Option<usize> {
+        let table = self.focused_table()?;
+        Some(self.rendered.rows_of_line(table.line)?.start)
     }
 
     /// Focuses the next test table, stopping at the last one.

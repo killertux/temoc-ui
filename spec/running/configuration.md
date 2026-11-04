@@ -10,10 +10,11 @@ the [workspace](../viewer/opening.md#the-workspace). Its contents are for temoc,
 temoc-ui passes the file along without reading it.
 
 temoc itself is found through your `PATH`, and runs with the workspace as its
-current folder.
+current folder. A relative `--config` path starts from the folder temoc-ui was
+started in, and temoc-ui passes it along so that temoc finds the same file.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation                | workspace     | arguments                        | keys | temoc arguments?                       |
 | -------------------------- | ------------- | -------------------------------- | ---- | -------------------------------------- |
@@ -24,7 +25,7 @@ current folder.
 
 Pages still open, but nothing runs.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation             | workspace     | arguments                  | keys | temoc arguments? | status?                                                  |
 | ----------------------- | ------------- | -------------------------- | ---- | ---------------- | -------------------------------------------------------- |

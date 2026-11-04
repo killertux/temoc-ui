@@ -2,7 +2,9 @@
 
 use crate::page::Page;
 use crate::render::Document;
+use crate::run::{FileResults, Request, Run};
 use crate::search::Search;
+use crate::temoc::{RunReport, RunResult, TestTable};
 use crate::{NotImplemented, workspace};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::Frame;
@@ -10,9 +12,15 @@ use ratatui::layout::{Constraint, Layout, Margin, Rect, Size};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Clear, Paragraph};
+use std::collections::HashMap;
 use std::fmt::Display;
 use std::fs;
 use std::path::PathBuf;
+
+/// The configuration file temoc-ui looks for in the workspace.
+const CONFIGURATION: &str = "temoc.toml";
+/// The result of a file that has no results yet.
+const NOT_RUN: &str = "not run";
 
 /// How temoc-ui was started.
 #[derive(Debug, Clone, Default)]
@@ -25,13 +33,28 @@ pub struct Launch {
     pub extra_path: Vec<PathBuf>,
 }
 
-/// Why temoc-ui did not start.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum StartError {
-    /// The application has not been built yet.
-    NotImplemented,
-    /// temoc-ui refused to open, with a message for the user.
-    Refused(String),
+/// The arguments of the command line, once they are understood.
+#[derive(Debug, Default, PartialEq, Eq)]
+struct Arguments<'launch> {
+    path: Option<&'launch str>,
+    config: Option<&'launch str>,
+}
+
+impl<'launch> Arguments<'launch> {
+    fn read(arguments: &'launch [String]) -> Result<Self, String> {
+        let mut read = Self::default();
+        let mut arguments = arguments.iter().map(String::as_str);
+        while let Some(argument) = arguments.next() {
+            if argument == "--config" {
+                read.config = Some(arguments.next().ok_or("--config needs a file")?);
+            } else if argument.starts_with('-') {
+                return Err(format!("Unknown option: {argument}"));
+            } else if read.path.replace(argument).is_some() {
+                return Err("Only one path can be opened".into());
+            }
+        }
+        Ok(read)
+    }
 }
 
 /// What the graph view currently shows.
@@ -104,6 +127,18 @@ pub struct App {
     status: Option<String>,
     /// The room for a page, as last drawn.
     page_size: Size,
+    /// The folder temoc-ui was started from.
+    start_folder: PathBuf,
+    /// The configuration file given with `--config`, as written.
+    config: Option<String>,
+    /// Folders to search ahead of `PATH` when starting temoc.
+    extra_path: Vec<PathBuf>,
+    /// The temoc process at work.
+    run: Option<Run>,
+    /// What each file's runs have reported. Outlives the pages.
+    results: HashMap<String, FileResults>,
+    /// The arguments of the last temoc command.
+    temoc_arguments: Option<Vec<String>>,
 }
 
 impl App {
@@ -111,16 +146,11 @@ impl App {
     ///
     /// # Errors
     ///
-    /// Returns [`StartError::Refused`] when the path given cannot be opened.
-    /// The `--config` option is not built yet, and returns
-    /// [`StartError::NotImplemented`].
-    pub fn start(launch: &Launch) -> Result<Self, StartError> {
-        let path = match launch.arguments.as_slice() {
-            [] => None,
-            [path] if !path.starts_with('-') => Some(path.as_str()),
-            _ => return Err(StartError::NotImplemented),
-        };
-        let opening = workspace::locate(&launch.current_dir, path).map_err(StartError::Refused)?;
+    /// Fails with a message for the user when the arguments make no sense or
+    /// the path given cannot be opened.
+    pub fn start(launch: &Launch) -> Result<Self, String> {
+        let arguments = Arguments::read(&launch.arguments)?;
+        let opening = workspace::locate(&launch.current_dir, arguments.path)?;
         let mut app = Self {
             running: true,
             workspace: opening.workspace,
@@ -131,9 +161,15 @@ impl App {
             only_tests: false,
             status: None,
             page_size: Size::default(),
+            start_folder: launch.current_dir.clone(),
+            config: arguments.config.map(String::from),
+            extra_path: launch.extra_path.clone(),
+            run: None,
+            results: HashMap::new(),
+            temoc_arguments: None,
         };
         match opening.file {
-            Some(file) => app.visit(&file, None).map_err(StartError::Refused)?,
+            Some(file) => app.visit(&file, None)?,
             None => app.open_search(),
         }
         Ok(app)
@@ -154,7 +190,9 @@ impl App {
         let refuse = |error: &dyn Display| format!("Cannot read {file}: {error}");
         let text = fs::read_to_string(self.workspace.join(file)).map_err(|e| refuse(&e))?;
         let document = Document::parse(&text).map_err(|e| refuse(&e))?;
-        Ok(Page::new(file.to_owned(), document, self.page_size))
+        let mut page = Page::new(file.to_owned(), document, self.page_size);
+        page.show_results(self.results.get(file));
+        Ok(page)
     }
 
     fn go_back(&mut self) {
@@ -192,6 +230,89 @@ impl App {
         self.search = None;
         let anchor = hit.heading.map(|heading| heading.anchor);
         self.visit(&hit.file, anchor.as_deref())
+    }
+
+    /// Runs every table of the open file.
+    fn run_file(&mut self) -> Result<(), String> {
+        let page = self.page.as_ref().filter(|page| page.is_test_file());
+        let page = page.ok_or("This file has no temoc tests")?;
+        let (file, tables) = (page.file().to_owned(), page.tables().to_vec());
+        self.start_run(&file, file.clone(), &tables)
+    }
+
+    /// Runs the focused table.
+    fn run_table(&mut self) -> Result<(), String> {
+        let page = self.page.as_ref();
+        let found = page.and_then(|page| Some((page.file(), page.focused_table()?)));
+        let (file, table) = found.ok_or("No test table to run")?;
+        let target = format!("{file}:{}", table.directive_line);
+        let (file, table) = (file.to_owned(), table.clone());
+        self.start_run(&file, target, &[table])
+    }
+
+    fn start_run(
+        &mut self,
+        file: &str,
+        target: String,
+        tables: &[TestTable],
+    ) -> Result<(), String> {
+        if self.run.is_some() {
+            return Err("temoc is already running".into());
+        }
+        let arguments = vec!["-c".into(), self.configuration()?, "-s".into(), target];
+        self.temoc_arguments = Some(arguments.clone());
+        let request = Request {
+            folder: self.workspace.clone(),
+            extra_path: self.extra_path.clone(),
+            arguments,
+            file: file.to_owned(),
+            tables: tables.to_vec(),
+        };
+        match Run::start(request) {
+            Ok(run) => self.run = Some(run),
+            Err(message) => self.keep_report(file, tables, RunReport::stopped(message)),
+        }
+        Ok(())
+    }
+
+    /// The configuration file to give temoc, which runs in the workspace.
+    fn configuration(&self) -> Result<String, String> {
+        let Some(written) = &self.config else {
+            return if self.workspace.join(CONFIGURATION).is_file() {
+                Ok(CONFIGURATION.into())
+            } else {
+                Err(format!(
+                    "No temoc configuration found. Add {CONFIGURATION} or use --config."
+                ))
+            };
+        };
+        let missing = || format!("Configuration file not found: {written}");
+        let path = self.start_folder.join(written);
+        let path = path.canonicalize().map_err(|_| missing())?;
+        if !path.is_file() {
+            return Err(missing());
+        }
+        let workspace = self.workspace.canonicalize();
+        let inside = workspace.map(|workspace| path.strip_prefix(workspace).map(PathBuf::from));
+        let path = match inside {
+            Ok(Ok(inside)) => inside,
+            _ => path,
+        };
+        Ok(path.to_string_lossy().into_owned())
+    }
+
+    /// Keeps what a run reported, and says so if it needs saying.
+    fn keep_report(&mut self, file: &str, tables: &[TestTable], report: RunReport) {
+        match (report.result, &report.error) {
+            (RunResult::Error, Some(message)) => {
+                self.status = Some(format!("temoc failed: {message}"));
+            }
+            (RunResult::Error, None) => self.status = Some("temoc failed".into()),
+            (RunResult::NoTests, _) => self.status = Some("temoc found nothing to run".into()),
+            _ => {}
+        }
+        let results = self.results.entry(file.to_owned()).or_default();
+        results.record(tables, report);
     }
 
     /// Shows what went wrong, if anything did.
@@ -261,6 +382,14 @@ impl App {
                 let result = self.follow_focused_link();
                 self.report(result);
             }
+            KeyCode::Char('R') => {
+                let result = self.run_file();
+                self.report(result);
+            }
+            KeyCode::Char('r') => {
+                let result = self.run_table();
+                self.report(result);
+            }
             code => return self.move_on_page(code),
         }
         Ok(())
@@ -291,12 +420,19 @@ impl App {
     }
 
     /// Picks up the progress of background work, such as a test run.
-    pub fn update(&mut self) {}
+    pub fn update(&mut self) {
+        let Some(report) = self.run.as_mut().and_then(Run::finished) else {
+            return;
+        };
+        if let Some(run) = self.run.take() {
+            self.keep_report(run.file(), run.tables(), report);
+        }
+    }
 
     /// Whether background work, such as a test run, is still going.
     #[must_use]
     pub fn is_busy(&self) -> bool {
-        false
+        self.run.is_some()
     }
 
     /// Draws the current screen, and adapts to its size.
@@ -305,15 +441,40 @@ impl App {
             Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(frame.area());
         self.page_size = body.as_size();
         if let Some(page) = &mut self.page {
+            page.show_results(self.results.get(page.file()));
             page.fit(self.page_size);
             frame.render_widget(Paragraph::new(page.lines()), body);
         }
-        if let Some(message) = &self.status {
-            frame.render_widget(Paragraph::new(message.as_str()), status);
-        }
+        self.draw_status(frame, status);
         if let Some(search) = &self.search {
             draw_search(search, frame);
         }
+    }
+
+    /// Draws the message on the left of the status bar, and the result of the
+    /// open file on the right.
+    fn draw_status(&self, frame: &mut Frame, area: Rect) {
+        let running = self
+            .run
+            .as_ref()
+            .map(|run| format!("Running {}...", run.file()));
+        let result = self.file_result().filter(|result| *result != NOT_RUN);
+        let result = result.map_or_else(String::new, |result| format!("file: {result}"));
+        let width = Line::from(result.as_str()).width();
+        let width = u16::try_from(width).unwrap_or(area.width);
+        let [message, file] =
+            Layout::horizontal([Constraint::Min(0), Constraint::Length(width)]).areas(area);
+        if let Some(text) = self.status.as_ref().or(running.as_ref()) {
+            frame.render_widget(Paragraph::new(text.as_str()), message);
+        }
+        frame.render_widget(Paragraph::new(result), file);
+    }
+
+    /// The result of the open file, if it has tests.
+    fn file_result(&self) -> Option<&'static str> {
+        let page = self.page.as_ref().filter(|page| page.is_test_file())?;
+        let results = self.results.get(page.file());
+        Some(results.map_or(NOT_RUN, |results| results.summary(page.tables())))
     }
 
     /// Takes the bytes waiting to be written to the terminal, such as a
@@ -326,6 +487,11 @@ impl App {
     #[must_use]
     pub fn state(&self) -> AppState {
         let page = self.page.as_ref();
+        let results = page
+            .and_then(|page| self.results.get(page.file()))
+            .cloned()
+            .unwrap_or_default();
+        let tables = page.map_or(&[][..], Page::tables);
         AppState {
             running: self.running,
             document: page.map(|page| page.file().to_owned()),
@@ -337,7 +503,13 @@ impl App {
             search_results: self.search.as_ref().map_or_else(Vec::new, |search| {
                 search.results().iter().map(ToString::to_string).collect()
             }),
-            focused_table: page.and_then(Page::focused_table).map(String::from),
+            focused_table: page
+                .and_then(Page::focused_table)
+                .map(|table| table.name.clone()),
+            table_results: results.by_table(tables),
+            file_result: self.file_result().map(String::from),
+            failures: results.failures(tables),
+            temoc_arguments: self.temoc_arguments.clone(),
             ..AppState::default()
         }
     }
@@ -374,7 +546,15 @@ fn draw_search(search: &Search, frame: &mut Frame) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::Terminal;
+    use ratatui::backend::TestBackend;
+    use ratatui::buffer::Cell;
+    use std::fs::Permissions;
+    use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
+    use std::thread::sleep;
+    use std::time::Duration;
+    use std::{env, process};
 
     fn launch(workspace: &str, arguments: &[&str]) -> Launch {
         Launch {
@@ -397,17 +577,22 @@ mod tests {
     }
 
     #[test]
-    fn what_is_not_built_says_so() {
-        for arguments in [&["--config", "a.toml"][..], &["a.md", "--config", "b.toml"]] {
-            let result = App::start(&launch("docs", arguments));
-            assert_eq!(result.err(), Some(StartError::NotImplemented));
+    fn the_config_option_can_come_before_or_after_the_path() {
+        let path = Some("a.md");
+        let config = Some("b.toml");
+        for arguments in [
+            ["a.md", "--config", "b.toml"],
+            ["--config", "b.toml", "a.md"],
+        ] {
+            let arguments = arguments.map(String::from);
+            assert_eq!(Arguments::read(&arguments), Ok(Arguments { path, config }));
         }
     }
 
     #[test]
     fn a_key_that_is_not_built_says_so() {
         let mut app = App::start(&launch("docs", &[])).unwrap();
-        let key = Event::Key(KeyEvent::from(KeyCode::Char('r')));
+        let key = Event::Key(KeyEvent::from(KeyCode::Char('t')));
         assert_eq!(app.handle_event(&key), Err(NotImplemented));
     }
 
@@ -466,5 +651,153 @@ mod tests {
     fn a_resized_terminal_is_not_a_missing_feature() {
         let mut app = App::start(&launch("docs", &[])).unwrap();
         assert_eq!(app.handle_event(&Event::Resize(100, 40)), Ok(()));
+    }
+
+    /// A workspace of its own, with a `temoc` that does what `script` says.
+    struct Workspace(PathBuf);
+
+    impl Workspace {
+        fn new(name: &str, script: &str) -> Self {
+            let folder = env::temp_dir().join(format!("temoc-ui-{name}-{}", process::id()));
+            fs::create_dir_all(&folder).unwrap();
+            let table = "[//]: # \"decisionTable A\"\n\n| a |\n| - |\n| 1 |\n";
+            fs::write(folder.join("README.md"), format!("# Name\n\n{table}")).unwrap();
+            fs::write(folder.join("other.md"), table).unwrap();
+            fs::write(folder.join(CONFIGURATION), "").unwrap();
+            let temoc = folder.join("temoc");
+            fs::write(&temoc, format!("#!/bin/sh\n{script}\n")).unwrap();
+            fs::set_permissions(&temoc, Permissions::from_mode(0o755)).unwrap();
+            Self(folder)
+        }
+
+        fn app(&self) -> App {
+            App::start(&Launch {
+                current_dir: self.0.clone(),
+                arguments: Vec::new(),
+                extra_path: vec![self.0.clone()],
+            })
+            .unwrap()
+        }
+    }
+
+    impl Drop for Workspace {
+        fn drop(&mut self) {
+            fs::remove_dir_all(&self.0).unwrap();
+        }
+    }
+
+    fn settle(app: &mut App) {
+        while app.is_busy() {
+            sleep(Duration::from_millis(5));
+            app.update();
+        }
+    }
+
+    fn status_bar(app: &mut App) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(40, 12)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let buffer = terminal.backend().buffer();
+        let cells = (0..40).filter_map(|x| buffer.cell((x, 11)));
+        let row: String = cells.map(Cell::symbol).collect();
+        row.trim_end().to_owned()
+    }
+
+    #[test]
+    fn a_run_leaves_the_viewer_free_and_refuses_another() {
+        let workspace = Workspace::new("busy", "sleep 30");
+        let mut app = workspace.app();
+        press(&mut app, KeyCode::Char('R'));
+        assert!(app.is_busy());
+        assert_eq!(status_bar(&mut app), "Running README.md...");
+        press(&mut app, KeyCode::Char('j'));
+        press(&mut app, KeyCode::Char('r'));
+        assert_eq!(
+            app.state().status.as_deref(),
+            Some("temoc is already running")
+        );
+        assert_eq!(status_bar(&mut app), "temoc is already running");
+        press(&mut app, KeyCode::Char('j'));
+        assert_eq!(status_bar(&mut app), "Running README.md...");
+    }
+
+    #[test]
+    fn results_go_to_the_file_that_ran_even_after_leaving_it() {
+        let workspace = Workspace::new("left", "sleep 0.3; echo 'Testing file a.md...OK'");
+        let mut app = workspace.app();
+        press(&mut app, KeyCode::Char('R'));
+        app.visit("other.md", None).unwrap();
+        assert!(app.is_busy());
+        settle(&mut app);
+        assert_eq!(app.state().file_result.as_deref(), Some("not run"));
+        press(&mut app, KeyCode::Char('h'));
+        assert_eq!(app.state().file_result.as_deref(), Some("passed"));
+    }
+
+    #[test]
+    fn a_page_opened_after_a_run_shows_its_results() {
+        let workspace = Workspace::new("reopen", "echo 'Testing file a.md...OK'");
+        let mut app = workspace.app();
+        press(&mut app, KeyCode::Char('R'));
+        settle(&mut app);
+        app.visit("other.md", None).unwrap();
+        status_bar(&mut app);
+        app.visit("README.md", None).unwrap();
+        assert_eq!(app.state().file_result.as_deref(), Some("passed"));
+        assert!(
+            app.page
+                .as_ref()
+                .is_some_and(|page| page.lines().iter().any(|l| l.to_string() == "✓ passed"))
+        );
+    }
+
+    #[test]
+    fn a_run_that_found_nothing_says_so() {
+        let workspace = Workspace::new("none", "echo 'Testing file a.md...NONE'");
+        let mut app = workspace.app();
+        press(&mut app, KeyCode::Char('r'));
+        settle(&mut app);
+        assert_eq!(
+            app.state().status.as_deref(),
+            Some("temoc found nothing to run")
+        );
+        assert_eq!(app.state().file_result.as_deref(), Some("not run"));
+    }
+
+    #[test]
+    fn a_run_with_no_message_still_says_it_failed() {
+        let workspace = Workspace::new("silent", "exit 3");
+        let mut app = workspace.app();
+        press(&mut app, KeyCode::Char('R'));
+        settle(&mut app);
+        assert_eq!(app.state().status.as_deref(), Some("temoc failed"));
+    }
+
+    #[test]
+    fn a_config_outside_the_workspace_is_passed_as_a_full_path() {
+        let workspace = Workspace::new("outside", "true");
+        let root = workspace.0.canonicalize().unwrap();
+        fs::create_dir(root.join("sub")).unwrap();
+        fs::write(root.join("sub/README.md"), "# Sub").unwrap();
+        let app = App::start(&Launch {
+            current_dir: root.clone(),
+            arguments: vec!["sub".into(), "--config".into(), CONFIGURATION.into()],
+            extra_path: Vec::new(),
+        })
+        .unwrap();
+        assert_eq!(
+            app.configuration(),
+            Ok(root.join(CONFIGURATION).to_string_lossy().into_owned())
+        );
+    }
+
+    #[test]
+    fn a_folder_is_not_a_configuration_file() {
+        let mut app = App::start(&launch("calculator", &["--config", "."])).unwrap();
+        app.visit("passing.md", None).unwrap();
+        press(&mut app, KeyCode::Char('R'));
+        assert_eq!(
+            app.state().status.as_deref(),
+            Some("Configuration file not found: .")
+        );
     }
 }

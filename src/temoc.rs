@@ -20,6 +20,8 @@ pub struct TestFile {
 pub struct TestTable {
     /// The nearest heading above it, or else its fixture class.
     pub name: String,
+    /// The line of its `decisionTable` directive, which is how temoc selects it.
+    pub directive_line: usize,
     /// The line of the markdown the table starts on.
     pub line: usize,
     /// The line of the nearest heading above it.
@@ -86,6 +88,7 @@ pub fn tests_in(root: &Node) -> TestFile {
                         name: heading
                             .as_ref()
                             .map_or_else(|| class.to_owned(), |(name, _)| name.clone()),
+                        directive_line: line_of(node),
                         line: line_of(table),
                         heading_line: heading.as_ref().map(|(_, line)| *line),
                     });
@@ -234,6 +237,18 @@ pub struct RunReport {
     pub error: Option<String>,
 }
 
+impl RunReport {
+    /// A run that stopped without a result, with the reason why.
+    #[must_use]
+    pub fn stopped(message: String) -> Self {
+        Self {
+            result: RunResult::Error,
+            failures: Vec::new(),
+            error: Some(message),
+        }
+    }
+}
+
 /// Works out the result of a temoc run from what it printed.
 #[must_use]
 pub fn read_output(stdout: &str, stderr: &str, exit_code: i32) -> RunReport {
@@ -350,6 +365,7 @@ Not the table.
             find_tests(markdown).unwrap().tables,
             [TestTable {
                 name: "A".into(),
+                directive_line: 3,
                 line: 5,
                 heading_line: Some(1),
             }]

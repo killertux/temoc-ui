@@ -2,6 +2,7 @@
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::{Color, Modifier};
 
 /// Where a piece of text is on screen.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,6 +27,16 @@ pub fn find(buffer: &Buffer, area: Rect, text: &str) -> Option<Found> {
             last: (x.checked_add(last_offset)?, y),
         })
     })
+}
+
+/// How the start of some text on screen is highlighted.
+pub fn highlight(buffer: &Buffer, found: Found) -> &'static str {
+    match buffer.cell(found.first) {
+        Some(cell) if cell.modifier.contains(Modifier::REVERSED) => "reversed",
+        Some(cell) if cell.fg == Color::Red => "red",
+        Some(cell) if cell.fg == Color::Yellow => "yellow",
+        _ => "none",
+    }
 }
 
 fn cell_character(buffer: &Buffer, x: u16, y: u16) -> char {

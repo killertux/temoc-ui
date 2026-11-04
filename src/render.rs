@@ -1,6 +1,7 @@
 //! Turning markdown into styled lines for the terminal.
 
-use crate::temoc::{self, TestFile};
+use crate::run::TableResult;
+use crate::temoc::{self, Failure, RunResult, TestFile};
 use markdown::ParseOptions;
 use markdown::mdast::{AlignKind, List, Node, Table};
 use markdown::unist::Position;
@@ -12,6 +13,10 @@ use std::ops::Range;
 
 /// Wide enough that a preview is never wrapped.
 const PREVIEW_WIDTH: usize = 200;
+/// How a real failure stands out.
+const FAILED: Color = Color::Red;
+/// How a snoozed failure stands out.
+const SNOOZED: Color = Color::Yellow;
 
 /// How a piece of text is emphasized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,6 +33,8 @@ enum Look {
     Quote,
     /// Shows that a row is cut off by the edge of the screen.
     Marker,
+    /// The result of a test table.
+    Verdict(RunResult),
 }
 
 impl Look {
@@ -42,6 +49,7 @@ impl Look {
             Self::Link(_) | Self::Footnote => "link".into(),
             Self::Quote => "quote".into(),
             Self::Marker => "marker".into(),
+            Self::Verdict(result) => result.to_string(),
         }
     }
 
@@ -62,6 +70,9 @@ impl Look {
             }
             Self::Quote => style.fg(Color::Gray),
             Self::Marker => style.fg(Color::Cyan),
+            Self::Verdict(RunResult::Passed) => style.fg(Color::Green),
+            Self::Verdict(RunResult::Snoozed) => style.fg(SNOOZED),
+            Self::Verdict(_) => style.fg(FAILED).add_modifier(Modifier::BOLD),
         }
     }
 
@@ -216,12 +227,26 @@ impl Document {
             .collect()
     }
 
-    /// Lays the document out for a screen of this width.
+    /// Lays the document out for a screen of this width. Each table with a
+    /// result, given by the line it starts on, shows that result below it.
     #[must_use]
-    pub fn render(&self, width: u16) -> Rendered {
+    pub fn render(&self, width: u16, results: &HashMap<usize, &TableResult>) -> Rendered {
         let nodes = children(&self.root);
         let width = usize::from(width);
-        let (rows, ranges) = placed_blocks(nodes, width, Look::Plain, true);
+        let (mut rows, mut ranges) = placed_blocks(nodes, width, Look::Plain, true);
+        let mut failing = HashMap::new();
+        let mut added = 0;
+        for (node, range) in nodes.iter().zip(&mut ranges) {
+            *range = range.start + added..range.end + added;
+            if let Some(result) = results.get(&line_of(node)) {
+                failing.extend(failing_rows(node, range.start, &result.failures));
+                let lines = result_rows(result, width);
+                added += lines.len();
+                let end = range.end + lines.len();
+                rows.splice(range.end..range.end, lines);
+                range.end = end;
+            }
+        }
         Rendered {
             width,
             widest: rows
@@ -231,6 +256,7 @@ impl Document {
                 .unwrap_or(0),
             links: links_in(&rows, &self.targets),
             blocks: nodes.iter().map(line_of).zip(ranges).collect(),
+            failing,
             rows,
         }
     }
@@ -250,6 +276,8 @@ pub struct Rendered {
     /// The rows of each top-level element, by the line of the markdown it
     /// starts on.
     blocks: HashMap<usize, Range<usize>>,
+    /// The color of each row that holds a failure.
+    failing: HashMap<usize, Color>,
     links: Vec<Link>,
 }
 
@@ -295,7 +323,7 @@ impl Rendered {
     }
 
     /// The rows from `top` on that fit in `height`, scrolled sideways by `left`,
-    /// with a link highlighted.
+    /// with a link and a whole row highlighted.
     #[must_use]
     pub fn lines(
         &self,
@@ -303,17 +331,28 @@ impl Rendered {
         height: usize,
         left: usize,
         focused: Option<&Link>,
+        focused_row: Option<usize>,
     ) -> Vec<Line<'static>> {
         let focused = focused.map(|link| Look::Link(link.id));
         self.rows
             .iter()
+            .enumerate()
             .skip(top)
             .take(height)
-            .map(|row| {
+            .map(|(index, row)| {
+                let row_style = self
+                    .failing
+                    .get(&index)
+                    .map_or_else(Style::new, |color| Style::new().fg(*color));
+                let row_style = if Some(index) == focused_row {
+                    row_style.add_modifier(Modifier::REVERSED)
+                } else {
+                    row_style
+                };
                 cut_to_screen(row, left, self.width)
                     .into_iter()
                     .map(|piece| {
-                        let style = piece.look.style();
+                        let style = piece.look.style().patch(row_style);
                         let style = if Some(piece.look) == focused {
                             style.add_modifier(Modifier::REVERSED)
                         } else {
@@ -484,6 +523,42 @@ fn links_in(rows: &[Row], targets: &HashMap<usize, LinkTarget>) -> Vec<Link> {
 
 fn line_of(node: &Node) -> usize {
     node.position().map_or(0, |position| position.start.line)
+}
+
+/// The rows of a table, drawn from row `start`, that hold a failure. Every row
+/// of a table takes one row on screen, and a rule follows the first.
+fn failing_rows(table: &Node, start: usize, failures: &[Failure]) -> Vec<(usize, Color)> {
+    let rows = children(table).iter().enumerate();
+    rows.filter_map(|(index, row)| {
+        let line = line_of(row);
+        let failure = failures.iter().find(|failure| failure.line == Some(line))?;
+        let color = match failure.snoozed_until {
+            Some(_) => SNOOZED,
+            None => FAILED,
+        };
+        Some((start + index + usize::from(index > 0), color))
+    })
+    .collect()
+}
+
+/// What a run says below a table: its result, then its failures.
+fn result_rows(table: &TableResult, width: usize) -> Vec<Row> {
+    let mark = match table.result {
+        RunResult::Passed => "✓",
+        RunResult::Snoozed => "~",
+        _ => "✗",
+    };
+    let verdict = Piece::new(
+        format!("{mark} {}", table.result),
+        Look::Verdict(table.result),
+    );
+    let mut rows = vec![Row::new(), vec![verdict]];
+    for failure in &table.failures {
+        let text = Piece::new(failure.to_string(), Look::Plain);
+        let wrapped = wrap(vec![text], width.saturating_sub(2));
+        rows.extend(with_prefix(wrapped, "  ", "  ", Look::Plain));
+    }
+    rows
 }
 
 /// The anchor GitHub gives a heading with this text.
@@ -848,8 +923,8 @@ mod tests {
     fn screen(markdown: &str, width: u16) -> Vec<String> {
         Document::parse(markdown)
             .unwrap()
-            .render(width)
-            .lines(0, usize::MAX, 0, None)
+            .render(width, &HashMap::new())
+            .lines(0, usize::MAX, 0, None, None)
             .iter()
             .map(ToString::to_string)
             .collect()
@@ -880,8 +955,10 @@ mod tests {
 
     #[test]
     fn a_broken_word_keeps_its_looks() {
-        let rendered = Document::parse("**aa**bbbb").unwrap().render(3);
-        let lines = rendered.lines(0, 2, 0, None);
+        let rendered = Document::parse("**aa**bbbb")
+            .unwrap()
+            .render(3, &HashMap::new());
+        let lines = rendered.lines(0, 2, 0, None, None);
         let spans: Vec<Vec<String>> = lines
             .iter()
             .map(|line| line.spans.iter().map(ToString::to_string).collect())
@@ -998,7 +1075,7 @@ mod tests {
     fn links(markdown: &str, width: u16) -> Vec<(String, String, Range<usize>)> {
         Document::parse(markdown)
             .unwrap()
-            .render(width)
+            .render(width, &HashMap::new())
             .links()
             .iter()
             .map(|link| (link.text.clone(), link.target.clone(), link.rows.clone()))
@@ -1059,8 +1136,10 @@ mod tests {
 
     #[test]
     fn only_the_focused_link_is_highlighted() {
-        let rendered = Document::parse("[a](1.md) [b](2.md)").unwrap().render(20);
-        let lines = rendered.lines(0, 1, 0, rendered.links().get(1));
+        let rendered = Document::parse("[a](1.md) [b](2.md)")
+            .unwrap()
+            .render(20, &HashMap::new());
+        let lines = rendered.lines(0, 1, 0, rendered.links().get(1), None);
         let reversed: Vec<String> = lines
             .iter()
             .flat_map(|line| &line.spans)
@@ -1073,8 +1152,8 @@ mod tests {
     fn scrolled(markdown: &str, width: u16, left: usize) -> Vec<String> {
         Document::parse(markdown)
             .unwrap()
-            .render(width)
-            .lines(0, usize::MAX, left, None)
+            .render(width, &HashMap::new())
+            .lines(0, usize::MAX, left, None, None)
             .iter()
             .map(ToString::to_string)
             .collect()
@@ -1122,8 +1201,8 @@ mod tests {
     fn a_table_keeps_its_look_when_it_scrolls() {
         let rendered = Document::parse("| a |\n| - |\n| `bbbbbbbb` |\n")
             .unwrap()
-            .render(5);
-        let lines = rendered.lines(2, 1, 2, None);
+            .render(5, &HashMap::new());
+        let lines = rendered.lines(2, 1, 2, None, None);
         let colors: Vec<Option<Color>> = lines
             .iter()
             .flat_map(|line| &line.spans)
@@ -1144,8 +1223,120 @@ mod tests {
     fn a_line_of_the_markdown_can_be_found_on_screen() {
         let rendered = Document::parse("# A\n\none two\n\n# B\n")
             .unwrap()
-            .render(4);
+            .render(4, &HashMap::new());
         assert_eq!(rendered.rows_of_line(3), Some(2..4));
         assert_eq!(rendered.rows_of_line(5), Some(5..6));
+    }
+
+    fn failed_at(line: usize, snoozed: bool) -> TableResult {
+        TableResult {
+            result: if snoozed {
+                RunResult::Snoozed
+            } else {
+                RunResult::Failed
+            },
+            failures: vec![Failure {
+                line: Some(line),
+                message: "expected a long value, got another".into(),
+                snoozed_until: snoozed.then(|| "2099-12-31".into()),
+            }],
+        }
+    }
+
+    const TABLE_THEN_MORE: &str = "| a |\n| - |\n| 1 |\n| 2 |\n\n[next](a.md)\n\n## After\n";
+
+    fn shown(rendered: &Rendered) -> Vec<String> {
+        let lines = rendered.lines(0, usize::MAX, 0, None, None);
+        lines.iter().map(ToString::to_string).collect()
+    }
+
+    #[test]
+    fn a_result_goes_below_its_table_and_moves_the_rest_down() {
+        let document = Document::parse(TABLE_THEN_MORE).unwrap();
+        let before = document.render(60, &HashMap::new());
+        let result = failed_at(4, false);
+        let after = document.render(60, &HashMap::from([(1, &result)]));
+        assert_eq!(
+            shown(&after),
+            [
+                "a",
+                "─",
+                "1",
+                "2",
+                "",
+                "✗ failed",
+                "  line 4: expected a long value, got another",
+                "",
+                "next",
+                "",
+                "After",
+            ]
+        );
+        assert_eq!(after.rows_of_line(1), Some(0..7));
+        assert_eq!(after.rows_of_line(8), Some(10..11));
+        assert_eq!(
+            after.links().first().map(|link| link.rows.clone()),
+            Some(8..9)
+        );
+        assert_eq!(before.height() + 3, after.height());
+    }
+
+    #[test]
+    fn a_long_failure_wraps_under_its_table() {
+        let document = Document::parse("| a |\n| - |\n| 1 |\n").unwrap();
+        let result = failed_at(3, false);
+        let rendered = document.render(20, &HashMap::from([(1, &result)]));
+        assert_eq!(
+            shown(&rendered).get(5..),
+            Some(
+                &[
+                    "  line 3: expected a".to_owned(),
+                    "  long value, got".to_owned(),
+                    "  another".to_owned(),
+                ][..]
+            )
+        );
+    }
+
+    fn row_color(rendered: &Rendered, row: usize) -> Option<Color> {
+        let lines = rendered.lines(row, 1, 0, None, None);
+        lines.first()?.spans.first()?.style.fg
+    }
+
+    #[test]
+    fn a_failing_row_skips_the_rule_under_the_header() {
+        let document = Document::parse(TABLE_THEN_MORE).unwrap();
+        let result = failed_at(4, false);
+        let rendered = document.render(40, &HashMap::from([(1, &result)]));
+        assert_eq!(row_color(&rendered, 2), None);
+        assert_eq!(row_color(&rendered, 3), Some(FAILED));
+    }
+
+    #[test]
+    fn a_failure_on_the_header_marks_the_header() {
+        let document = Document::parse(TABLE_THEN_MORE).unwrap();
+        let result = failed_at(1, true);
+        let rendered = document.render(40, &HashMap::from([(1, &result)]));
+        assert_eq!(row_color(&rendered, 0), Some(SNOOZED));
+    }
+
+    #[test]
+    fn a_failure_outside_the_rows_marks_nothing() {
+        let document = Document::parse(TABLE_THEN_MORE).unwrap();
+        let result = failed_at(100, false);
+        let rendered = document.render(40, &HashMap::from([(1, &result)]));
+        assert!(rendered.failing.is_empty());
+    }
+
+    #[test]
+    fn the_focused_row_is_reversed_whole() {
+        let document = Document::parse("| a | b |\n| - | - |\n| 1 | 2 |\n").unwrap();
+        let rendered = document.render(40, &HashMap::new());
+        let lines = rendered.lines(0, 1, 0, None, Some(0));
+        let spans = lines.first().map_or(&[][..], |line| line.spans.as_slice());
+        assert_ne!(spans.len(), 0);
+        for span in spans {
+            assert!(span.style.add_modifier.contains(Modifier::REVERSED));
+        }
     }
 }

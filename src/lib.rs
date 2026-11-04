@@ -7,6 +7,7 @@
 pub mod app;
 pub mod page;
 pub mod render;
+pub mod run;
 pub mod search;
 pub mod temoc;
 pub mod workspace;

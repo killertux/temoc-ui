@@ -19,16 +19,17 @@ test case:
 
 temoc-ui lets you read those pages the way they were meant to be read. It opens as
 a markdown viewer that makes it easy to jump between pages, follow links and find
-what you are looking for. The goal is that when a page contains tests, you can also
-run the whole file or a single table and see the results in place.
+what you are looking for. When a page contains tests, you can also run the whole
+file or a single table and see the results in place.
 
 > [!NOTE]
-> temoc-ui is in early development. It works as a markdown viewer today, but it
-> **cannot run tests yet**. See [Project status](#project-status).
+> temoc-ui is in early development. See [Project status](#project-status) for what
+> works today.
 
 ## Getting started
 
-You need a recent stable [Rust](https://www.rust-lang.org/tools/install) toolchain.
+You need a recent stable [Rust](https://www.rust-lang.org/tools/install) toolchain,
+and [temoc](https://github.com/killertux/temoc/releases) on your `PATH` to run tests.
 Install temoc-ui from this repository:
 
 ```sh
@@ -41,6 +42,7 @@ Then open a folder, or a single markdown file:
 temoc-ui              # the current folder
 temoc-ui docs/        # another folder
 temoc-ui docs/api.md  # one page
+temoc-ui --config ci/temoc.toml  # with a temoc configuration file
 ```
 
 temoc-ui opens the folder's `README.md`. If there isn't one, search opens so that
@@ -69,6 +71,8 @@ cargo run -- samples/docs
 | `Enter`                       | Follow the focused link               |
 | `h` or `Backspace`, `l`       | Go back or forward                    |
 | `]`, `[`                      | Focus the next or previous test table |
+| `r`                           | Run the focused table                 |
+| `R`                           | Run the whole file                    |
 | `/`                           | Open search                           |
 | `q`, `Ctrl-c`                 | Quit                                  |
 
@@ -80,6 +84,20 @@ contain temoc tests.
 temoc-ui never opens a web browser. External links stay on the page and show their
 address in the status line.
 
+### Running tests
+
+Running needs a temoc configuration file, which tells temoc how to start your Slim
+server. temoc-ui uses `temoc.toml` at the root of the workspace, or the file given
+with `--config`. Pages open without one, but nothing can run.
+
+The focused table has a reversed header row. After a run, each table shows its result
+below it, with its failures listed under that and the failing rows highlighted: red
+for a real failure and yellow for a snoozed one. The result for the whole file is at
+the right of the status bar.
+
+Tests run in the background, so you can keep reading, and results stay until you close
+temoc-ui or the file runs again.
+
 ## Project status
 
 **Working today**
@@ -88,10 +106,10 @@ address in the status line.
 - Scrolling, following links and going back and forward through history
 - Searching files and headings, with a filter for test files
 - Finding test tables and moving between them
+- Running a whole file or a single table, and showing the results in place
 
 **Coming next**
 
-- Running a whole file or a single table, and showing the results in place
 - A pop-up file tree
 - A graph of how the pages link together
 - Mouse support
