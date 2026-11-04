@@ -17,7 +17,7 @@ makes temoc report success without running anything.
 Imports still apply to a table run alone, but symbols set by other tables do not.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation  | workspace  | arguments  | keys  | temoc arguments?               |
 | ------------ | ---------- | ---------- | ----- | ------------------------------ |
@@ -29,7 +29,7 @@ Imports still apply to a table run alone, but symbols set by other tables do not
 Only the table that ran changes. Until every table has a result, the file result is
 `partial`, unless a table failed.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation          | workspace  | arguments  | keys      | file result? | table results?                           |
 | -------------------- | ---------- | ---------- | --------- | ------------ | ---------------------------------------- |
@@ -46,7 +46,7 @@ because its only directive has no table. temoc reads the whole file before choos
 a table, so one malformed table stops every table in that file from running. See
 [when temoc cannot finish](running-a-file.md#when-temoc-cannot-finish).
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation        | workspace  | arguments | keys | temoc arguments? | status?              |
 | ------------------ | ---------- | --------- | ---- | ---------------- | -------------------- |

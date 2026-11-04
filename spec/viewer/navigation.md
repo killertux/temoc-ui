@@ -7,7 +7,7 @@ Back to the [specification index](../README.md).
 These rows use a page longer than the screen.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action             | workspace | arguments          | keys              | look for  | visible? |
 | -------------------- | --------- | ------------------ | ----------------- | --------- | -------- |
@@ -28,7 +28,7 @@ These rows use a page longer than the screen.
 `Tab` moves through the links on the page and wraps around at either end. The
 focused link is highlighted and scrolled into view.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action                 | workspace | keys                          | focused link?   |
 | ------------------------ | --------- | ----------------------------- | --------------- |
@@ -44,7 +44,7 @@ focused link is highlighted and scrolled into view.
 `Enter` opens the focused link, and [clicking](mouse.md#following-links) a link does
 the same. Relative paths are resolved from the current document.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action                  | workspace | keys                  | document?                |
 | ------------------------- | --------- | --------------------- | ------------------------ |
@@ -55,7 +55,7 @@ the same. Relative paths are resolved from the current document.
 
 A link with a heading anchor opens the page and scrolls to that heading.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action                | workspace | keys                      | document?          | look for | visible? |
 | ----------------------- | --------- | ------------------------- | ------------------ | -------- | -------- |
@@ -65,7 +65,7 @@ A link with a heading anchor opens the page and scrolls to that heading.
 Links that cannot be opened leave you on the same page and explain why. temoc-ui
 does not launch a web browser.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action      | workspace | keys                                | document? | status?                                             |
 | ------------- | --------- | ----------------------------------- | --------- | --------------------------------------------------- |
@@ -78,7 +78,7 @@ does not launch a web browser.
 scrolling it into view. The first table is focused when a test file opens. Focus
 stops at the first and last tables and does not wrap around.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action           | workspace  | arguments  | keys    | focused table? |
 | ------------------ | ---------- | ---------- | ------- | -------------- |
@@ -89,7 +89,7 @@ stops at the first and last tables and does not wrap around.
 | Stops at the start | calculator | passing.md | `[`     | Addition       |
 | Page without tests | docs       | reference.md | `]`   | none           |
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action                | workspace | arguments     | keys  | look for  | visible? |
 | ----------------------- | --------- | ------------- | ----- | --------- | -------- |
@@ -102,7 +102,7 @@ stops at the first and last tables and does not wrap around.
 `h` or `Backspace` goes back and `l` goes forward, like a web browser. Following a
 new link clears the forward history.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action                 | workspace | keys                    | document?                |
 | ------------------------ | --------- | ----------------------- | ------------------------ |
@@ -115,13 +115,13 @@ new link clears the forward history.
 
 Going back restores the scroll position and the focused link.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action          | workspace | keys          | focused link?   |
 | ----------------- | --------- | ------------- | --------------- |
 | Focus is restored | docs      | `Tab Enter h` | Getting started |
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # action           | workspace | keys                                            | look for | visible? |
 | ------------------ | --------- | ----------------------------------------------- | -------- | -------- |

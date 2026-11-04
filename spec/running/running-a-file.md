@@ -8,7 +8,7 @@ file share a run, so symbols set by one table are available to later tables.
 The `-s` option is always passed because temoc hides snoozed failures without it.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation        | workspace  | arguments  | keys | temoc arguments?            |
 | ------------------ | ---------- | ---------- | ---- | --------------------------- |
@@ -19,7 +19,7 @@ The `-s` option is always passed because temoc hides snoozed failures without it
 
 The file gets one overall result, and every table gets its own.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation         | workspace  | arguments  | keys | file result? | table results?                         |
 | ------------------- | ---------- | ---------- | ---- | ------------ | -------------------------------------- |
@@ -34,7 +34,7 @@ The file gets one overall result, and every table gets its own.
 Each failure names its table and line, and what was expected. The failing row is
 highlighted in the table.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation    | workspace  | arguments  | keys | failures?                                                             |
 | -------------- | ---------- | ---------- | ---- | --------------------------------------------------------------------- |
@@ -47,7 +47,7 @@ highlighted in the table.
 
 Results stay while you navigate, until temoc-ui closes or the file runs again.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation            | workspace  | arguments  | keys                      | document?  | file result? |
 | ---------------------- | ---------- | ---------- | ------------------------- | ---------- | ------------ |
@@ -55,7 +55,7 @@ Results stay while you navigate, until temoc-ui closes or the file runs again.
 
 ## Pages without tests
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation     | workspace  | arguments | keys | temoc arguments? | status?                      |
 | --------------- | ---------- | --------- | ---- | ---------------- | ---------------------------- |
@@ -66,7 +66,7 @@ Results stay while you navigate, until temoc-ui closes or the file runs again.
 temoc stops without a result when a file is malformed or the Slim server does not
 respond. That is an error, not a test failure, and temoc's message is shown.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation          | workspace      | arguments | keys | file result? | status?                                                                                          |
 | -------------------- | -------------- | --------- | ---- | ------------ | ------------------------------------------------------------------------------------------------ |

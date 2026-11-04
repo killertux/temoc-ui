@@ -13,7 +13,7 @@ folder is marked `▸` and an open one `▾`. The open document is selected, and
 folders above it start open.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation        | workspace | arguments                | keys  | tree open? | tree?                                                                     | tree selection?    |
 | ------------------ | --------- | ------------------------ | ----- | ---------- | ------------------------------------------------------------------------- | ------------------ |
@@ -29,7 +29,7 @@ folders above it start open.
 `Right` opens a folder, and `h` or `Left` closes it. `Enter` opens a folder too. The
 [mouse](mouse.md#in-the-file-tree) works here as well.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation        | workspace | keys          | tree?                                                                        | tree selection? |
 | ------------------ | --------- | ------------- | ---------------------------------------------------------------------------- | --------------- |
@@ -48,7 +48,7 @@ folders above it start open.
 [back](navigation.md#history) returns to the previous document. Closing the pop-up
 any other way leaves the document as it was.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation        | workspace | keys                | document?                | tree open? |
 | ------------------ | --------- | ------------------- | ------------------------ | ---------- |

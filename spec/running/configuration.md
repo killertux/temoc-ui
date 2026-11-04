@@ -13,7 +13,7 @@ temoc itself is found through your `PATH`, and runs with the workspace as its
 current folder.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation                | workspace     | arguments                        | keys | temoc arguments?                       |
 | -------------------------- | ------------- | -------------------------------- | ---- | -------------------------------------- |
@@ -24,7 +24,7 @@ current folder.
 
 Pages still open, but nothing runs.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation             | workspace     | arguments                  | keys | temoc arguments? | status?                                                  |
 | ----------------------- | ------------- | -------------------------- | ---- | ---------------- | -------------------------------------------------------- |

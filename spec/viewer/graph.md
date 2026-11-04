@@ -23,7 +23,7 @@ from the start page, so a longer route to it does not move it.
 In `columns?` below, columns are separated by semicolons.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation         | workspace  | arguments | keys         | graph open? | columns?                                                                          |
 | ------------------- | ---------- | --------- | ------------ | ----------- | --------------------------------------------------------------------------------- |
@@ -39,7 +39,7 @@ The [`link-chain`](../../samples/link-chain/README.md) sample is a chain of page
 a shortcut and an island. `distance?` is how many links the selected file is from
 the start page.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation                | workspace  | arguments     | keys     | distance?     |
 | -------------------------- | ---------- | ------------- | -------- | ------------- |
@@ -51,7 +51,7 @@ the start page.
 | The shortest route wins    | link-chain | shortcut.md   | `Ctrl-g` | 1             |
 | Links out are not enough   | link-chain | island.md     | `Ctrl-g` | not reachable |
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation     | workspace | keys     | look for  | visible? |
 | --------------- | --------- | -------- | --------- | -------- |
@@ -64,7 +64,7 @@ Each pair of files has at most one link in each direction, however many times on
 mentions the other. Links to a heading count as links to its file. Links to a
 website, to the same page, or out of the workspace are not shown.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation | workspace | keys     | links?                                                                                                                                                                                                                       |
 | ----------- | --------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -74,7 +74,7 @@ A panel below the graph lists the links out of the selected file and into it. A 
 to a file that does not exist has no place in the graph, so it appears only in this
 panel.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation          | workspace | arguments          | keys         | selected file?           | links out?                                                                     | links in?                         |
 | -------------------- | --------- | ------------------ | ------------ | ------------------------ | ------------------------------------------------------------------------------ | --------------------------------- |
@@ -92,7 +92,7 @@ nearest file. `g` and `G` go to the top and bottom of the column. Movement stops
 the edges, and the view follows the selected file. The
 [mouse](mouse.md#in-the-graph-view) works here too.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation        | workspace | keys             | selected file?           |
 | ------------------ | --------- | ---------------- | ------------------------ |
@@ -113,7 +113,7 @@ screen, and [`link-chain`](../../samples/link-chain/README.md) too wide, so the 
 has to follow the selection in both directions. `in graph?` looks only at the graph,
 because the panel below it always names the selected file.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation            | workspace  | keys         | look for   | in graph? |
 | ---------------------- | ---------- | ------------ | ---------- | --------- |
@@ -121,7 +121,7 @@ because the panel below it always names the selected file.
 | View follows downwards | many-pages | `Ctrl-g l G` | page-30.md | yes       |
 | View follows upwards   | many-pages | `Ctrl-g l G g` | page-01.md | yes     |
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation            | workspace  | arguments   | keys                          | look for    | in graph? |
 | ---------------------- | ---------- | ----------- | ----------------------------- | ----------- | --------- |
@@ -136,7 +136,7 @@ because the panel below it always names the selected file.
 `Enter` opens the selected file and returns to the document screen. Going
 [back](navigation.md#history) returns to the previous document.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation      | workspace | keys                 | document?    | graph open? |
 | ---------------- | --------- | -------------------- | ------------ | ----------- |

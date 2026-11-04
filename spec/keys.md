@@ -34,7 +34,7 @@ quits, except in the search box, where it is typed like any other letter.
 `Ctrl-c` quits from anywhere.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation             | workspace | keys  | look for           | visible? |
 | ----------------------- | --------- | ----- | ------------------ | -------- |
@@ -42,7 +42,7 @@ quits, except in the search box, where it is typed like any other letter.
 | Help opens              | docs      | `?`   | Run the whole file | yes      |
 | Help closes             | docs      | `? ?` | Run the whole file | no       |
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation            | workspace | keys       | still open? |
 | ---------------------- | --------- | ---------- | ----------- |

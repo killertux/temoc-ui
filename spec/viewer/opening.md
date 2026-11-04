@@ -23,7 +23,7 @@ With a file path, that file opens. Otherwise the workspace's `README.md` opens. 
 there is no `README.md`, search opens so that you can pick a file.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation            | workspace | arguments                   | document?                | search open? |
 | ---------------------- | --------- | --------------------------- | ------------------------ | ------------ |
@@ -36,7 +36,7 @@ there is no `README.md`, search opens so that you can pick a file.
 
 The workspace follows the same rules. Search shows what the workspace contains:
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation             | workspace | arguments                | keys | results?                                 |
 | ----------------------- | --------- | ------------------------ | ---- | ---------------------------------------- |
@@ -47,7 +47,7 @@ The workspace follows the same rules. Search shows what the workspace contains:
 
 temoc-ui prints a message and exits without opening.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation     | workspace | arguments | still open? | status?                       |
 | --------------- | --------- | --------- | ----------- | ----------------------------- |

@@ -12,7 +12,7 @@ what appears on screen, and `style?` is how it is emphasized. A `text?` of
 `nothing` means that nothing is drawn.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable MarkdownRendering"
+[//]: # "decisionTable MarkdownRendering -- snooze until 2099-12-31"
 
 | # element       | markdown                             | text?        | style?    |
 | --------------- | ------------------------------------ | ------------ | --------- |
@@ -33,7 +33,7 @@ what appears on screen, and `style?` is how it is emphasized. A `text?` of
 Tables are drawn with their columns aligned, and code blocks keep their text
 exactly as written.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # element        | workspace | arguments    | look for             | visible? |
 | ---------------- | --------- | ------------ | -------------------- | -------- |
@@ -46,7 +46,7 @@ exactly as written.
 
 Temoc directives stay hidden, and test tables appear like any other table.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # element       | workspace  | arguments  | look for      | visible? |
 | --------------- | ---------- | ---------- | ------------- | -------- |

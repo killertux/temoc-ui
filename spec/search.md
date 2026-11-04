@@ -13,7 +13,7 @@ is `.md` in any case. Hidden folders and folders named `target` or `node_modules
 are skipped.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation   | workspace | keys | search open? | results?                                                                        |
 | ------------- | --------- | ---- | ------------ | ------------------------------------------------------------------------------- |
@@ -25,7 +25,7 @@ must appear in order but need not be next to each other, and case is ignored. A
 heading result is written as `file > heading`. File matches come before heading
 matches.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation        | workspace | keys             | results?                                                   |
 | ------------------ | --------- | ---------------- | ---------------------------------------------------------- |
@@ -37,7 +37,7 @@ matches.
 | Build folders      | docs      | `/ "build"`      | none                                                       |
 | Not markdown       | docs      | `/ "data"`       | none                                                       |
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation            | workspace | keys             | first result?            |
 | ---------------------- | --------- | ---------------- | ------------------------ |
@@ -49,7 +49,7 @@ matches.
 `Down` and `Up` choose a result. Opening a heading scrolls to it. Going
 [back](viewer/navigation.md#history) returns to where you were.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation        | workspace | keys                     | document?                | search open? |
 | ------------------ | --------- | ------------------------ | ------------------------ | ------------ |
@@ -60,7 +60,7 @@ matches.
 | Cancel             | docs      | `/ "reference" Esc`      | README.md                | no           |
 | Back to the start  | docs      | `/ "reference" Enter h`  | README.md                | no           |
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation             | workspace | keys                | look for | visible? |
 | ----------------------- | --------- | ------------------- | -------- | -------- |
@@ -72,7 +72,7 @@ matches.
 `Ctrl-t` shows only [test files](running/finding-tests.md), and pressing it again
 shows everything. The choice is remembered until temoc-ui closes.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation            | workspace  | keys                       | results?                                                    |
 | ---------------------- | ---------- | -------------------------- | ----------------------------------------------------------- |

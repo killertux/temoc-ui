@@ -12,7 +12,10 @@ All of these must pass:
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
+temoc -c temoc.toml
 ```
+
+CI runs the same checks on every push to `main` and every pull request.
 
 Report any failure honestly. Do not describe work as done while a check fails.
 
@@ -57,6 +60,11 @@ Report any failure honestly. Do not describe work as done while a check fails.
   it pass.
 - Never edit `spec/` or `samples/` unless a human asks for it or approves the
   edit. `samples/` holds the workspaces the spec runs against.
+- A table marked `-- snooze until 2099-12-31` is specified but not built yet.
+  Removing those snoozes is the goal: when a table's behavior is built, remove
+  its snooze in the same change. That edit to `spec/` is already approved.
+  `grep -rn 'snooze until 2099' spec` lists what is left.
+- Do not add a snooze to `spec/` without human approval.
 - If the spec is ambiguous, incomplete, or conflicts with the code or the task,
   stop and ask a human. Do not guess, and do not change the spec to fit the code.
 
