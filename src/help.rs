@@ -1,16 +1,17 @@
 //! The help screen.
 
+use crate::theme::Theme;
 use ratatui::Frame;
 use ratatui::layout::Rect;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::{Block, Clear, Paragraph};
+use ratatui::widgets::{Clear, Paragraph};
 
 /// How wide the column of keys is.
 const KEY_WIDTH: usize = 21;
 
 /// Every key and what it does, as `spec/keys.md` lists them.
-const KEYS: [(&str, &str); 20] = [
+const KEYS: [(&str, &str); 21] = [
     ("j, Down", "Scroll down one line"),
     ("k, Up", "Scroll up one line"),
     ("PageDown, Space", "Scroll down one page"),
@@ -28,6 +29,7 @@ const KEYS: [(&str, &str); 20] = [
     ("R", "Run the whole file"),
     ("t", "Open the file tree"),
     ("Ctrl-g", "Enter the graph view"),
+    ("T", "Swap between dark and light"),
     ("v", "Start selecting text"),
     ("?", "Show or hide help"),
     ("q, Ctrl-c", "Quit"),
@@ -58,8 +60,8 @@ impl Help {
     }
 
     /// Draws the keys over `area`, and adapts to its size.
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
-        let block = Block::bordered().title("Help");
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, theme: Theme) {
+        let block = theme.frame("Help");
         self.room = usize::from(block.inner(area).height);
         self.top = self.top.min(self.last_top());
         let lines: Vec<Line> = KEYS
@@ -73,7 +75,8 @@ impl Help {
             })
             .collect();
         frame.render_widget(Clear, area);
-        frame.render_widget(Paragraph::new(lines).block(block), area);
+        let lines = Paragraph::new(lines).style(theme.plain()).block(block);
+        frame.render_widget(lines, area);
     }
 }
 
@@ -87,7 +90,7 @@ mod tests {
     fn draw(help: &mut Help, height: u16) -> String {
         let mut terminal = Terminal::new(TestBackend::new(70, height)).unwrap();
         terminal
-            .draw(|frame| help.draw(frame, frame.area()))
+            .draw(|frame| help.draw(frame, frame.area(), Theme::default()))
             .unwrap();
         let buffer = terminal.backend().buffer();
         buffer.content().iter().map(Cell::symbol).collect()
@@ -125,7 +128,7 @@ mod tests {
     #[test]
     fn every_key_shows_on_a_tall_enough_screen() {
         let mut help = Help::default();
-        let text = draw(&mut help, 22);
+        let text = draw(&mut help, 23);
         assert!(KEYS.iter().all(|(_, action)| text.contains(action)));
     }
 
@@ -136,8 +139,8 @@ mod tests {
         help.scroll_down(100);
         let text = draw(&mut help, 7);
         assert!(text.contains("Quit"));
-        assert!(text.contains("Open the file tree"));
-        assert!(!text.contains("Run the whole file"));
+        assert!(text.contains("Enter the graph view"));
+        assert!(!text.contains("Open the file tree"));
         help.scroll_up(100);
         assert!(draw(&mut help, 7).contains("Scroll down one line"));
     }
@@ -145,7 +148,7 @@ mod tests {
     #[test]
     fn a_screen_that_fits_does_not_scroll() {
         let mut help = Help::default();
-        draw(&mut help, 22);
+        draw(&mut help, 23);
         help.scroll_down(1);
         assert_eq!(help.top, 0);
     }
@@ -155,7 +158,7 @@ mod tests {
         let mut help = Help::default();
         draw(&mut help, 7);
         help.scroll_down(100);
-        draw(&mut help, 22);
+        draw(&mut help, 23);
         assert_eq!(help.top, 0);
     }
 

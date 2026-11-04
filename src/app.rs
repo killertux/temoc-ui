@@ -8,6 +8,7 @@ use crate::render::{Document, Motion};
 use crate::run::{FileResults, Request, Run};
 use crate::search::Search;
 use crate::temoc::{RunReport, RunResult, TestTable};
+use crate::theme::{Rgb, Theme};
 use crate::tree::{FileTree, Row};
 use crate::{NotImplemented, workspace};
 use crossterm::event::{
@@ -39,6 +40,10 @@ pub struct Launch {
     pub arguments: Vec<String>,
     /// Folders to search ahead of `PATH` when starting temoc.
     pub extra_path: Vec<PathBuf>,
+    /// The value of `COLORTERM`.
+    pub color_term: Option<String>,
+    /// The terminal's background colour, if it said.
+    pub background: Option<Rgb>,
 }
 
 /// The arguments of the command line, once they are understood.
@@ -46,6 +51,7 @@ pub struct Launch {
 struct Arguments<'launch> {
     path: Option<&'launch str>,
     config: Option<&'launch str>,
+    theme: Option<&'launch str>,
 }
 
 impl<'launch> Arguments<'launch> {
@@ -55,6 +61,8 @@ impl<'launch> Arguments<'launch> {
         while let Some(argument) = arguments.next() {
             if argument == "--config" {
                 read.config = Some(arguments.next().ok_or("--config needs a file")?);
+            } else if argument == "--theme" {
+                read.theme = Some(arguments.next().ok_or("--theme needs a name")?);
             } else if argument.starts_with('-') {
                 return Err(format!("Unknown option: {argument}"));
             } else if read.path.replace(argument).is_some() {
@@ -98,6 +106,8 @@ pub struct AppState {
     pub graph: Option<GraphState>,
     /// The selected text.
     pub selection: Option<String>,
+    /// The theme in use.
+    pub theme: Theme,
 }
 
 /// The temoc-ui application.
@@ -116,6 +126,7 @@ pub struct App {
     help: Option<Help>,
     /// Whether search shows only test files. Outlives the search box.
     only_tests: bool,
+    theme: Theme,
     status: Option<String>,
     /// The room for a page, as last drawn.
     page_size: Size,
@@ -150,6 +161,10 @@ impl App {
     /// the path given cannot be opened.
     pub fn start(launch: &Launch) -> Result<Self, String> {
         let arguments = Arguments::read(&launch.arguments)?;
+        let theme = match arguments.theme {
+            Some(name) => Theme::named(name).ok_or(format!("Unknown theme: {name}"))?,
+            None => Theme::matching(launch.color_term.as_deref(), launch.background),
+        };
         let opening = workspace::locate(&launch.current_dir, arguments.path)?;
         let mut app = Self {
             running: true,
@@ -162,6 +177,7 @@ impl App {
             graph: None,
             help: None,
             only_tests: false,
+            theme,
             status: None,
             page_size: Size::default(),
             screen: Rect::default(),
@@ -556,6 +572,10 @@ impl App {
             self.help = Some(Help::default());
             return Ok(());
         }
+        if key.code == KeyCode::Char('T') && !control {
+            self.theme = self.theme.swapped();
+            return Ok(());
+        }
         if self.tree.is_some() {
             if !control {
                 self.handle_tree_key(key.code);
@@ -775,28 +795,31 @@ impl App {
         let [body, status] =
             Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(frame.area());
         self.page_size = body.as_size();
+        let theme = self.theme;
+        frame.render_widget(Block::new().style(theme.plain()), body);
         if let Some(graph) = &mut self.graph {
-            graph.draw(frame, body);
+            graph.draw(frame, body, theme);
         } else if let Some(page) = &mut self.page {
             page.show_results(self.results.get(page.file()));
             page.fit(self.page_size);
-            frame.render_widget(Paragraph::new(page.lines()), body);
+            frame.render_widget(Paragraph::new(page.lines(theme)), body);
         }
         self.draw_status(frame, status);
         if let Some(search) = &self.search {
-            draw_search(search, frame);
+            draw_search(search, frame, theme);
         }
         if let Some(tree) = &mut self.tree {
-            draw_tree(tree, frame);
+            draw_tree(tree, frame, theme);
         }
         if let Some(help) = &mut self.help {
-            help.draw(frame, body);
+            help.draw(frame, body, theme);
         }
     }
 
     /// Draws the message on the left of the status bar, and the result of the
     /// open file on the right.
     fn draw_status(&self, frame: &mut Frame, area: Rect) {
+        frame.render_widget(Block::new().style(self.theme.status_bar()), area);
         let running = self
             .run
             .as_ref()
@@ -867,6 +890,7 @@ impl App {
             failures: results.failures(tables),
             temoc_arguments: self.temoc_arguments.clone(),
             selection: page.and_then(Page::selected_text),
+            theme: self.theme,
             tree: self
                 .tree
                 .as_ref()
@@ -907,7 +931,7 @@ fn highlighted(line: Line<'_>) -> Line<'_> {
     line.style(Style::new().add_modifier(Modifier::REVERSED))
 }
 
-fn draw_tree(tree: &mut FileTree, frame: &mut Frame) {
+fn draw_tree(tree: &mut FileTree, frame: &mut Frame, theme: Theme) {
     let area = pop_up_area(frame.area());
     // The border takes two rows.
     let room = usize::from(area.height).saturating_sub(2);
@@ -926,12 +950,14 @@ fn draw_tree(tree: &mut FileTree, frame: &mut Frame) {
         .collect();
     frame.render_widget(Clear, area);
     frame.render_widget(
-        Paragraph::new(lines).block(Block::bordered().title("Files")),
+        Paragraph::new(lines)
+            .style(theme.plain())
+            .block(theme.frame("Files")),
         area,
     );
 }
 
-fn draw_search(search: &Search, frame: &mut Frame) {
+fn draw_search(search: &Search, frame: &mut Frame, theme: Theme) {
     let area = pop_up_area(frame.area());
     // The border takes two rows, and the search box another.
     let room = usize::from(area.height).saturating_sub(3);
@@ -954,7 +980,9 @@ fn draw_search(search: &Search, frame: &mut Frame) {
     };
     frame.render_widget(Clear, area);
     frame.render_widget(
-        Paragraph::new(lines).block(Block::bordered().title(title)),
+        Paragraph::new(lines)
+            .style(theme.plain())
+            .block(theme.frame(title)),
         area,
     );
 }
@@ -978,7 +1006,7 @@ mod tests {
                 .join("samples")
                 .join(workspace),
             arguments: arguments.iter().map(ToString::to_string).collect(),
-            extra_path: Vec::new(),
+            ..Launch::default()
         }
     }
 
@@ -1001,8 +1029,46 @@ mod tests {
             ["--config", "b.toml", "a.md"],
         ] {
             let arguments = arguments.map(String::from);
-            assert_eq!(Arguments::read(&arguments), Ok(Arguments { path, config }));
+            let read = Arguments {
+                path,
+                config,
+                theme: None,
+            };
+            assert_eq!(Arguments::read(&arguments), Ok(read));
         }
+    }
+
+    #[test]
+    fn a_theme_comes_with_any_other_argument() {
+        let arguments = ["--theme", "light", "a.md"].map(String::from);
+        let read = Arguments::read(&arguments).unwrap();
+        assert_eq!((read.path, read.theme), (Some("a.md"), Some("light")));
+    }
+
+    #[test]
+    fn the_theme_option_beats_the_terminal() {
+        let app = App::start(&Launch {
+            color_term: Some("truecolor".into()),
+            background: Some(Rgb(255, 255, 255)),
+            ..launch("docs", &["--theme", "dark-256"])
+        })
+        .unwrap();
+        assert_eq!(app.state().theme, Theme::DARK_256);
+    }
+
+    #[test]
+    fn an_unknown_theme_is_refused() {
+        let refused = App::start(&launch("docs", &["--theme", "blue"]));
+        assert_eq!(refused.unwrap_err(), "Unknown theme: blue");
+    }
+
+    #[test]
+    fn t_swaps_the_theme_but_ctrl_t_does_not() {
+        let mut app = App::start(&launch("docs", &["--theme", "dark"])).unwrap();
+        press(&mut app, KeyCode::Char('T'));
+        assert_eq!(app.state().theme, Theme::LIGHT);
+        assert_eq!(press_ctrl(&mut app, 'T'), Err(NotImplemented));
+        assert_eq!(app.state().theme, Theme::LIGHT);
     }
 
     #[test]
@@ -1364,7 +1430,7 @@ mod tests {
 
     /// Where a link of the docs README is on a 40 column screen.
     fn link_spot(app: &App, text: &str) -> (u16, u16) {
-        let lines = app.page.as_ref().unwrap().lines();
+        let lines = app.page.as_ref().unwrap().lines(Theme::default());
         let (row, column) = lines
             .iter()
             .enumerate()
@@ -1430,7 +1496,7 @@ mod tests {
             app.page
                 .as_ref()
                 .unwrap()
-                .lines()
+                .lines(Theme::default())
                 .first()
                 .map(ToString::to_string),
             Some("Long Page".to_owned())
@@ -1597,6 +1663,7 @@ mod tests {
                 current_dir: self.0.clone(),
                 arguments: Vec::new(),
                 extra_path: vec![self.0.clone()],
+                ..Launch::default()
             })
             .unwrap()
         }
@@ -1665,11 +1732,10 @@ mod tests {
         status_bar(&mut app);
         app.visit("README.md", None).unwrap();
         assert_eq!(app.state().file_result.as_deref(), Some("passed"));
-        assert!(
-            app.page
-                .as_ref()
-                .is_some_and(|page| page.lines().iter().any(|l| l.to_string() == "✓ passed"))
-        );
+        assert!(app.page.as_ref().is_some_and(|page| {
+            let lines = page.lines(Theme::default());
+            lines.iter().any(|l| l.to_string() == "✓ passed")
+        }));
     }
 
     #[test]
@@ -1703,7 +1769,7 @@ mod tests {
         let app = App::start(&Launch {
             current_dir: root.clone(),
             arguments: vec!["sub".into(), "--config".into(), CONFIGURATION.into()],
-            extra_path: Vec::new(),
+            ..Launch::default()
         })
         .unwrap();
         assert_eq!(

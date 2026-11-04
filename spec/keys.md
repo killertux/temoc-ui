@@ -21,6 +21,7 @@ Back to the [specification index](README.md).
 | `R`                 | Run the whole file                       | [Running a file](running/running-a-file.md)  |
 | `t`                 | Open the file tree                       | [File tree](viewer/file-tree.md)             |
 | `Ctrl-g`            | Enter the graph view                     | [Graph view](viewer/graph.md)                |
+| `T`                 | Swap between dark and light              | [Themes](viewer/themes.md)                   |
 | `v`                 | Start selecting text                     | [Selecting text](viewer/selecting-text.md)   |
 | `?`                 | Show or hide help                        | This page                                    |
 | `q`, `Ctrl-c`       | Quit                                     | This page                                    |

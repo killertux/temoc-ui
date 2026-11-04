@@ -37,7 +37,7 @@ The `color term` column is the value of `COLORTERM`, and empty means that it is 
 set. The `terminal background` column is what the terminal answers.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation            | workspace | color term | terminal background | arguments           | theme?    |
 | ---------------------- | --------- | ---------- | ------------------- | ------------------- | --------- |
@@ -55,7 +55,7 @@ set. The `terminal background` column is what the terminal answers.
 | It can pick a palette  | docs      | truecolor  | #FFFFFF             | --theme dark-256    | dark-256  |
 | It can pick 24-bit     | docs      |            | no answer           | --theme light       | light     |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace | arguments     | still open? | status?              |
 | ------------------ | --------- | ------------- | ----------- | -------------------- |
@@ -70,7 +70,7 @@ show 24-bit colour never gets it. The choice lasts until temoc-ui closes.
 `T` works everywhere but the search box, where it is typed like any other letter, and
 help, where other keys do nothing. Swapping changes nothing but the colours.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation       | workspace | color term | arguments         | keys         | theme?    |
 | ----------------- | --------- | ---------- | ----------------- | ------------ | --------- |
@@ -84,7 +84,7 @@ help, where other keys do nothing. Swapping changes nothing but the colours.
 | Typed in search   | docs      | truecolor  |                   | `/ T`        | dark      |
 | Ignored in help   | docs      | truecolor  |                   | `? T`        | dark      |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation           | workspace | keys      | focused link? | tree open? |
 | --------------------- | --------- | --------- | ------------- | ---------- |
@@ -97,7 +97,7 @@ No cell is left to the terminal's own colours. This covers the blank cells of th
 the whole width of the status bar, and everything inside a pop-up. `unpainted cells?`
 counts the cells whose foreground or background is the terminal's default.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # screen      | workspace  | arguments  | keys     | unpainted cells? |
 | ------------- | ---------- | ---------- | -------- | ---------------- |
@@ -125,7 +125,7 @@ themes, and a dark bar with white text in the light themes. It stands apart from
 markdown whatever the page shows. The file result in the bar uses the bar's own text
 colour.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # theme   | workspace | arguments         | bar against page? |
 | --------- | --------- | ----------------- | ----------------- |
@@ -151,7 +151,7 @@ entry.
 
 ### dark
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # style        | workspace  | arguments               | keys         | look for          | foreground? | background? | contrast? |
 | -------------- | ---------- | ----------------------- | ------------ | ----------------- | ----------- | ----------- | --------- |
@@ -176,7 +176,7 @@ entry.
 
 ### light
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # style        | workspace  | arguments                | keys         | look for          | foreground? | background? | contrast? |
 | -------------- | ---------- | ------------------------ | ------------ | ----------------- | ----------- | ----------- | --------- |
@@ -201,7 +201,7 @@ entry.
 
 ### dark-256
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # style        | workspace  | arguments                   | keys         | look for          | foreground? | background? | contrast? |
 | -------------- | ---------- | --------------------------- | ------------ | ----------------- | ----------- | ----------- | --------- |
@@ -226,7 +226,7 @@ entry.
 
 ### light-256
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # style        | workspace  | arguments                    | keys         | look for          | foreground? | background? | contrast? |
 | -------------- | ---------- | ---------------------------- | ------------ | ----------------- | ----------- | ----------- | --------- |

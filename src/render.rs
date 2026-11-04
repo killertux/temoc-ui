@@ -2,10 +2,11 @@
 
 use crate::run::TableResult;
 use crate::temoc::{self, Failure, RunResult, TestFile};
+use crate::theme::Theme;
 use markdown::ParseOptions;
 use markdown::mdast::{AlignKind, List, Node, Table};
 use markdown::unist::Position;
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use std::collections::HashMap;
 use std::mem;
@@ -13,10 +14,6 @@ use std::ops::Range;
 
 /// Wide enough that a preview is never wrapped.
 const PREVIEW_WIDTH: usize = 200;
-/// How a real failure stands out.
-const FAILED: Color = Color::Red;
-/// How a snoozed failure stands out.
-const SNOOZED: Color = Color::Yellow;
 
 /// How a piece of text is emphasized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -53,26 +50,26 @@ impl Look {
         }
     }
 
-    fn style(self) -> Style {
+    fn style(self, theme: Theme) -> Style {
         let style = Style::new();
         match self {
             Self::Plain => style,
             Self::Heading(1) => style
-                .fg(Color::Cyan)
+                .fg(theme.heading)
                 .add_modifier(Modifier::BOLD | Modifier::UNDERLINED),
-            Self::Heading(_) => style.fg(Color::Cyan).add_modifier(Modifier::BOLD),
+            Self::Heading(_) => style.fg(theme.heading).add_modifier(Modifier::BOLD),
             Self::Bold => style.add_modifier(Modifier::BOLD),
             Self::Italic => style.add_modifier(Modifier::ITALIC),
             Self::Struck => style.add_modifier(Modifier::CROSSED_OUT),
-            Self::Code => style.fg(Color::Yellow),
+            Self::Code => style.fg(theme.code),
             Self::Link(_) | Self::Footnote => {
-                style.fg(Color::Blue).add_modifier(Modifier::UNDERLINED)
+                style.fg(theme.link).add_modifier(Modifier::UNDERLINED)
             }
-            Self::Quote => style.fg(Color::Gray),
-            Self::Marker => style.fg(Color::Cyan),
-            Self::Verdict(RunResult::Passed) => style.fg(Color::Green),
-            Self::Verdict(RunResult::Snoozed) => style.fg(SNOOZED),
-            Self::Verdict(_) => style.fg(FAILED).add_modifier(Modifier::BOLD),
+            Self::Quote | Self::Marker => style.fg(theme.quote),
+            Self::Verdict(result @ (RunResult::Passed | RunResult::Snoozed)) => {
+                style.fg(theme.result(result))
+            }
+            Self::Verdict(result) => style.fg(theme.result(result)).add_modifier(Modifier::BOLD),
         }
     }
 
@@ -152,6 +149,17 @@ pub struct Heading {
     pub anchor: String,
     /// The line of the markdown it starts on.
     pub line: usize,
+}
+
+/// What stands out on a page.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct Marks<'page> {
+    /// The focused link.
+    pub link: Option<&'page Link>,
+    /// A whole row, such as the header of the focused table.
+    pub row: Option<usize>,
+    /// The selected text.
+    pub selection: Option<(Spot, Spot)>,
 }
 
 /// A character of the laid out text.
@@ -327,7 +335,7 @@ pub struct Rendered {
     /// starts on.
     blocks: HashMap<usize, Range<usize>>,
     /// The color of each row that holds a failure.
-    failing: HashMap<usize, Color>,
+    failing: HashMap<usize, RunResult>,
     links: Vec<Link>,
 }
 
@@ -545,19 +553,22 @@ impl Rendered {
         rows.join("\n")
     }
 
-    /// The rows from `top` on that fit in `height`, scrolled sideways by `left`,
-    /// with a link, a whole row and a span of text highlighted.
+    /// The rows from `top` on that fit in `height`, scrolled sideways by `left`.
     #[must_use]
     pub fn lines(
         &self,
+        theme: Theme,
         top: usize,
         height: usize,
         left: usize,
-        focused: Option<&Link>,
-        focused_row: Option<usize>,
-        selection: Option<(Spot, Spot)>,
+        marks: Marks<'_>,
     ) -> Vec<Line<'static>> {
-        let focused = focused.map(|link| Look::Link(link.id));
+        let Marks {
+            link,
+            row: focused_row,
+            selection,
+        } = marks;
+        let focused = link.map(|link| Look::Link(link.id));
         self.rows
             .iter()
             .enumerate()
@@ -567,7 +578,7 @@ impl Rendered {
                 let row_style = self
                     .failing
                     .get(&index)
-                    .map_or_else(Style::new, |color| Style::new().fg(*color));
+                    .map_or_else(Style::new, |result| Style::new().fg(theme.result(*result)));
                 let row_style = if Some(index) == focused_row {
                     row_style.add_modifier(Modifier::REVERSED)
                 } else {
@@ -580,7 +591,7 @@ impl Rendered {
                 cut_to_screen(marked.as_deref().unwrap_or(row), left, self.width)
                     .into_iter()
                     .map(|piece| {
-                        let style = piece.look.style().patch(row_style);
+                        let style = piece.look.style(theme).patch(row_style);
                         let style = if Some(piece.look) == focused || piece.selected {
                             style.add_modifier(Modifier::REVERSED)
                         } else {
@@ -804,16 +815,16 @@ fn line_of(node: &Node) -> usize {
 
 /// The rows of a table, drawn from row `start`, that hold a failure. Every row
 /// of a table takes one row on screen, and a rule follows the first.
-fn failing_rows(table: &Node, start: usize, failures: &[Failure]) -> Vec<(usize, Color)> {
+fn failing_rows(table: &Node, start: usize, failures: &[Failure]) -> Vec<(usize, RunResult)> {
     let rows = children(table).iter().enumerate();
     rows.filter_map(|(index, row)| {
         let line = line_of(row);
         let failure = failures.iter().find(|failure| failure.line == Some(line))?;
-        let color = match failure.snoozed_until {
-            Some(_) => SNOOZED,
-            None => FAILED,
+        let result = match failure.snoozed_until {
+            Some(_) => RunResult::Snoozed,
+            None => RunResult::Failed,
         };
-        Some((start + index + usize::from(index > 0), color))
+        Some((start + index + usize::from(index > 0), result))
     })
     .collect()
 }
@@ -1196,12 +1207,20 @@ fn trailing_spaces(word: &[Piece]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use ratatui::style::Color;
+
+    fn selected(selection: (Spot, Spot)) -> Marks<'static> {
+        Marks {
+            selection: Some(selection),
+            ..Marks::default()
+        }
+    }
 
     fn screen(markdown: &str, width: u16) -> Vec<String> {
         Document::parse(markdown)
             .unwrap()
             .render(width, &HashMap::new())
-            .lines(0, usize::MAX, 0, None, None, None)
+            .lines(Theme::DARK, 0, usize::MAX, 0, Marks::default())
             .iter()
             .map(ToString::to_string)
             .collect()
@@ -1235,7 +1254,7 @@ mod tests {
         let rendered = Document::parse("**aa**bbbb")
             .unwrap()
             .render(3, &HashMap::new());
-        let lines = rendered.lines(0, 2, 0, None, None, None);
+        let lines = rendered.lines(Theme::DARK, 0, 2, 0, Marks::default());
         let spans: Vec<Vec<String>> = lines
             .iter()
             .map(|line| line.spans.iter().map(ToString::to_string).collect())
@@ -1416,7 +1435,11 @@ mod tests {
         let rendered = Document::parse("[a](1.md) [b](2.md)")
             .unwrap()
             .render(20, &HashMap::new());
-        let lines = rendered.lines(0, 1, 0, rendered.links().get(1), None, None);
+        let marks = Marks {
+            link: rendered.links().get(1),
+            ..Marks::default()
+        };
+        let lines = rendered.lines(Theme::DARK, 0, 1, 0, marks);
         let reversed: Vec<String> = lines
             .iter()
             .flat_map(|line| &line.spans)
@@ -1430,7 +1453,7 @@ mod tests {
         Document::parse(markdown)
             .unwrap()
             .render(width, &HashMap::new())
-            .lines(0, usize::MAX, left, None, None, None)
+            .lines(Theme::DARK, 0, usize::MAX, left, Marks::default())
             .iter()
             .map(ToString::to_string)
             .collect()
@@ -1479,14 +1502,14 @@ mod tests {
         let rendered = Document::parse("| a |\n| - |\n| `bbbbbbbb` |\n")
             .unwrap()
             .render(5, &HashMap::new());
-        let lines = rendered.lines(2, 1, 2, None, None, None);
+        let lines = rendered.lines(Theme::DARK, 2, 1, 2, Marks::default());
         let colors: Vec<Option<Color>> = lines
             .iter()
             .flat_map(|line| &line.spans)
             .filter(|span| span.content.contains('b'))
             .map(|span| span.style.fg)
             .collect();
-        assert_eq!(colors, [Some(Color::Yellow)]);
+        assert_eq!(colors, [Some(Theme::DARK.code)]);
     }
 
     #[test]
@@ -1533,7 +1556,7 @@ mod tests {
         let document = Document::parse(&markdown).unwrap();
         let rendered = document.render(20, &HashMap::new());
         assert_eq!(rendered.link_at(0, 15, 0), None);
-        let line = rendered.lines(0, 1, 16, None, None, None);
+        let line = rendered.lines(Theme::DARK, 0, 1, 16, Marks::default());
         let text = line.first().map(ToString::to_string).unwrap_or_default();
         let column = text.chars().position(|c| c == 'f').unwrap();
         assert_eq!(rendered.link_at(0, column, 16), Some(0));
@@ -1680,7 +1703,7 @@ mod tests {
     }
 
     fn reversed_text(rendered: &Rendered, selection: (Spot, Spot)) -> Vec<String> {
-        let lines = rendered.lines(0, 10, 0, None, None, Some(selection));
+        let lines = rendered.lines(Theme::DARK, 0, 10, 0, selected(selection));
         lines
             .iter()
             .map(|line| {
@@ -1705,7 +1728,7 @@ mod tests {
     #[test]
     fn a_selection_keeps_the_look_of_what_it_covers() {
         let rendered = rendered("ab **cd**", 40);
-        let lines = rendered.lines(0, 1, 0, None, None, Some((spot(0, 3), spot(0, 3))));
+        let lines = rendered.lines(Theme::DARK, 0, 1, 0, selected((spot(0, 3), spot(0, 3))));
         let spans = lines.first().map_or(&[][..], |line| line.spans.as_slice());
         let span = spans.iter().find(|span| span.content == "c").unwrap();
         assert!(span.style.add_modifier.contains(Modifier::BOLD));
@@ -1714,8 +1737,8 @@ mod tests {
     #[test]
     fn a_selection_in_a_scrolled_block_moves_with_it() {
         let rendered = rendered("```\n0123456789012345\n```", 10);
-        let selection = Some((spot(0, 8), spot(0, 9)));
-        let lines = rendered.lines(0, 1, 6, None, None, selection);
+        let selection = selected((spot(0, 8), spot(0, 9)));
+        let lines = rendered.lines(Theme::DARK, 0, 1, 6, selection);
         let spans = lines.first().map_or(&[][..], |line| line.spans.as_slice());
         let selected: String = spans
             .iter()
@@ -1743,7 +1766,7 @@ mod tests {
     const TABLE_THEN_MORE: &str = "| a |\n| - |\n| 1 |\n| 2 |\n\n[next](a.md)\n\n## After\n";
 
     fn shown(rendered: &Rendered) -> Vec<String> {
-        let lines = rendered.lines(0, usize::MAX, 0, None, None, None);
+        let lines = rendered.lines(Theme::DARK, 0, usize::MAX, 0, Marks::default());
         lines.iter().map(ToString::to_string).collect()
     }
 
@@ -1796,7 +1819,7 @@ mod tests {
     }
 
     fn row_color(rendered: &Rendered, row: usize) -> Option<Color> {
-        let lines = rendered.lines(row, 1, 0, None, None, None);
+        let lines = rendered.lines(Theme::DARK, row, 1, 0, Marks::default());
         lines.first()?.spans.first()?.style.fg
     }
 
@@ -1806,7 +1829,7 @@ mod tests {
         let result = failed_at(4, false);
         let rendered = document.render(40, &HashMap::from([(1, &result)]));
         assert_eq!(row_color(&rendered, 2), None);
-        assert_eq!(row_color(&rendered, 3), Some(FAILED));
+        assert_eq!(row_color(&rendered, 3), Some(Theme::DARK.failed));
     }
 
     #[test]
@@ -1814,7 +1837,7 @@ mod tests {
         let document = Document::parse(TABLE_THEN_MORE).unwrap();
         let result = failed_at(1, true);
         let rendered = document.render(40, &HashMap::from([(1, &result)]));
-        assert_eq!(row_color(&rendered, 0), Some(SNOOZED));
+        assert_eq!(row_color(&rendered, 0), Some(Theme::DARK.snoozed));
     }
 
     #[test]
@@ -1829,7 +1852,11 @@ mod tests {
     fn the_focused_row_is_reversed_whole() {
         let document = Document::parse("| a | b |\n| - | - |\n| 1 | 2 |\n").unwrap();
         let rendered = document.render(40, &HashMap::new());
-        let lines = rendered.lines(0, 1, 0, None, Some(0), None);
+        let marks = Marks {
+            row: Some(0),
+            ..Marks::default()
+        };
+        let lines = rendered.lines(Theme::DARK, 0, 1, 0, marks);
         let spans = lines.first().map_or(&[][..], |line| line.spans.as_slice());
         assert_ne!(spans.len(), 0);
         for span in spans {

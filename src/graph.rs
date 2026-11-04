@@ -3,14 +3,15 @@
 mod drawing;
 
 use crate::render::Document;
+use crate::theme::Theme;
 use crate::workspace;
 use drawing::{Drawing, ROW_STEP};
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
 use ratatui::layout::{Constraint, Layout, Position, Rect};
-use ratatui::style::{Color, Modifier, Style};
+use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
-use ratatui::widgets::{Block, Paragraph};
+use ratatui::widgets::Paragraph;
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::fs;
 use std::path::Path;
@@ -407,7 +408,7 @@ impl Graph {
     }
 
     /// Draws the graph and the panel below it, and adapts to their size.
-    pub fn draw(&mut self, frame: &mut Frame, area: Rect) {
+    pub fn draw(&mut self, frame: &mut Frame, area: Rect, theme: Theme) {
         let panel_height = PANEL_HEIGHT.min(area.height / 2);
         let [graph, panel] =
             Layout::vertical([Constraint::Min(0), Constraint::Length(panel_height)]).areas(area);
@@ -417,13 +418,13 @@ impl Graph {
         }
         self.top = self.top.min(self.last_top());
         self.left = self.left.min(self.last_left());
-        self.draw_lines(frame.buffer_mut());
+        self.draw_lines(frame.buffer_mut(), theme);
         self.draw_names(frame.buffer_mut());
-        self.draw_panel(frame, panel);
+        self.draw_panel(frame, panel, theme);
     }
 
     /// Draws the lines, with those of the selected file highlighted.
-    fn draw_lines(&self, buffer: &mut Buffer) {
+    fn draw_lines(&self, buffer: &mut Buffer, theme: Theme) {
         let lit = self
             .selected_position()
             .map_or_else(HashSet::new, |file| self.drawing.touching(file));
@@ -436,9 +437,11 @@ impl Graph {
                     && let Some(cell) = buffer.cell_mut((area.x + x, area.y + y))
                 {
                     cell.set_char(ink.symbol());
-                    if lit.contains(&point) {
-                        cell.set_style(lit_style());
-                    }
+                    cell.set_style(if lit.contains(&point) {
+                        theme.lit_graph_line()
+                    } else {
+                        theme.graph_line()
+                    });
                 }
             }
         }
@@ -470,9 +473,9 @@ impl Graph {
         }
     }
 
-    fn draw_panel(&self, frame: &mut Frame, area: Rect) {
+    fn draw_panel(&self, frame: &mut Frame, area: Rect, theme: Theme) {
         let file = self.selected_position();
-        let block = Block::bordered().title(self.chosen_file().unwrap_or("No files").to_owned());
+        let block = theme.frame(self.chosen_file().unwrap_or("No files").to_owned());
         let inside = block.inner(area);
         frame.render_widget(block, area);
         let [links_out, links_in] =
@@ -490,11 +493,6 @@ impl Graph {
         frame.render_widget(list("Links out", out, links_out), links_out);
         frame.render_widget(list("Links in", into, links_in), links_in);
     }
-}
-
-/// How the lines of the selected file are drawn.
-fn lit_style() -> Style {
-    Style::new().fg(Color::Cyan).add_modifier(Modifier::BOLD)
 }
 
 fn spot_of(columns: &[Vec<usize>], file: usize) -> Option<(usize, usize)> {
@@ -545,7 +543,7 @@ mod tests {
     fn draw(graph: &mut Graph, width: u16, height: u16) -> Buffer {
         let mut terminal = Terminal::new(TestBackend::new(width, height)).unwrap();
         terminal
-            .draw(|frame| graph.draw(frame, frame.area()))
+            .draw(|frame| graph.draw(frame, frame.area(), Theme::DARK))
             .unwrap();
         terminal.backend().buffer().clone()
     }
@@ -698,9 +696,9 @@ mod tests {
             buffer.cell((x, y)).unwrap().clone()
         };
         assert_eq!(arrow(0).symbol(), "▶");
-        assert_eq!(arrow(0).fg, Color::Cyan);
+        assert_eq!(arrow(0).fg, Theme::DARK.heading);
         assert_eq!(arrow(2).symbol(), "▶");
-        assert_eq!(arrow(2).fg, Color::Reset);
+        assert_eq!(arrow(2).fg, Theme::DARK.line);
     }
 
     #[test]

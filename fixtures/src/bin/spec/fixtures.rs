@@ -1,13 +1,16 @@
 //! The fixtures used by the pages in `spec/`.
 
 use crate::clipboard;
-use crate::session::{Outcome, Session};
+use crate::screen;
+use crate::session::{FakeTerminal, Outcome, Session};
+use ratatui::style::Color;
 use rust_slim::fixture;
 use std::path::Path;
 use temoc_ui::app::AppState;
 use temoc_ui::graph::GraphState;
 use temoc_ui::render::{self, Preview};
 use temoc_ui::temoc::{self, RunReport, TestFile};
+use temoc_ui::theme::Rgb;
 
 const NONE: &str = "none";
 
@@ -17,6 +20,13 @@ fn yes_no(value: bool) -> String {
 
 fn or_none(value: Option<String>) -> String {
     value.unwrap_or_else(|| NONE.into())
+}
+
+/// A colour written like `#16181D`. Anything else is no colour.
+fn hex_color(text: &str) -> Option<Rgb> {
+    let digits = text.strip_prefix('#')?;
+    let channel = |range| u8::from_str_radix(digits.get(range)?, 16).ok();
+    Some(Rgb(channel(0..2)?, channel(2..4)?, channel(4..6)?))
 }
 
 fn list(items: &[String], separator: &str) -> String {
@@ -34,6 +44,8 @@ pub struct Tui {
     arguments: String,
     keys: String,
     look_for: String,
+    color_term: String,
+    terminal_background: String,
     outcome: Option<Outcome>,
 }
 
@@ -65,8 +77,57 @@ impl Tui {
         self.look_for = look_for;
     }
 
+    pub fn set_color_term(&mut self, color_term: String) {
+        self.color_term = color_term;
+    }
+
+    pub fn set_terminal_background(&mut self, terminal_background: String) {
+        self.terminal_background = terminal_background;
+    }
+
     pub fn execute(&mut self) {
-        self.outcome = Some(Outcome::of(&self.workspace, &self.arguments, &self.keys));
+        let terminal = FakeTerminal {
+            color_term: Some(self.color_term.clone()).filter(|term| !term.is_empty()),
+            background: hex_color(&self.terminal_background),
+        };
+        self.outcome = Some(Outcome::of(
+            &self.workspace,
+            &self.arguments,
+            &self.keys,
+            terminal,
+        ));
+    }
+
+    #[must_use]
+    pub fn theme(&self) -> String {
+        self.read_state(|state| state.theme.name.to_owned())
+    }
+
+    #[must_use]
+    pub fn foreground(&self) -> String {
+        self.read_colors(|(foreground, _)| screen::color_name(foreground))
+    }
+
+    #[must_use]
+    pub fn background(&self) -> String {
+        self.read_colors(|(_, background)| screen::color_name(background))
+    }
+
+    #[must_use]
+    pub fn contrast(&self) -> String {
+        self.read_colors(|(foreground, background)| {
+            or_none(screen::contrast(foreground, background))
+        })
+    }
+
+    #[must_use]
+    pub fn bar_against_page(&self) -> String {
+        self.read_session(|session| or_none(session.bar_against_page()))
+    }
+
+    #[must_use]
+    pub fn unpainted_cells(&self) -> String {
+        self.read_session(|session| session.unpainted_cells().to_string())
     }
 
     #[must_use]
@@ -262,6 +323,14 @@ impl Tui {
             Some(Outcome::Broken(problem)) => problem.clone(),
             Some(Outcome::Finished(session)) => read(session),
         }
+    }
+
+    fn read_colors(&self, read: impl FnOnce((Color, Color)) -> String) -> String {
+        self.read_session(|session| {
+            session
+                .colors(&self.look_for)
+                .map_or_else(|problem| problem, read)
+        })
     }
 
     /// Reads the application's state. temoc-ui refusing to open is a valid

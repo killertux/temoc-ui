@@ -9,6 +9,7 @@ use std::process::ExitCode;
 use std::time::Duration;
 use temoc_ui::NotImplemented;
 use temoc_ui::app::{App, Launch};
+use temoc_ui::terminal;
 
 /// How often background work is picked up while no input arrives.
 const TICK: Duration = Duration::from_millis(100);
@@ -24,10 +25,15 @@ fn main() -> ExitCode {
 }
 
 fn run() -> Result<(), String> {
+    let arguments: Vec<String> = env::args().skip(1).collect();
+    // There is no need to bother the terminal when the theme is already chosen.
+    let chosen = arguments.iter().any(|argument| argument == "--theme");
     let launch = Launch {
         current_dir: env::current_dir().map_err(|error| error.to_string())?,
-        arguments: env::args().skip(1).collect(),
+        arguments,
         extra_path: Vec::new(),
+        color_term: env::var_os("COLORTERM").map(|term| term.to_string_lossy().into_owned()),
+        background: if chosen { None } else { terminal::background() },
     };
     let mut app = App::start(&launch)?;
     let mut terminal = ratatui::try_init().map_err(|error| error.to_string())?;

@@ -8,11 +8,13 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
+use ratatui::style::Color;
 use std::env;
 use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use temoc_ui::app::{App, AppState, Launch};
+use temoc_ui::theme::Rgb;
 
 const WIDTH: u16 = 80;
 const HEIGHT: u16 = 24;
@@ -40,13 +42,22 @@ pub struct Session {
     output: Vec<u8>,
 }
 
+/// What the pretend terminal says about itself.
+#[derive(Default)]
+pub struct FakeTerminal {
+    pub color_term: Option<String>,
+    pub background: Option<Rgb>,
+}
+
 impl Outcome {
     /// Starts temoc-ui in a sample workspace and presses the keys.
-    pub fn of(workspace: &str, arguments: &str, keys: &str) -> Self {
+    pub fn of(workspace: &str, arguments: &str, keys: &str, terminal: FakeTerminal) -> Self {
         let launch = Launch {
             current_dir: samples().join(workspace),
             arguments: arguments.split_whitespace().map(String::from).collect(),
             extra_path: example_binaries().into_iter().collect(),
+            color_term: terminal.color_term,
+            background: terminal.background,
         };
         match App::start(&launch) {
             Err(message) => Self::Refused(message),
@@ -177,7 +188,25 @@ impl Session {
     /// How `text` is highlighted on screen.
     pub fn highlight(&self, text: &str) -> Result<&'static str, String> {
         let found = self.locate(text)?;
-        Ok(screen::highlight(self.buffer(), found))
+        Ok(screen::highlight(self.buffer(), found, self.state().theme))
+    }
+
+    /// The foreground and background at `text` on screen.
+    pub fn colors(&self, text: &str) -> Result<(Color, Color), String> {
+        let found = self.locate(text)?;
+        screen::colors(self.buffer(), found.first).ok_or_else(|| format!("`{text}` has no cell"))
+    }
+
+    /// The contrast between the status bar and the page.
+    pub fn bar_against_page(&self) -> Option<String> {
+        let (_, page) = screen::colors(self.buffer(), (0, 0))?;
+        let (_, bar) = screen::colors(self.buffer(), (WIDTH - 1, HEIGHT - 1))?;
+        screen::contrast(bar, page)
+    }
+
+    /// How many cells are left to the terminal's default colours.
+    pub fn unpainted_cells(&self) -> usize {
+        screen::unpainted(self.buffer())
     }
 
     /// Whether `text` is inside `area` of the screen.

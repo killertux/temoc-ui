@@ -43,6 +43,7 @@ temoc-ui              # the current folder
 temoc-ui docs/        # another folder
 temoc-ui docs/api.md  # one page
 temoc-ui --config ci/temoc.toml  # with a temoc configuration file
+temoc-ui --theme light           # with a theme
 ```
 
 temoc-ui opens the folder's `README.md`. If there isn't one, search opens so that
@@ -76,6 +77,7 @@ cargo run -- samples/docs
 | `/`                           | Open search                           |
 | `t`                           | Open the file tree                    |
 | `Ctrl-g`                      | Open the graph of links               |
+| `T`                           | Swap between dark and light           |
 | `v`                           | Start selecting text                  |
 | `?`                           | Show or hide help                     |
 | `q`, `Ctrl-c`                 | Quit                                  |
@@ -111,6 +113,12 @@ the wheel to scroll.
 `?` lists the keys, from anywhere but search, and `?` or `Esc` hides the list. If it
 does not fit on the screen, `j`, `k`, the arrow keys and the wheel scroll it.
 
+There are four themes: `dark` and `light` use 24-bit colour, and `dark-256` and
+`light-256` use the 256-colour palette. temoc-ui matches your terminal, using `COLORTERM`
+to tell whether it shows 24-bit colour and asking it for its background colour. If it
+does not answer, you get a dark theme. `--theme NAME` picks one yourself, and `T` swaps
+between dark and light until you close temoc-ui.
+
 temoc-ui never opens a web browser. External links stay on the page and show their
 address in the status line.
 
@@ -142,6 +150,7 @@ temoc-ui or the file runs again.
 - Selecting and copying text
 - A graph of how the pages link together
 - A help screen listing the keys
+- Dark and light themes, in 24-bit and 256 colours
 
 **Further out**
 

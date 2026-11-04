@@ -1,8 +1,9 @@
 //! A document on screen: how far it is scrolled and what is focused.
 
-use crate::render::{Document, Link, Motion, Rendered, Spot};
+use crate::render::{Document, Link, Marks, Motion, Rendered, Spot};
 use crate::run::FileResults;
 use crate::temoc::TestTable;
+use crate::theme::Theme;
 use ratatui::layout::Size;
 use ratatui::text::Line;
 use std::collections::HashMap;
@@ -118,14 +119,17 @@ impl Page {
 
     /// The rows on screen.
     #[must_use]
-    pub fn lines(&self) -> Vec<Line<'static>> {
+    pub fn lines(&self, theme: Theme) -> Vec<Line<'static>> {
         self.rendered.lines(
+            theme,
             self.scroll,
             self.screen_height(),
             self.left,
-            self.focused_link(),
-            self.focused_table_row(),
-            self.selected_spots(),
+            Marks {
+                link: self.focused_link(),
+                row: self.focused_table_row(),
+                selection: self.selected_spots(),
+            },
         )
     }
 
@@ -392,7 +396,8 @@ mod tests {
     }
 
     fn shown(page: &Page) -> Vec<String> {
-        page.lines().iter().map(ToString::to_string).collect()
+        let lines = page.lines(Theme::default());
+        lines.iter().map(ToString::to_string).collect()
     }
 
     fn numbered(count: usize) -> String {
