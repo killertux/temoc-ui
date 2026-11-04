@@ -283,7 +283,7 @@ Not the table.
 ";
         let found = find_tests(markdown).unwrap();
         assert!(found.is_test_file);
-        assert!(found.tables.is_empty());
+        assert_eq!(found.tables, Vec::<String>::new());
     }
 
     #[test]
