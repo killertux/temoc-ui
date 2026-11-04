@@ -82,6 +82,12 @@ you type don't need to be next to each other. Use `Down` and `Up` to choose a re
 and `Enter` to open it, or `Esc` to close search. `Ctrl-t` shows only the files that
 contain temoc tests.
 
+The mouse works too. The wheel scrolls, and holding `Shift` or using a sideways wheel
+scrolls wide tables and code. Click a link to follow it, a test table to focus it, or
+a row of the file tree to open it. temoc-ui captures the mouse, so your terminal's own
+text selection needs its usual override, which is `Shift` in most terminals, until
+selecting text is built.
+
 The file tree shows the workspace's markdown files, with the open page selected. Use
 `j` and `k` or the arrow keys to move, `l` and `h` to open and close a folder, and
 `Enter` to open a file or folder. `t` or `Esc` closes it.
@@ -113,11 +119,11 @@ temoc-ui or the file runs again.
 - Finding test tables and moving between them
 - Running a whole file or a single table, and showing the results in place
 - A pop-up file tree
+- Mouse support
 
 **Coming next**
 
 - A graph of how the pages link together
-- Mouse support
 - Selecting and copying text
 - A help screen
 

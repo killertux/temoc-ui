@@ -11,7 +11,7 @@ application does this, so temoc-ui
 The wheel scrolls the document three lines at a time, stopping at either end.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action         | workspace | arguments          | keys                | look for  | visible? |
 | ---------------- | --------- | ------------------ | ------------------- | --------- | -------- |
@@ -23,7 +23,7 @@ A sideways wheel [scrolls wide tables and code blocks](navigation.md#scrolling-s
 as does holding `Shift` while turning the wheel. Each step moves the same distance
 as pressing `Left` or `Right`.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action             | workspace   | keys                                   | look for     | visible? |
 | -------------------- | ----------- | -------------------------------------- | ------------ | -------- |
@@ -38,7 +38,7 @@ Clicking a link focuses it and follows it, just like
 [pressing `Enter`](navigation.md#following-links). Dragging from a link
 [selects text](selecting-text.md) instead.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action             | workspace | keys                       | document?                | focused link?   |
 | -------------------- | --------- | -------------------------- | ------------------------ | --------------- |
@@ -51,14 +51,14 @@ Clicking a link focuses it and follows it, just like
 Links behave as they do from the keyboard, including heading anchors and links that
 cannot be opened.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action      | workspace | keys                      | document? | status?                                           |
 | ------------- | --------- | ------------------------- | --------- | ------------------------------------------------- |
 | Missing file  | docs      | `Click "Missing page"`    | README.md | Link target not found: missing.md                 |
 | External link | docs      | `Click "Temoc on GitHub"` | README.md | External link: https://github.com/killertux/temoc |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action | workspace | keys                       | document?          | look for | visible? |
 | -------- | --------- | -------------------------- | ------------------ | -------- | -------- |
@@ -70,7 +70,7 @@ Clicking a test table focuses it, so that `r`
 [runs it](../running/running-a-table.md). Clicking anything else leaves the focus
 where it was.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action             | workspace  | arguments  | keys                     | focused table? |
 | -------------------- | ---------- | ---------- | ------------------------ | -------------- |
@@ -79,7 +79,7 @@ where it was.
 | Click outside tables | calculator | passing.md | `] Click "Passing Tests"` | Multiplication |
 | Page without tables  | docs       |            | `Click "Welcome"`        | none           |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action           | workspace  | arguments  | keys             | temoc arguments?               |
 | ------------------ | ---------- | ---------- | ---------------- | ------------------------------ |
@@ -91,7 +91,7 @@ In the [file tree](file-tree.md), clicking a file opens it, and clicking a folde
 opens or closes it. Clicking outside the pop-up closes it without doing anything
 else. The wheel scrolls the tree and leaves the document behind it alone.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action           | workspace | keys                                  | document?                | tree open? | tree?                                                                        |
 | ------------------ | --------- | ------------------------------------- | ------------------------ | ---------- | ---------------------------------------------------------------------------- |
@@ -104,7 +104,7 @@ else. The wheel scrolls the tree and leaves the document behind it alone.
 The [`many-pages`](../../samples/many-pages/README.md) sample has more files than
 the pop-up can show.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action                | workspace  | arguments          | keys                  | look for   | visible? | tree selection? |
 | ----------------------- | ---------- | ------------------ | --------------------- | ---------- | -------- | --------------- |
@@ -112,7 +112,7 @@ the pop-up can show.
 | Wheel scrolls the tree  | many-pages | page-02.md         | `t WheelDown`         | page-01.md | no       | page-02.md      |
 | Wheel scrolls back      | many-pages | page-02.md         | `t WheelDown WheelUp` | page-01.md | yes      | page-02.md      |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action                 | workspace | arguments          | keys            | look for  | visible? |
 | ------------------------ | --------- | ------------------ | --------------- | --------- | -------- |

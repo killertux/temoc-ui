@@ -44,6 +44,9 @@ pub struct FileTree {
     selected: usize,
     /// The first row on screen.
     top: usize,
+    /// Whether the rows on screen follow the selection. The wheel lets the
+    /// selection go off screen, until it next moves.
+    follow: bool,
 }
 
 impl FileTree {
@@ -67,6 +70,7 @@ impl FileTree {
             rows,
             selected,
             top: 0,
+            follow: true,
         }
     }
 
@@ -99,11 +103,37 @@ impl FileTree {
     pub fn choose_next(&mut self) {
         let last = self.rows.len().saturating_sub(1);
         self.selected = self.selected.saturating_add(1).min(last);
+        self.follow = true;
     }
 
     /// Selects the previous row, stopping at the first one.
     pub fn choose_previous(&mut self) {
         self.selected = self.selected.saturating_sub(1);
+        self.follow = true;
+    }
+
+    /// Selects a row by how far it is below the first one on screen. Says
+    /// whether there is a row there.
+    pub fn select_shown(&mut self, offset: usize) -> bool {
+        let index = self.top.saturating_add(offset);
+        let exists = index < self.rows.len();
+        if exists {
+            self.selected = index;
+            self.follow = true;
+        }
+        exists
+    }
+
+    /// Scrolls down, leaving the selection where it is.
+    pub fn scroll_down(&mut self, rows: usize) {
+        self.top = self.top.saturating_add(rows);
+        self.follow = false;
+    }
+
+    /// Scrolls up, leaving the selection where it is.
+    pub fn scroll_up(&mut self, rows: usize) {
+        self.top = self.top.saturating_sub(rows);
+        self.follow = false;
     }
 
     /// Opens the selected folder.
@@ -122,17 +152,26 @@ impl FileTree {
         }
     }
 
+    /// Opens the selected folder if it is closed, and closes it if it is open.
+    pub fn toggle_folder(&mut self) {
+        match self.selection().map(|row| row.kind) {
+            Some(Kind::Folder { open: true }) => self.close_folder(),
+            Some(Kind::Folder { open: false }) => self.open_folder(),
+            _ => {}
+        }
+    }
+
     fn selected_folder(&self) -> Option<String> {
         let row = self.selection()?;
         matches!(row.kind, Kind::Folder { .. }).then(|| row.path.clone())
     }
 
     /// The first row to show when `room` rows fit, moving as little as possible
-    /// to keep the selection on screen.
+    /// to keep the selection on screen unless the wheel took it away.
     pub fn first_shown(&mut self, room: usize) -> usize {
-        if self.selected < self.top {
+        if self.follow && self.selected < self.top {
             self.top = self.selected;
-        } else if self.selected >= self.top.saturating_add(room) {
+        } else if self.follow && self.selected >= self.top.saturating_add(room) {
             self.top = self.selected.saturating_add(1).saturating_sub(room);
         }
         self.top = self.top.min(self.rows.len().saturating_sub(room));
@@ -344,6 +383,56 @@ mod tests {
             tree.choose_previous();
         }
         assert_eq!(tree.first_shown(3), 1);
+    }
+
+    #[test]
+    fn the_wheel_can_leave_the_selection_behind_until_it_moves() {
+        let mut tree = numbered(10);
+        tree.first_shown(3);
+        tree.scroll_down(3);
+        assert_eq!(tree.first_shown(3), 3);
+        assert_eq!(tree.selected(), 0);
+        tree.choose_next();
+        assert_eq!(tree.first_shown(3), 1);
+    }
+
+    #[test]
+    fn the_wheel_stops_at_both_ends() {
+        let mut tree = numbered(10);
+        tree.scroll_up(3);
+        assert_eq!(tree.first_shown(3), 0);
+        tree.scroll_down(100);
+        assert_eq!(tree.first_shown(3), 7);
+    }
+
+    #[test]
+    fn a_row_is_selected_by_its_place_on_screen() {
+        let mut tree = numbered(10);
+        tree.scroll_down(3);
+        tree.first_shown(3);
+        assert!(tree.select_shown(1));
+        assert_eq!(tree.chosen_file(), Some("14.md"));
+    }
+
+    #[test]
+    fn below_the_last_row_nothing_is_selected() {
+        let mut tree = numbered(2);
+        assert!(!tree.select_shown(2));
+        assert_eq!(tree.selected(), 0);
+    }
+
+    #[test]
+    fn toggling_opens_and_closes_only_folders() {
+        let mut tree = tree(&NESTED, None);
+        tree.toggle_folder();
+        assert_eq!(labels(&tree).first().map(String::as_str), Some("▾ a"));
+        tree.toggle_folder();
+        assert_eq!(labels(&tree).first().map(String::as_str), Some("▸ a"));
+        tree.choose_next();
+        tree.choose_next();
+        let before = labels(&tree);
+        tree.toggle_folder();
+        assert_eq!(labels(&tree), before);
     }
 
     #[test]

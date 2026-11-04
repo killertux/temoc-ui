@@ -183,6 +183,27 @@ impl Page {
         }
     }
 
+    /// Reacts to a click on the screen. A test table there gets the focus, and
+    /// so does a link. Says whether a link was clicked.
+    pub fn click(&mut self, column: u16, row: u16) -> bool {
+        if row >= self.size.height {
+            return false;
+        }
+        let row = self.scroll.saturating_add(usize::from(row));
+        let holds_row = |table: &TestTable| {
+            let rows = self.rendered.rows_of_line(table.line);
+            rows.is_some_and(|rows| rows.contains(&row))
+        };
+        if let Some(index) = self.tables.iter().position(holds_row) {
+            self.focused_table = Some(index);
+        }
+        let link = self.rendered.link_at(row, usize::from(column), self.left);
+        if let Some(index) = link {
+            self.focus_link(index);
+        }
+        link.is_some()
+    }
+
     /// The focused link.
     #[must_use]
     pub fn focused_link(&self) -> Option<&Link> {
@@ -410,6 +431,65 @@ mod tests {
         page.scroll_right();
         page.next_link();
         assert_eq!(page.left, 8);
+    }
+
+    const TWO_TABLES: &str = "\
+[//]: # \"decisionTable A\"
+
+| a |
+| - |
+| 1 |
+
+Between.
+
+[//]: # \"decisionTable B\"
+
+| b |
+| - |
+| 2 |
+";
+
+    fn focused_table(page: &Page) -> Option<&str> {
+        page.focused_table().map(|table| table.name.as_str())
+    }
+
+    #[test]
+    fn clicking_a_table_focuses_it_without_moving_the_page() {
+        let mut page = page(TWO_TABLES, 20, 4);
+        page.scroll_down(1);
+        let top = page.scroll;
+        assert!(!page.click(0, 3));
+        assert_eq!(focused_table(&page), Some("A"));
+        page.scroll_down(4);
+        let scroll = page.scroll;
+        assert!(!page.click(0, 2));
+        assert_eq!(focused_table(&page), Some("B"));
+        assert_eq!(page.scroll, scroll);
+        assert_ne!(top, scroll);
+    }
+
+    #[test]
+    fn clicking_between_tables_leaves_the_focus() {
+        let mut page = page(TWO_TABLES, 20, 20);
+        page.next_table();
+        page.click(0, 4);
+        assert_eq!(focused_table(&page), Some("B"));
+    }
+
+    #[test]
+    fn clicking_a_link_in_a_scrolled_page_finds_it() {
+        let markdown = format!("{}\n\n[link](1.md)", numbered(5));
+        let mut page = page(&markdown, 20, 3);
+        page.bottom();
+        assert!(page.click(1, 2));
+        assert_eq!(page.focused_link().map(|l| l.text.as_str()), Some("link"));
+    }
+
+    #[test]
+    fn a_click_below_the_page_hits_nothing() {
+        let mut page = page("[link](1.md)", 20, 1);
+        assert!(!page.click(0, 1));
+        assert_eq!(page.focused_link(), None);
     }
 
     #[test]

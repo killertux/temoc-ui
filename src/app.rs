@@ -7,9 +7,11 @@ use crate::search::Search;
 use crate::temoc::{RunReport, RunResult, TestTable};
 use crate::tree::{FileTree, Row};
 use crate::{NotImplemented, workspace};
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
+use crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
+};
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Layout, Margin, Rect, Size};
+use ratatui::layout::{Constraint, Layout, Margin, Position, Rect, Size};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Clear, Paragraph};
@@ -22,6 +24,8 @@ use std::path::PathBuf;
 const CONFIGURATION: &str = "temoc.toml";
 /// The result of a file that has no results yet.
 const NOT_RUN: &str = "not run";
+/// How many lines one step of the mouse wheel scrolls.
+const WHEEL_STEP: usize = 3;
 
 /// How temoc-ui was started.
 #[derive(Debug, Clone, Default)]
@@ -129,6 +133,10 @@ pub struct App {
     status: Option<String>,
     /// The room for a page, as last drawn.
     page_size: Size,
+    /// The whole screen, as last drawn.
+    screen: Rect,
+    /// Where the left mouse button went down, if this can still be a click.
+    pressed: Option<Position>,
     /// The folder temoc-ui was started from.
     start_folder: PathBuf,
     /// The configuration file given with `--config`, as written.
@@ -164,6 +172,8 @@ impl App {
             only_tests: false,
             status: None,
             page_size: Size::default(),
+            screen: Rect::default(),
+            pressed: None,
             start_folder: launch.current_dir.clone(),
             config: arguments.config.map(String::from),
             extra_path: launch.extra_path.clone(),
@@ -350,8 +360,96 @@ impl App {
     pub fn handle_event(&mut self, event: &Event) -> Result<(), NotImplemented> {
         match event {
             Event::Key(key) if key.kind != KeyEventKind::Release => self.handle_key(key),
-            Event::Mouse(_) => Err(NotImplemented),
+            Event::Mouse(mouse) => {
+                self.handle_mouse(*mouse);
+                Ok(())
+            }
             _ => Ok(()),
+        }
+    }
+
+    fn handle_mouse(&mut self, mouse: MouseEvent) {
+        let spot = Position::new(mouse.column, mouse.row);
+        match mouse.kind {
+            MouseEventKind::Down(MouseButton::Left) => self.pressed = Some(spot),
+            MouseEventKind::Drag(MouseButton::Left) if self.pressed != Some(spot) => {
+                self.pressed = None;
+            }
+            MouseEventKind::Up(MouseButton::Left) if self.pressed.take() == Some(spot) => {
+                self.status = None;
+                self.click(spot);
+            }
+            kind @ (MouseEventKind::ScrollDown
+            | MouseEventKind::ScrollUp
+            | MouseEventKind::ScrollLeft
+            | MouseEventKind::ScrollRight) => {
+                self.status = None;
+                self.turn_wheel(kind, mouse.modifiers.contains(KeyModifiers::SHIFT));
+            }
+            _ => {}
+        }
+    }
+
+    fn click(&mut self, spot: Position) {
+        if self.search.is_some() {
+            return;
+        }
+        if self.tree.is_some() {
+            self.click_tree(spot);
+        } else if self
+            .page
+            .as_mut()
+            .is_some_and(|page| page.click(spot.x, spot.y))
+        {
+            let result = self.follow_focused_link();
+            self.report(result);
+        }
+    }
+
+    fn click_tree(&mut self, spot: Position) {
+        let area = pop_up_area(self.screen);
+        if !area.contains(spot) {
+            self.tree = None;
+            return;
+        }
+        let rows = area.inner(Margin::new(1, 1));
+        let Some(tree) = self.tree.as_mut().filter(|_| rows.contains(spot)) else {
+            return;
+        };
+        if !tree.select_shown(usize::from(spot.y.saturating_sub(rows.y))) {
+            return;
+        }
+        if tree.chosen_file().is_some() {
+            let result = self.open_tree_selection();
+            self.report(result);
+        } else {
+            tree.toggle_folder();
+        }
+    }
+
+    /// Holding Shift turns an upright wheel into a sideways one.
+    fn turn_wheel(&mut self, kind: MouseEventKind, shift: bool) {
+        if self.search.is_some() {
+            return;
+        }
+        if let Some(tree) = &mut self.tree {
+            match (kind, shift) {
+                (MouseEventKind::ScrollDown, false) => tree.scroll_down(WHEEL_STEP),
+                (MouseEventKind::ScrollUp, false) => tree.scroll_up(WHEEL_STEP),
+                _ => {}
+            }
+        } else if let Some(page) = &mut self.page {
+            match (kind, shift) {
+                (MouseEventKind::ScrollDown, false) => page.scroll_down(WHEEL_STEP),
+                (MouseEventKind::ScrollUp, false) => page.scroll_up(WHEEL_STEP),
+                (MouseEventKind::ScrollRight, _) | (MouseEventKind::ScrollDown, true) => {
+                    page.scroll_right();
+                }
+                (MouseEventKind::ScrollLeft, _) | (MouseEventKind::ScrollUp, true) => {
+                    page.scroll_left();
+                }
+                _ => {}
+            }
         }
     }
 
@@ -479,6 +577,12 @@ impl App {
         }
     }
 
+    /// Whether the application is still open.
+    #[must_use]
+    pub fn is_running(&self) -> bool {
+        self.running
+    }
+
     /// Whether background work, such as a test run, is still going.
     #[must_use]
     pub fn is_busy(&self) -> bool {
@@ -487,6 +591,7 @@ impl App {
 
     /// Draws the current screen, and adapts to its size.
     pub fn draw(&mut self, frame: &mut Frame) {
+        self.screen = frame.area();
         let [body, status] =
             Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(frame.area());
         self.page_size = body.as_size();
@@ -578,8 +683,8 @@ impl App {
 }
 
 /// Where a pop-up goes.
-fn pop_up_area(frame: &Frame) -> Rect {
-    frame.area().inner(Margin::new(4, 2))
+fn pop_up_area(screen: Rect) -> Rect {
+    screen.inner(Margin::new(4, 2))
 }
 
 fn highlighted(line: Line<'_>) -> Line<'_> {
@@ -587,7 +692,7 @@ fn highlighted(line: Line<'_>) -> Line<'_> {
 }
 
 fn draw_tree(tree: &mut FileTree, frame: &mut Frame) {
-    let area = pop_up_area(frame);
+    let area = pop_up_area(frame.area());
     // The border takes two rows.
     let room = usize::from(area.height).saturating_sub(2);
     let first = tree.first_shown(room);
@@ -611,7 +716,7 @@ fn draw_tree(tree: &mut FileTree, frame: &mut Frame) {
 }
 
 fn draw_search(search: &Search, frame: &mut Frame) {
-    let area = pop_up_area(frame);
+    let area = pop_up_area(frame.area());
     // The border takes two rows, and the search box another.
     let room = usize::from(area.height).saturating_sub(3);
     let first = search.selected().saturating_sub(room.saturating_sub(1));
@@ -809,6 +914,128 @@ mod tests {
                 .status
                 .is_some_and(|s| s.starts_with("Cannot read other.md: "))
         );
+    }
+
+    fn mouse(app: &mut App, kind: MouseEventKind, column: u16, row: u16) {
+        let event = Event::Mouse(MouseEvent {
+            kind,
+            column,
+            row,
+            modifiers: KeyModifiers::NONE,
+        });
+        app.handle_event(&event).unwrap();
+    }
+
+    fn click(app: &mut App, column: u16, row: u16) {
+        let button = MouseButton::Left;
+        mouse(app, MouseEventKind::Down(button), column, row);
+        mouse(app, MouseEventKind::Up(button), column, row);
+    }
+
+    fn app_on_screen(arguments: &[&str]) -> App {
+        let mut app = App::start(&launch("docs", arguments)).unwrap();
+        status_bar(&mut app);
+        app
+    }
+
+    /// Where a link of the docs README is on a 40 column screen.
+    fn link_spot(app: &App, text: &str) -> (u16, u16) {
+        let lines = app.page.as_ref().unwrap().lines();
+        let (row, column) = lines
+            .iter()
+            .enumerate()
+            .find_map(|(row, line)| Some((row, line.to_string().find(text)?)))
+            .unwrap();
+        (u16::try_from(column).unwrap(), u16::try_from(row).unwrap())
+    }
+
+    #[test]
+    fn pressing_and_releasing_in_different_spots_is_not_a_click() {
+        let mut app = app_on_screen(&[]);
+        let (column, row) = link_spot(&app, "Reference");
+        let button = MouseButton::Left;
+        mouse(&mut app, MouseEventKind::Down(button), column, row);
+        mouse(&mut app, MouseEventKind::Up(button), column + 1, row);
+        assert_eq!(app.state().document.as_deref(), Some("README.md"));
+    }
+
+    #[test]
+    fn dragging_away_and_back_is_not_a_click() {
+        let mut app = app_on_screen(&[]);
+        let (column, row) = link_spot(&app, "Reference");
+        let button = MouseButton::Left;
+        mouse(&mut app, MouseEventKind::Down(button), column, row);
+        mouse(&mut app, MouseEventKind::Drag(button), column + 1, row);
+        mouse(&mut app, MouseEventKind::Drag(button), column, row);
+        mouse(&mut app, MouseEventKind::Up(button), column, row);
+        assert_eq!(app.state().document.as_deref(), Some("README.md"));
+    }
+
+    #[test]
+    fn other_buttons_do_not_click() {
+        let mut app = app_on_screen(&[]);
+        let (column, row) = link_spot(&app, "Reference");
+        let button = MouseButton::Right;
+        mouse(&mut app, MouseEventKind::Down(button), column, row);
+        mouse(&mut app, MouseEventKind::Up(button), column, row);
+        assert_eq!(app.state().document.as_deref(), Some("README.md"));
+    }
+
+    #[test]
+    fn moving_the_mouse_leaves_the_status_alone() {
+        let mut app = app_on_screen(&[]);
+        press(&mut app, KeyCode::BackTab);
+        press(&mut app, KeyCode::BackTab);
+        press(&mut app, KeyCode::Enter);
+        mouse(&mut app, MouseEventKind::Moved, 5, 5);
+        assert!(app.state().status.is_some());
+        mouse(&mut app, MouseEventKind::ScrollDown, 5, 5);
+        assert_eq!(app.state().status, None);
+    }
+
+    #[test]
+    fn the_mouse_does_nothing_while_search_is_open() {
+        let mut app = app_on_screen(&["guide/long-page.md"]);
+        press(&mut app, KeyCode::Char('/'));
+        mouse(&mut app, MouseEventKind::ScrollDown, 0, 0);
+        click(&mut app, 0, 0);
+        assert!(app.state().search_open);
+        press(&mut app, KeyCode::Esc);
+        status_bar(&mut app);
+        assert_eq!(
+            app.page
+                .as_ref()
+                .unwrap()
+                .lines()
+                .first()
+                .map(ToString::to_string),
+            Some("Long Page".to_owned())
+        );
+    }
+
+    #[test]
+    fn clicking_the_border_of_the_tree_keeps_it_open() {
+        let mut app = app_on_screen(&[]);
+        press(&mut app, KeyCode::Char('t'));
+        status_bar(&mut app);
+        let area = pop_up_area(app.screen);
+        click(&mut app, area.x, area.y);
+        click(&mut app, area.x + 5, area.bottom() - 1);
+        let state = app.state();
+        assert!(state.tree.is_some());
+        assert_eq!(state.tree_selection.as_deref(), Some("README.md"));
+    }
+
+    #[test]
+    fn clicking_below_the_rows_of_the_tree_keeps_it_open() {
+        let mut app = app_on_screen(&[]);
+        press(&mut app, KeyCode::Char('t'));
+        status_bar(&mut app);
+        let area = pop_up_area(app.screen);
+        click(&mut app, area.x + 5, area.bottom() - 2);
+        let state = app.state();
+        assert!(state.tree.is_some());
+        assert_eq!(state.tree_selection.as_deref(), Some("README.md"));
     }
 
     #[test]

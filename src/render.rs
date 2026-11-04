@@ -300,6 +300,22 @@ impl Rendered {
         self.blocks.get(&line).cloned()
     }
 
+    /// The position among [`Self::links`] of the link at a column of a row, as
+    /// shown when scrolled sideways by `left`.
+    #[must_use]
+    pub fn link_at(&self, row: usize, column: usize, left: usize) -> Option<usize> {
+        let mut end = 0;
+        let shown = cut_to_screen(self.rows.get(row)?, left, self.width);
+        let piece = shown.iter().find(|piece| {
+            end += text_width(&piece.text);
+            column < end
+        })?;
+        let Look::Link(id) = piece.look else {
+            return None;
+        };
+        self.links.iter().position(|link| link.id == id)
+    }
+
     /// How far the page can scroll sideways.
     #[must_use]
     pub fn last_left(&self) -> usize {
@@ -1226,6 +1242,49 @@ mod tests {
             .render(4, &HashMap::new());
         assert_eq!(rendered.rows_of_line(3), Some(2..4));
         assert_eq!(rendered.rows_of_line(5), Some(5..6));
+    }
+
+    #[test]
+    fn a_link_is_found_by_where_it_is_on_screen() {
+        let document = Document::parse("see [one](1.md) and [two](2.md)").unwrap();
+        let rendered = document.render(40, &HashMap::new());
+        assert_eq!(rendered.link_at(0, 0, 0), None);
+        assert_eq!(rendered.link_at(0, 4, 0), Some(0));
+        assert_eq!(rendered.link_at(0, 6, 0), Some(0));
+        assert_eq!(rendered.link_at(0, 7, 0), None);
+        assert_eq!(rendered.link_at(0, 12, 0), Some(1));
+        assert_eq!(rendered.link_at(0, 39, 0), None);
+        assert_eq!(rendered.link_at(1, 0, 0), None);
+    }
+
+    #[test]
+    fn a_wrapped_link_is_found_on_all_of_its_rows() {
+        let document = Document::parse("[one two](1.md)").unwrap();
+        let rendered = document.render(4, &HashMap::new());
+        assert_eq!(rendered.link_at(0, 0, 0), Some(0));
+        assert_eq!(rendered.link_at(1, 0, 0), Some(0));
+    }
+
+    #[test]
+    fn a_link_in_a_scrolled_table_is_found_where_it_is_shown() {
+        let filler = "x".repeat(30);
+        let markdown = format!("| {filler} | [far](2.md) |\n| - | - |\n");
+        let document = Document::parse(&markdown).unwrap();
+        let rendered = document.render(20, &HashMap::new());
+        assert_eq!(rendered.link_at(0, 15, 0), None);
+        let line = rendered.lines(0, 1, 16, None, None);
+        let text = line.first().map(ToString::to_string).unwrap_or_default();
+        let column = text.chars().position(|c| c == 'f').unwrap();
+        assert_eq!(rendered.link_at(0, column, 16), Some(0));
+    }
+
+    #[test]
+    fn a_marker_at_the_edge_is_not_part_of_a_link() {
+        let filler = "x".repeat(30);
+        let markdown = format!("| [near](1.md) | {filler} |\n| - | - |\n");
+        let document = Document::parse(&markdown).unwrap();
+        let rendered = document.render(20, &HashMap::new());
+        assert_eq!(rendered.link_at(0, 0, 2), None);
     }
 
     fn failed_at(line: usize, snoozed: bool) -> TableResult {

@@ -1,6 +1,7 @@
 //! The temoc-ui command.
 
-use crossterm::event;
+use crossterm::event::{self, DisableMouseCapture, EnableMouseCapture};
+use crossterm::execute;
 use ratatui::DefaultTerminal;
 use std::env;
 use std::io::{self, Write};
@@ -30,13 +31,18 @@ fn run() -> Result<(), String> {
     };
     let mut app = App::start(&launch)?;
     let mut terminal = ratatui::try_init().map_err(|error| error.to_string())?;
-    let result = show(&mut app, &mut terminal);
+    let result =
+        execute!(io::stdout(), EnableMouseCapture).and_then(|()| show(&mut app, &mut terminal));
+    let released = execute!(io::stdout(), DisableMouseCapture);
     let restored = ratatui::try_restore();
-    result.and(restored).map_err(|error| error.to_string())
+    result
+        .and(released)
+        .and(restored)
+        .map_err(|error| error.to_string())
 }
 
 fn show(app: &mut App, terminal: &mut DefaultTerminal) -> io::Result<()> {
-    while app.state().running {
+    while app.is_running() {
         app.update();
         terminal.draw(|frame| app.draw(frame))?;
         let mut stdout = io::stdout();
