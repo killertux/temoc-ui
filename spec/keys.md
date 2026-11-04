@@ -42,7 +42,7 @@ quits, except in the search box, where it is typed like any other letter.
 | Help opens              | docs      | `?`   | Run the whole file | yes      |
 | Help closes             | docs      | `? ?` | Run the whole file | no       |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation            | workspace | keys       | still open? |
 | ---------------------- | --------- | ---------- | ----------- |

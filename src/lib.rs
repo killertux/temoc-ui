@@ -5,7 +5,9 @@
 //! specification's fixtures drive.
 
 pub mod app;
+pub mod page;
 pub mod render;
+pub mod search;
 pub mod temoc;
 pub mod workspace;
 

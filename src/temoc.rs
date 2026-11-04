@@ -11,8 +11,19 @@ use std::{error, fs, io};
 pub struct TestFile {
     /// Whether the file has at least one `decisionTable` directive.
     pub is_test_file: bool,
-    /// The name of each test table that can run, in document order.
-    pub tables: Vec<String>,
+    /// Each test table that can run, in document order.
+    pub tables: Vec<TestTable>,
+}
+
+/// A test table that can run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TestTable {
+    /// The nearest heading above it, or else its fixture class.
+    pub name: String,
+    /// The line of the markdown the table starts on.
+    pub line: usize,
+    /// The line of the nearest heading above it.
+    pub heading_line: Option<usize>,
 }
 
 /// Why a markdown file could not be inspected.
@@ -53,26 +64,41 @@ pub fn inspect_file(path: &Path) -> Result<TestFile, InspectError> {
 pub fn find_tests(markdown: &str) -> Result<TestFile, InspectError> {
     let root = markdown::to_mdast(markdown, &ParseOptions::gfm())
         .map_err(|message| InspectError::Parse(message.to_string()))?;
+    Ok(tests_in(&root))
+}
+
+/// Looks for temoc tests in parsed markdown. See [`find_tests`].
+#[must_use]
+pub fn tests_in(root: &Node) -> TestFile {
     let mut found = TestFile::default();
     let mut heading = None;
     let mut nodes = root.children().into_iter().flatten().peekable();
     while let Some(node) = nodes.next() {
         match node {
-            Node::Heading(_) => heading = Some(node.to_string()),
+            Node::Heading(_) => heading = Some((node.to_string(), line_of(node))),
             Node::Definition(definition) => {
                 let Some(class) = directive_class(definition) else {
                     continue;
                 };
                 found.is_test_file = true;
-                if matches!(nodes.peek(), Some(Node::Table(_))) {
-                    let name = heading.clone().unwrap_or_else(|| class.to_owned());
-                    found.tables.push(name);
+                if let Some(table @ Node::Table(_)) = nodes.peek() {
+                    found.tables.push(TestTable {
+                        name: heading
+                            .as_ref()
+                            .map_or_else(|| class.to_owned(), |(name, _)| name.clone()),
+                        line: line_of(table),
+                        heading_line: heading.as_ref().map(|(_, line)| *line),
+                    });
                 }
             }
             _ => {}
         }
     }
-    Ok(found)
+    found
+}
+
+fn line_of(node: &Node) -> usize {
+    node.position().map_or(0, |position| position.start.line)
 }
 
 /// The fixture class of a `decisionTable` directive, without the snooze or
@@ -253,7 +279,8 @@ mod tests {
     use super::*;
 
     fn tables(markdown: &str) -> Vec<String> {
-        find_tests(markdown).unwrap().tables
+        let tables = find_tests(markdown).unwrap().tables;
+        tables.into_iter().map(|table| table.name).collect()
     }
 
     #[test]
@@ -287,7 +314,7 @@ Not the table.
 ";
         let found = find_tests(markdown).unwrap();
         assert!(found.is_test_file);
-        assert_eq!(found.tables, Vec::<String>::new());
+        assert_eq!(found.tables, []);
     }
 
     #[test]
@@ -314,6 +341,19 @@ Not the table.
 | 1 |
 ";
         assert_eq!(tables(markdown), ["The sum method"]);
+    }
+
+    #[test]
+    fn a_table_knows_where_it_and_its_heading_are() {
+        let markdown = "# A\n\n[//]: # \"decisionTable B\"\n\n| a |\n| - |\n| 1 |\n";
+        assert_eq!(
+            find_tests(markdown).unwrap().tables,
+            [TestTable {
+                name: "A".into(),
+                line: 5,
+                heading_line: Some(1),
+            }]
+        );
     }
 
     #[test]

@@ -104,6 +104,72 @@ fn relative_name(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 
+/// A spot in a file of the workspace.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Place {
+    /// The file, relative to the workspace.
+    pub file: String,
+    /// The heading to scroll to.
+    pub anchor: Option<String>,
+}
+
+/// Works out where a link in `document` leads.
+///
+/// # Errors
+///
+/// Returns the message to show when the link cannot be opened.
+pub fn follow_link(workspace: &Path, document: &str, target: &str) -> Result<Place, String> {
+    if is_external(target) {
+        return Err(format!("External link: {target}"));
+    }
+    let (written, anchor) = target
+        .split_once('#')
+        .map_or((target, None), |(path, anchor)| (path, Some(anchor)));
+    let file = if written.is_empty() {
+        document.to_owned()
+    } else {
+        resolve(document, written)
+    };
+    let path = workspace.join(&file);
+    if !path.is_file() {
+        return Err(format!("Link target not found: {written}"));
+    }
+    if !is_markdown(&path) {
+        return Err(format!("Not a markdown file: {written}"));
+    }
+    Ok(Place {
+        file,
+        anchor: anchor.map(String::from),
+    })
+}
+
+/// Whether a link target starts with a URL scheme, such as `https:`.
+fn is_external(target: &str) -> bool {
+    target.split_once(':').is_some_and(|(scheme, _)| {
+        scheme.starts_with(|c: char| c.is_ascii_alphabetic())
+            && scheme
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "+-.".contains(c))
+    })
+}
+
+/// Resolves a relative path from a document. A path can lead out of the
+/// workspace, in which case it keeps the `..` that does so.
+fn resolve(document: &str, path: &str) -> String {
+    let folder = document.rsplit_once('/').map_or("", |(folder, _)| folder);
+    let mut parts: Vec<&str> = Vec::new();
+    for part in folder.split('/').chain(path.split('/')) {
+        match part {
+            "" | "." => {}
+            ".." if parts.last().is_some_and(|last| *last != "..") => {
+                parts.pop();
+            }
+            part => parts.push(part),
+        }
+    }
+    parts.join("/")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -112,6 +178,60 @@ mod tests {
         Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("samples")
             .join(name)
+    }
+
+    fn follow(document: &str, target: &str) -> Result<Place, String> {
+        follow_link(&sample("docs"), document, target)
+    }
+
+    fn place(file: &str, anchor: Option<&str>) -> Place {
+        Place {
+            file: file.into(),
+            anchor: anchor.map(String::from),
+        }
+    }
+
+    #[test]
+    fn links_are_resolved_from_the_document() {
+        assert_eq!(
+            follow("guide/long-page.md", "getting-started.md"),
+            Ok(place("guide/getting-started.md", None))
+        );
+        assert_eq!(
+            follow("guide/long-page.md", "../reference.md"),
+            Ok(place("reference.md", None))
+        );
+        assert_eq!(
+            follow("README.md", "./guide/../reference.md"),
+            Ok(place("reference.md", None))
+        );
+    }
+
+    #[test]
+    fn an_anchor_alone_stays_in_the_document() {
+        assert_eq!(
+            follow("guide/long-page.md", "#the-end"),
+            Ok(place("guide/long-page.md", Some("the-end")))
+        );
+    }
+
+    #[test]
+    fn a_link_can_lead_out_of_the_workspace() {
+        let found = follow_link(&sample("docs").join("guide"), "a.md", "../README.md");
+        assert_eq!(found, Ok(place("../README.md", None)));
+        assert_eq!(resolve("../a.md", "../b.md"), "../../b.md");
+    }
+
+    #[test]
+    fn links_that_cannot_be_opened_say_why() {
+        for (target, message) in [
+            ("missing.md#top", "Link target not found: missing.md"),
+            ("guide", "Link target not found: guide"),
+            ("data.txt", "Not a markdown file: data.txt"),
+            ("mailto:a@b.c", "External link: mailto:a@b.c"),
+        ] {
+            assert_eq!(follow("README.md", target), Err(message.to_owned()));
+        }
     }
 
     #[test]
