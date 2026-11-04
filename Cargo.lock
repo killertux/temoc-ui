@@ -1192,9 +1192,9 @@ checksum = "d6f6ff9a378485b298a5286656da665ba74413d36db0979633275d2e708145d4"
 
 [[package]]
 name = "rust_slim"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ad9be10f081abc17d84f2450dad755719599e829e4a3eb17b0e0b119b6700edb"
+checksum = "237c21d0223b07d54c9759a15c26a961a66e0f328ac070179d1b6475a4ef742b"
 dependencies = [
  "chrono",
  "convert_case 0.6.0",
@@ -1353,9 +1353,9 @@ checksum = "0c790de23124f9ab44544d7ac05d60440adc586479ce501c1d6d7da3cd8c9cf5"
 
 [[package]]
 name = "slim_protocol"
-version = "0.3.0"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "45ff6ffd3f0f09034960ca680f4dd5174d5f0dc467199864fffd6e2539c0d99f"
+checksum = "f25f54c91cbc70c5818d30cc0ae3d8f3b8b209c56152116562affb5963c0be5e"
 dependencies = [
  "thiserror 1.0.69",
  "ulid",

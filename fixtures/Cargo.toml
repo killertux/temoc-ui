@@ -8,7 +8,7 @@ publish = false
 [dependencies]
 crossterm = "0.29.0"
 ratatui = "0.30.2"
-rust_slim = { version = "0.3.0", features = ["macros"] }
+rust_slim = { version = "0.3.1", features = ["macros"] }
 temoc-ui = { path = ".." }
 
 [lints]
