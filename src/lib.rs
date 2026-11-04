@@ -10,6 +10,7 @@ pub mod render;
 pub mod run;
 pub mod search;
 pub mod temoc;
+pub mod tree;
 pub mod workspace;
 
 /// A feature described by the specification that has not been built yet.

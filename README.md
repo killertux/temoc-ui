@@ -74,12 +74,17 @@ cargo run -- samples/docs
 | `r`                           | Run the focused table                 |
 | `R`                           | Run the whole file                    |
 | `/`                           | Open search                           |
+| `t`                           | Open the file tree                    |
 | `q`, `Ctrl-c`                 | Quit                                  |
 
 Search looks through file paths and headings across the workspace, and the letters
 you type don't need to be next to each other. Use `Down` and `Up` to choose a result
 and `Enter` to open it, or `Esc` to close search. `Ctrl-t` shows only the files that
 contain temoc tests.
+
+The file tree shows the workspace's markdown files, with the open page selected. Use
+`j` and `k` or the arrow keys to move, `l` and `h` to open and close a folder, and
+`Enter` to open a file or folder. `t` or `Esc` closes it.
 
 temoc-ui never opens a web browser. External links stay on the page and show their
 address in the status line.
@@ -107,10 +112,10 @@ temoc-ui or the file runs again.
 - Searching files and headings, with a filter for test files
 - Finding test tables and moving between them
 - Running a whole file or a single table, and showing the results in place
+- A pop-up file tree
 
 **Coming next**
 
-- A pop-up file tree
 - A graph of how the pages link together
 - Mouse support
 - Selecting and copying text

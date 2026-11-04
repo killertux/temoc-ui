@@ -5,6 +5,7 @@ use crate::render::Document;
 use crate::run::{FileResults, Request, Run};
 use crate::search::Search;
 use crate::temoc::{RunReport, RunResult, TestTable};
+use crate::tree::{FileTree, Row};
 use crate::{NotImplemented, workspace};
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::Frame;
@@ -122,6 +123,7 @@ pub struct App {
     /// The pages left by going back, the most recent last.
     forward: Vec<Page>,
     search: Option<Search>,
+    tree: Option<FileTree>,
     /// Whether search shows only test files. Outlives the search box.
     only_tests: bool,
     status: Option<String>,
@@ -158,6 +160,7 @@ impl App {
             back: Vec::new(),
             forward: Vec::new(),
             search: None,
+            tree: None,
             only_tests: false,
             status: None,
             page_size: Size::default(),
@@ -230,6 +233,24 @@ impl App {
         self.search = None;
         let anchor = hit.heading.map(|heading| heading.anchor);
         self.visit(&hit.file, anchor.as_deref())
+    }
+
+    fn open_tree(&mut self) {
+        let document = self.page.as_ref().map(Page::file);
+        self.tree = Some(FileTree::open(&self.workspace, document));
+    }
+
+    /// Opens the selected file, or else the selected folder.
+    fn open_tree_selection(&mut self) -> Result<(), String> {
+        let Some(tree) = &mut self.tree else {
+            return Ok(());
+        };
+        let Some(file) = tree.chosen_file().map(String::from) else {
+            tree.open_folder();
+            return Ok(());
+        };
+        self.tree = None;
+        self.visit(&file, None)
     }
 
     /// Runs every table of the open file.
@@ -345,6 +366,12 @@ impl App {
             self.handle_search_key(key.code, control);
             return Ok(());
         }
+        if self.tree.is_some() {
+            if !control {
+                self.handle_tree_key(key.code);
+            }
+            return Ok(());
+        }
         if control {
             return Err(NotImplemented);
         }
@@ -372,10 +399,33 @@ impl App {
         }
     }
 
+    fn handle_tree_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Esc | KeyCode::Char('t') => self.tree = None,
+            KeyCode::Char('q') => self.running = false,
+            KeyCode::Enter => {
+                let result = self.open_tree_selection();
+                self.report(result);
+            }
+            code => {
+                if let Some(tree) = &mut self.tree {
+                    match code {
+                        KeyCode::Char('j') | KeyCode::Down => tree.choose_next(),
+                        KeyCode::Char('k') | KeyCode::Up => tree.choose_previous(),
+                        KeyCode::Char('l') | KeyCode::Right => tree.open_folder(),
+                        KeyCode::Char('h') | KeyCode::Left => tree.close_folder(),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     fn handle_page_key(&mut self, code: KeyCode) -> Result<(), NotImplemented> {
         match code {
             KeyCode::Char('q') => self.running = false,
             KeyCode::Char('/') => self.open_search(),
+            KeyCode::Char('t') => self.open_tree(),
             KeyCode::Char('h') | KeyCode::Backspace => self.go_back(),
             KeyCode::Char('l') => self.go_forward(),
             KeyCode::Enter => {
@@ -449,6 +499,9 @@ impl App {
         if let Some(search) = &self.search {
             draw_search(search, frame);
         }
+        if let Some(tree) = &mut self.tree {
+            draw_tree(tree, frame);
+        }
     }
 
     /// Draws the message on the left of the status bar, and the result of the
@@ -510,13 +563,55 @@ impl App {
             file_result: self.file_result().map(String::from),
             failures: results.failures(tables),
             temoc_arguments: self.temoc_arguments.clone(),
+            tree: self
+                .tree
+                .as_ref()
+                .map(|tree| tree.rows().iter().map(Row::label).collect()),
+            tree_selection: self
+                .tree
+                .as_ref()
+                .and_then(FileTree::selection)
+                .map(|row| row.name.clone()),
             ..AppState::default()
         }
     }
 }
 
+/// Where a pop-up goes.
+fn pop_up_area(frame: &Frame) -> Rect {
+    frame.area().inner(Margin::new(4, 2))
+}
+
+fn highlighted(line: Line<'_>) -> Line<'_> {
+    line.style(Style::new().add_modifier(Modifier::REVERSED))
+}
+
+fn draw_tree(tree: &mut FileTree, frame: &mut Frame) {
+    let area = pop_up_area(frame);
+    // The border takes two rows.
+    let room = usize::from(area.height).saturating_sub(2);
+    let first = tree.first_shown(room);
+    let selected = tree.selected();
+    let rows = tree.rows().iter().enumerate().skip(first).take(room);
+    let lines: Vec<Line> = rows
+        .map(|(index, row)| {
+            let line = Line::from(format!("{}{}", "  ".repeat(row.depth), row.label()));
+            if index == selected {
+                highlighted(line)
+            } else {
+                line
+            }
+        })
+        .collect();
+    frame.render_widget(Clear, area);
+    frame.render_widget(
+        Paragraph::new(lines).block(Block::bordered().title("Files")),
+        area,
+    );
+}
+
 fn draw_search(search: &Search, frame: &mut Frame) {
-    let area = frame.area().inner(Margin::new(4, 2));
+    let area = pop_up_area(frame);
     // The border takes two rows, and the search box another.
     let room = usize::from(area.height).saturating_sub(3);
     let first = search.selected().saturating_sub(room.saturating_sub(1));
@@ -525,7 +620,7 @@ fn draw_search(search: &Search, frame: &mut Frame) {
         .chain(results.map(|(index, hit)| {
             let line = Line::from(hit.to_string());
             if index == search.selected() {
-                line.style(Style::new().add_modifier(Modifier::REVERSED))
+                highlighted(line)
             } else {
                 line
             }
@@ -592,7 +687,7 @@ mod tests {
     #[test]
     fn a_key_that_is_not_built_says_so() {
         let mut app = App::start(&launch("docs", &[])).unwrap();
-        let key = Event::Key(KeyEvent::from(KeyCode::Char('t')));
+        let key = Event::Key(KeyEvent::from(KeyCode::Char('v')));
         assert_eq!(app.handle_event(&key), Err(NotImplemented));
     }
 
@@ -645,6 +740,75 @@ mod tests {
         press(&mut app, KeyCode::Char('/'));
         press(&mut app, KeyCode::Tab);
         assert!(app.state().search_open);
+    }
+
+    #[test]
+    fn the_tree_opens_without_a_document() {
+        let mut app = App::start(&launch("docs", &["guide"])).unwrap();
+        press(&mut app, KeyCode::Esc);
+        press(&mut app, KeyCode::Char('t'));
+        let state = app.state();
+        assert_eq!(state.tree_selection.as_deref(), Some("getting-started.md"));
+        press(&mut app, KeyCode::Enter);
+        assert_eq!(app.state().document.as_deref(), Some("getting-started.md"));
+    }
+
+    #[test]
+    fn t_is_typed_in_search() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        press(&mut app, KeyCode::Char('/'));
+        press(&mut app, KeyCode::Char('t'));
+        assert_eq!(app.state().tree, None);
+    }
+
+    #[test]
+    fn q_quits_from_the_tree() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        press(&mut app, KeyCode::Char('t'));
+        press(&mut app, KeyCode::Char('q'));
+        assert!(!app.state().running);
+    }
+
+    #[test]
+    fn the_page_behind_the_tree_takes_no_keys() {
+        let mut app = App::start(&launch("calculator", &["passing.md"])).unwrap();
+        press(&mut app, KeyCode::Char('t'));
+        for key in ['/', 'R', 'r', ']', 'v', '?'] {
+            press(&mut app, KeyCode::Char(key));
+        }
+        let state = app.state();
+        assert!(!state.search_open);
+        assert_eq!(state.temoc_arguments, None);
+        assert_eq!(state.focused_table.as_deref(), Some("Addition"));
+        assert!(state.tree.is_some());
+    }
+
+    #[test]
+    fn control_keys_do_not_move_the_tree() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        press(&mut app, KeyCode::Char('t'));
+        let key = KeyEvent::new(KeyCode::Char('j'), KeyModifiers::CONTROL);
+        app.handle_event(&Event::Key(key)).unwrap();
+        assert_eq!(app.state().tree_selection.as_deref(), Some("README.md"));
+    }
+
+    #[test]
+    fn a_file_that_disappeared_says_so_and_closes_the_tree() {
+        let workspace = Workspace::new("vanish", "true");
+        let mut app = workspace.app();
+        press(&mut app, KeyCode::Char('t'));
+        press(&mut app, KeyCode::Char('k'));
+        assert_eq!(app.state().tree_selection.as_deref(), Some("other.md"));
+        fs::remove_file(workspace.0.join("other.md")).unwrap();
+        press(&mut app, KeyCode::Enter);
+        let state = app.state();
+        assert_eq!(state.tree, None);
+        assert_eq!(state.document.as_deref(), Some("README.md"));
+        assert!(
+            state
+                .status
+                .is_some_and(|s| s.starts_with("Cannot read other.md: "))
+        );
     }
 
     #[test]
