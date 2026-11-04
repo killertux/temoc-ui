@@ -26,6 +26,8 @@ enum Look {
     Link(usize),
     Footnote,
     Quote,
+    /// Shows that a row is cut off by the edge of the screen.
+    Marker,
 }
 
 impl Look {
@@ -39,6 +41,7 @@ impl Look {
             Self::Code => "code".into(),
             Self::Link(_) | Self::Footnote => "link".into(),
             Self::Quote => "quote".into(),
+            Self::Marker => "marker".into(),
         }
     }
 
@@ -58,6 +61,7 @@ impl Look {
                 style.fg(Color::Blue).add_modifier(Modifier::UNDERLINED)
             }
             Self::Quote => style.fg(Color::Gray),
+            Self::Marker => style.fg(Color::Cyan),
         }
     }
 
@@ -76,6 +80,9 @@ impl Look {
 struct Piece {
     text: String,
     look: Look,
+    /// The width of the table or code block this is part of, if any. These
+    /// are never wrapped, and scroll sideways instead.
+    block_width: Option<usize>,
 }
 
 impl Piece {
@@ -83,6 +90,7 @@ impl Piece {
         Self {
             text: text.into(),
             look,
+            block_width: None,
         }
     }
 }
@@ -134,13 +142,32 @@ pub struct Link {
     pub target: String,
     /// The rows of the screen it takes up.
     pub rows: Range<usize>,
+    sideways: Option<SidewaysPlace>,
+}
+
+/// Where a link sits in a row that can scroll sideways, in columns from the
+/// start of the row.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SidewaysPlace {
+    link: Range<usize>,
+    /// Where the part of the row that scrolls begins.
+    start: usize,
+    /// Where the row ends.
+    end: usize,
 }
 
 /// A parsed markdown document.
 #[derive(Debug, Clone)]
 pub struct Document {
     root: Node,
-    targets: HashMap<usize, String>,
+    targets: HashMap<usize, LinkTarget>,
+}
+
+/// What a link in the markdown says, by its offset in the markdown.
+#[derive(Debug, Clone)]
+struct LinkTarget {
+    text: String,
+    url: String,
 }
 
 impl Document {
@@ -193,8 +220,15 @@ impl Document {
     #[must_use]
     pub fn render(&self, width: u16) -> Rendered {
         let nodes = children(&self.root);
-        let (rows, ranges) = placed_blocks(nodes, usize::from(width), Look::Plain, true);
+        let width = usize::from(width);
+        let (rows, ranges) = placed_blocks(nodes, width, Look::Plain, true);
         Rendered {
+            width,
+            widest: rows
+                .iter()
+                .filter_map(|row| row_end(row))
+                .max()
+                .unwrap_or(0),
             links: links_in(&rows, &self.targets),
             blocks: nodes.iter().map(line_of).zip(ranges).collect(),
             rows,
@@ -209,6 +243,9 @@ impl Document {
 /// A document laid out for the screen.
 #[derive(Debug, Clone)]
 pub struct Rendered {
+    width: usize,
+    /// How far the widest table or code block reaches.
+    widest: usize,
     rows: Vec<Row>,
     /// The rows of each top-level element, by the line of the markdown it
     /// starts on.
@@ -235,16 +272,46 @@ impl Rendered {
         self.blocks.get(&line).cloned()
     }
 
-    /// The rows from `top` on that fit in `height`, with a link highlighted.
+    /// How far the page can scroll sideways.
     #[must_use]
-    pub fn lines(&self, top: usize, height: usize, focused: Option<&Link>) -> Vec<Line<'static>> {
+    pub fn last_left(&self) -> usize {
+        self.widest.saturating_sub(self.width)
+    }
+
+    /// How far to scroll sideways to show a link, moving as little as possible
+    /// from `left`. A link too wide to show is shown from its start.
+    #[must_use]
+    pub fn left_showing(&self, link: &Link, left: usize) -> usize {
+        let Some(place) = &link.sideways else {
+            return left;
+        };
+        let furthest = place.end.saturating_sub(self.width);
+        let shift = left.min(furthest);
+        // The markers at each edge take up a column.
+        let most = place.link.start.saturating_sub(place.start + 1);
+        let least = (place.link.end + 1).saturating_sub(self.width);
+        let shown = shift.max(least.min(furthest)).min(most);
+        if shown == shift { left } else { shown }
+    }
+
+    /// The rows from `top` on that fit in `height`, scrolled sideways by `left`,
+    /// with a link highlighted.
+    #[must_use]
+    pub fn lines(
+        &self,
+        top: usize,
+        height: usize,
+        left: usize,
+        focused: Option<&Link>,
+    ) -> Vec<Line<'static>> {
         let focused = focused.map(|link| Look::Link(link.id));
         self.rows
             .iter()
             .skip(top)
             .take(height)
             .map(|row| {
-                row.iter()
+                cut_to_screen(row, left, self.width)
+                    .into_iter()
                     .map(|piece| {
                         let style = piece.look.style();
                         let style = if Some(piece.look) == focused {
@@ -252,7 +319,7 @@ impl Rendered {
                         } else {
                             style
                         };
-                        Span::styled(piece.text.clone(), style)
+                        Span::styled(piece.text, style)
                     })
                     .collect()
             })
@@ -260,9 +327,75 @@ impl Rendered {
     }
 }
 
-/// Where each link points, by the offset of the link in the markdown. Links
-/// can use a definition written anywhere in the document.
-fn link_targets(root: &Node) -> HashMap<usize, String> {
+/// How much of a row comes before the part that scrolls sideways. A quote's
+/// bar or a list's bullet stays where it is.
+fn fixed_width(row: &[Piece]) -> usize {
+    let fixed = row.iter().take_while(|piece| piece.block_width.is_none());
+    fixed.map(|piece| text_width(&piece.text)).sum()
+}
+
+/// Where a row ends, if it scrolls sideways.
+fn row_end(row: &[Piece]) -> Option<usize> {
+    let block_width = row.iter().find_map(|piece| piece.block_width)?;
+    Some(fixed_width(row) + block_width)
+}
+
+/// What a row shows on a screen of this width when scrolled sideways. A table
+/// or code block has markers where it is cut off.
+fn cut_to_screen(row: &[Piece], left: usize, width: usize) -> Row {
+    let start = row.iter().position(|piece| piece.block_width.is_some());
+    let (fixed, sliding) = row.split_at(start.unwrap_or(row.len()));
+    let end = row_end(row).unwrap_or(0);
+    let shift = left.min(end.saturating_sub(width));
+    let mut shown = fixed.to_vec();
+    if shift > 0 && row_width(sliding) > 0 {
+        shown.push(Piece::new("‹", Look::Marker));
+        shown.extend(split_at_column(sliding, shift + 1).1);
+    } else {
+        shown.extend_from_slice(sliding);
+    }
+    if !sliding.is_empty()
+        && let Some(room) = width.checked_sub(1)
+        && row_width(&shown) > width
+    {
+        shown = split_at_column(&shown, room).0;
+        shown.push(Piece::new("›", Look::Marker));
+    }
+    shown
+}
+
+/// Splits a row at a column. A wide character on the split is lost, and a space
+/// on each side takes its place so that everything else stays aligned.
+fn split_at_column(row: &[Piece], column: usize) -> (Row, Row) {
+    let mut used = 0;
+    let mut crossed = false;
+    let (mut before, mut after) = (Row::new(), Row::new());
+    for piece in row {
+        let (mut start, mut rest) = (String::new(), String::new());
+        for character in piece.text.chars() {
+            let width = character_width(character);
+            if crossed || used + width > column {
+                if !crossed && used < column {
+                    start.push(' ');
+                    rest.push(' ');
+                } else {
+                    rest.push(character);
+                }
+                crossed = true;
+            } else {
+                start.push(character);
+                used += width;
+            }
+        }
+        before.push(Piece::new(start, piece.look));
+        after.push(Piece::new(rest, piece.look));
+    }
+    (before, after)
+}
+
+/// Finds what each link says. Links can use a definition written anywhere in
+/// the document.
+fn link_targets(root: &Node) -> HashMap<usize, LinkTarget> {
     let mut definitions = HashMap::new();
     walk(root, &mut |node| {
         if let Node::Definition(definition) = node {
@@ -273,15 +406,19 @@ fn link_targets(root: &Node) -> HashMap<usize, String> {
     });
     let mut targets = HashMap::new();
     walk(root, &mut |node| {
-        let target = match node {
-            Node::Link(link) => Some((link_id(link.position.as_ref()), link.url.as_str())),
+        let found = match node {
+            Node::Link(link) => Some((&link.position, &link.children, link.url.as_str())),
             Node::LinkReference(link) => definitions
                 .get(link.identifier.as_str())
-                .map(|url| (link_id(link.position.as_ref()), *url)),
+                .map(|url| (&link.position, &link.children, *url)),
             _ => None,
         };
-        if let Some((id, url)) = target {
-            targets.insert(id, url.to_owned());
+        if let Some((position, children, url)) = found {
+            let target = LinkTarget {
+                text: plain_text(children),
+                url: url.to_owned(),
+            };
+            targets.insert(link_id(position.as_ref()), target);
         }
     });
     targets
@@ -294,34 +431,48 @@ fn walk<'node>(node: &'node Node, visit: &mut impl FnMut(&'node Node)) {
     }
 }
 
+/// Inline elements as they read on screen, however they end up being wrapped.
+fn plain_text(nodes: &[Node]) -> String {
+    let pieces = inline_pieces(nodes, Look::Plain);
+    let text: String = pieces.iter().map(|piece| piece.text.as_str()).collect();
+    text.replace('\n', " ")
+}
+
 fn link_id(position: Option<&Position>) -> usize {
     position.map_or(0, |position| position.start.offset)
 }
 
 /// Finds the links in laid out rows. The pieces of a link always come one after
 /// another, even when it wraps onto a new row.
-fn links_in(rows: &[Row], targets: &HashMap<usize, String>) -> Vec<Link> {
+fn links_in(rows: &[Row], targets: &HashMap<usize, LinkTarget>) -> Vec<Link> {
     let mut links: Vec<Link> = Vec::new();
     for (index, row) in rows.iter().enumerate() {
+        let mut column = 0;
         for piece in row {
+            let columns = column..column + text_width(&piece.text);
+            column = columns.end;
             let Look::Link(id) = piece.look else {
                 continue;
             };
             match links.last_mut() {
                 Some(link) if link.id == id => {
-                    if link.rows.end == index {
-                        link.text.push(' ');
-                    }
-                    link.text.push_str(&piece.text);
                     link.rows.end = index + 1;
+                    if let Some(place) = &mut link.sideways {
+                        place.link.end = columns.end;
+                    }
                 }
                 _ => {
                     if let Some(target) = targets.get(&id) {
                         links.push(Link {
                             id,
-                            text: piece.text.clone(),
-                            target: target.clone(),
+                            text: target.text.clone(),
+                            target: target.url.clone(),
                             rows: index..index + 1,
+                            sideways: row_end(row).map(|end| SidewaysPlace {
+                                link: columns,
+                                start: fixed_width(row),
+                                end,
+                            }),
                         });
                     }
                 }
@@ -385,17 +536,21 @@ fn block(node: &Node, width: usize, look: Look) -> Vec<Row> {
             with_prefix(inner, "│ ", "│ ", Look::Quote)
         }
         Node::List(list) => list_rows(list, width, look),
-        Node::Code(code) => code
-            .value
-            .lines()
-            .map(|line| vec![Piece::new(line.replace('\t', "    "), Look::Code)])
-            .collect(),
-        Node::Table(table) => table_rows(table, look),
+        Node::Code(code) => unwrapped(
+            code.value
+                .lines()
+                .map(|line| vec![Piece::new(line.replace('\t', "    "), Look::Code)])
+                .collect(),
+        ),
+        Node::Table(table) => unwrapped(table_rows(table, look)),
         Node::ThematicBreak(_) => vec![vec![Piece::new("─".repeat(width), look)]],
         Node::Html(html) if !is_comment(&html.value) => html
             .value
             .lines()
-            .map(|line| vec![Piece::new(line, look)])
+            .flat_map(|line| match wrap(vec![Piece::new(line, look)], width) {
+                rows if rows.is_empty() => vec![Row::new()],
+                rows => rows,
+            })
             .collect(),
         Node::FootnoteDefinition(footnote) => {
             let marker = format!("[^{}]: ", footnote.identifier);
@@ -410,6 +565,15 @@ fn block(node: &Node, width: usize, look: Look) -> Vec<Row> {
         }
         _ => Vec::new(),
     }
+}
+
+/// Marks rows as a block that scrolls sideways as one.
+fn unwrapped(mut rows: Vec<Row>) -> Vec<Row> {
+    let width = rows.iter().map(|row| row_width(row)).max().unwrap_or(0);
+    for piece in rows.iter_mut().flatten() {
+        piece.block_width = Some(width);
+    }
+    rows
 }
 
 fn is_comment(html: &str) -> bool {
@@ -566,12 +730,16 @@ fn text_width(text: &str) -> usize {
     Span::raw(text).width()
 }
 
+fn character_width(character: char) -> usize {
+    text_width(character.encode_utf8(&mut [0; 4]))
+}
+
 fn row_width(row: &[Piece]) -> usize {
     row.iter().map(|piece| text_width(&piece.text)).sum()
 }
 
 /// Breaks inline text into rows no wider than `width`, between words. A word
-/// wider than the screen gets a row to itself.
+/// wider than the screen starts a new row and continues on the rows below.
 fn wrap(pieces: Vec<Piece>, width: usize) -> Vec<Row> {
     let mut wrapper = Wrapper::new(width);
     for piece in pieces {
@@ -607,7 +775,8 @@ impl Wrapper {
         }
     }
 
-    /// A word can span pieces, as in `**bold**text`, and is never split.
+    /// A word can span pieces, as in `**bold**text`, and is only split when it
+    /// is too wide for a row.
     fn end_word(&mut self) {
         let word = mem::take(&mut self.word);
         let used = row_width(&self.row);
@@ -615,11 +784,37 @@ impl Wrapper {
         if used > 0 && used + needed > self.width {
             self.end_row();
         }
-        for piece in word {
-            match self.row.last_mut() {
-                Some(last) if last.look == piece.look => last.text.push_str(&piece.text),
-                _ => self.row.push(piece),
+        if needed > self.width {
+            self.break_word(word);
+        } else {
+            for piece in word {
+                self.push(piece);
             }
+        }
+    }
+
+    /// Fills rows with a word, one character at a time. A row always takes at
+    /// least one character, however narrow the screen is. Only trailing spaces
+    /// can be left over, and they are not needed on the next row.
+    fn break_word(&mut self, word: Row) {
+        for piece in word {
+            for character in piece.text.chars() {
+                let used = row_width(&self.row);
+                if used > 0 && used + character_width(character) > self.width {
+                    if character == ' ' {
+                        continue;
+                    }
+                    self.end_row();
+                }
+                self.push(Piece::new(character, piece.look));
+            }
+        }
+    }
+
+    fn push(&mut self, piece: Piece) {
+        match self.row.last_mut() {
+            Some(last) if last.look == piece.look => last.text.push_str(&piece.text),
+            _ => self.row.push(piece),
         }
     }
 
@@ -654,7 +849,7 @@ mod tests {
         Document::parse(markdown)
             .unwrap()
             .render(width)
-            .lines(0, usize::MAX, None)
+            .lines(0, usize::MAX, 0, None)
             .iter()
             .map(ToString::to_string)
             .collect()
@@ -674,8 +869,59 @@ mod tests {
     }
 
     #[test]
-    fn a_word_wider_than_the_screen_keeps_its_own_row() {
-        assert_eq!(screen("a bbbbbbbb c", 4), ["a", "bbbbbbbb", "c"]);
+    fn a_word_wider_than_the_screen_continues_on_the_rows_below() {
+        assert_eq!(screen("a bbbbbbbb c", 4), ["a", "bbbb", "bbbb", "c"]);
+    }
+
+    #[test]
+    fn the_end_of_a_broken_word_shares_its_row_with_what_follows() {
+        assert_eq!(screen("aaaaaa b", 4), ["aaaa", "aa b"]);
+    }
+
+    #[test]
+    fn a_broken_word_keeps_its_looks() {
+        let rendered = Document::parse("**aa**bbbb").unwrap().render(3);
+        let lines = rendered.lines(0, 2, 0, None);
+        let spans: Vec<Vec<String>> = lines
+            .iter()
+            .map(|line| line.spans.iter().map(ToString::to_string).collect())
+            .collect();
+        assert_eq!(spans, [vec!["aa", "b"], vec!["bbb"]]);
+    }
+
+    #[test]
+    fn a_broken_word_lines_up_under_its_list_item() {
+        assert_eq!(screen("- aaaaaaaa", 6), ["• aaaa", "  aaaa"]);
+    }
+
+    #[test]
+    fn a_wide_character_is_never_split_by_a_broken_word() {
+        assert_eq!(screen("你好世", 4), ["你好", "世"]);
+        assert_eq!(screen("你好世", 3), ["你", "好", "世"]);
+    }
+
+    #[test]
+    fn a_screen_too_narrow_for_a_character_still_shows_the_word() {
+        assert_eq!(screen("你好", 1), ["你", "好"]);
+        assert_eq!(screen("ab", 0), ["a", "b"]);
+    }
+
+    #[test]
+    fn a_word_that_fills_its_rows_leaves_no_blank_row() {
+        assert_eq!(screen("aaaaaaaa b", 4), ["aaaa", "aaaa", "b"]);
+    }
+
+    #[test]
+    fn html_shown_as_text_wraps_and_keeps_its_blank_rows() {
+        assert_eq!(
+            screen("<pre>\naaaa bbbb\n\nc\n</pre>", 6),
+            ["<pre>", "aaaa", "bbbb", "", "c", "</pre>"]
+        );
+    }
+
+    #[test]
+    fn text_is_never_marked() {
+        assert_eq!(scrolled("aaaaaaaa", 4, 0), ["aaaa", "aaaa"]);
     }
 
     #[test]
@@ -775,6 +1021,20 @@ mod tests {
     }
 
     #[test]
+    fn a_broken_link_reads_as_it_was_written() {
+        assert_eq!(
+            links("[aaaaaa](a.md)", 4),
+            [("aaaaaa".to_owned(), "a.md".to_owned(), 0..2)]
+        );
+    }
+
+    #[test]
+    fn a_link_around_an_image_reads_as_its_description() {
+        let found = links("[![a picture](i.png)](a.md)", 20);
+        assert_eq!(found, [("a picture".to_owned(), "a.md".to_owned(), 0..1)]);
+    }
+
+    #[test]
     fn links_next_to_each_other_stay_apart() {
         let found = links("[a](1.md)[b](2.md)", 20);
         assert_eq!(
@@ -800,7 +1060,7 @@ mod tests {
     #[test]
     fn only_the_focused_link_is_highlighted() {
         let rendered = Document::parse("[a](1.md) [b](2.md)").unwrap().render(20);
-        let lines = rendered.lines(0, 1, rendered.links().get(1));
+        let lines = rendered.lines(0, 1, 0, rendered.links().get(1));
         let reversed: Vec<String> = lines
             .iter()
             .flat_map(|line| &line.spans)
@@ -808,6 +1068,69 @@ mod tests {
             .map(ToString::to_string)
             .collect();
         assert_eq!(reversed, ["b"]);
+    }
+
+    fn scrolled(markdown: &str, width: u16, left: usize) -> Vec<String> {
+        Document::parse(markdown)
+            .unwrap()
+            .render(width)
+            .lines(0, usize::MAX, left, None)
+            .iter()
+            .map(ToString::to_string)
+            .collect()
+    }
+
+    #[test]
+    fn a_cut_off_row_is_marked_on_each_side_with_more_to_see() {
+        let code = "```\nabcdefgh\n```";
+        assert_eq!(scrolled(code, 5, 0), ["abcd›"]);
+        assert_eq!(scrolled(code, 5, 1), ["‹cde›"]);
+        assert_eq!(scrolled(code, 5, 3), ["‹efgh"]);
+    }
+
+    #[test]
+    fn a_row_never_scrolls_past_its_end() {
+        assert_eq!(scrolled("```\nabcdefgh\n```", 5, 100), ["‹efgh"]);
+    }
+
+    #[test]
+    fn a_code_block_moves_as_one_and_blank_rows_have_no_marker() {
+        let code = "```\nabcdefgh\n\nab\n```";
+        assert_eq!(scrolled(code, 5, 3), ["‹efgh", "", "‹"]);
+    }
+
+    #[test]
+    fn what_comes_before_a_block_stays_in_place() {
+        let code = "> ```\n> abcdefgh\n> ```";
+        assert_eq!(scrolled(code, 6, 2), ["│ ‹de›"]);
+    }
+
+    #[test]
+    fn a_wide_character_on_the_edge_becomes_a_space() {
+        let code = "```\n你好世界\n```";
+        assert_eq!(scrolled(code, 5, 0), ["你好›"]);
+        assert_eq!(scrolled(code, 5, 1), ["‹好 ›"]);
+        assert_eq!(scrolled(code, 5, 2), ["‹ 世›"]);
+    }
+
+    #[test]
+    fn text_does_not_scroll() {
+        assert_eq!(scrolled("short\n\n```\nabcdefgh\n```", 5, 2)[0], "short");
+    }
+
+    #[test]
+    fn a_table_keeps_its_look_when_it_scrolls() {
+        let rendered = Document::parse("| a |\n| - |\n| `bbbbbbbb` |\n")
+            .unwrap()
+            .render(5);
+        let lines = rendered.lines(2, 1, 2, None);
+        let colors: Vec<Option<Color>> = lines
+            .iter()
+            .flat_map(|line| &line.spans)
+            .filter(|span| span.content.contains('b'))
+            .map(|span| span.style.fg)
+            .collect();
+        assert_eq!(colors, [Some(Color::Yellow)]);
     }
 
     #[test]

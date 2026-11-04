@@ -19,6 +19,19 @@ The wheel scrolls the document three lines at a time, stopping at either end.
 | Wheel back up    | docs      | guide/long-page.md | `WheelDown WheelUp` | Long Page | yes      |
 | Stops at the top | docs      | guide/long-page.md | `WheelUp`           | Long Page | yes      |
 
+A sideways wheel [scrolls wide tables and code blocks](navigation.md#scrolling-sideways),
+as does holding `Shift` while turning the wheel. Each step moves the same distance
+as pressing `Left` or `Right`.
+
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+
+| # action             | workspace   | keys                                   | look for     | visible? |
+| -------------------- | ----------- | -------------------------------------- | ------------ | -------- |
+| Sideways wheel       | wide-blocks | `WheelRight`                           | First Column | no       |
+| Sideways wheel back  | wide-blocks | `WheelRight WheelLeft`                 | First Column | yes      |
+| Shift and wheel      | wide-blocks | `Shift-WheelDown`                      | First Column | no       |
+| Shift and wheel back | wide-blocks | `Shift-WheelDown Shift-WheelUp`        | First Column | yes      |
+
 ## Following links
 
 Clicking a link focuses it and follows it, just like

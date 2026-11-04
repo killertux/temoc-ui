@@ -64,6 +64,7 @@ cargo run -- samples/docs
 | `j`, `k`, `Down`, `Up`        | Scroll one line                       |
 | `Space`, `PageDown`, `PageUp` | Scroll one page                       |
 | `g`, `G`                      | Go to the top or bottom               |
+| `Left`, `Right`               | Scroll wide tables and code sideways  |
 | `Tab`, `Shift-Tab`            | Focus the next or previous link       |
 | `Enter`                       | Follow the focused link               |
 | `h` or `Backspace`, `l`       | Go back or forward                    |

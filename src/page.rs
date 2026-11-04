@@ -6,6 +6,9 @@ use ratatui::layout::Size;
 use ratatui::text::Line;
 use std::ops::Range;
 
+/// How many columns one step sideways moves.
+const SIDEWAYS_STEP: usize = 8;
+
 /// A document on screen. Going back to a page finds it as it was left.
 #[derive(Debug, Clone)]
 pub struct Page {
@@ -15,6 +18,8 @@ pub struct Page {
     tables: Vec<TestTable>,
     size: Size,
     scroll: usize,
+    /// How far wide tables and code blocks are scrolled sideways.
+    left: usize,
     focused_link: Option<usize>,
     focused_table: Option<usize>,
 }
@@ -32,6 +37,7 @@ impl Page {
             tables,
             size,
             scroll: 0,
+            left: 0,
             focused_link: None,
         }
     }
@@ -49,13 +55,18 @@ impl Page {
         }
         self.size = size;
         self.scroll = self.scroll.min(self.last_scroll());
+        self.left = self.left.min(self.rendered.last_left());
     }
 
     /// The rows on screen.
     #[must_use]
     pub fn lines(&self) -> Vec<Line<'static>> {
-        self.rendered
-            .lines(self.scroll, self.screen_height(), self.focused_link())
+        self.rendered.lines(
+            self.scroll,
+            self.screen_height(),
+            self.left,
+            self.focused_link(),
+        )
     }
 
     fn screen_height(&self) -> usize {
@@ -84,6 +95,17 @@ impl Page {
     /// Scrolls up one screen.
     pub fn page_up(&mut self) {
         self.scroll_up(self.screen_height());
+    }
+
+    /// Scrolls wide tables and code blocks right, stopping at their end.
+    pub fn scroll_right(&mut self) {
+        let left = self.left.saturating_add(SIDEWAYS_STEP);
+        self.left = left.min(self.rendered.last_left());
+    }
+
+    /// Scrolls wide tables and code blocks left, stopping at their start.
+    pub fn scroll_left(&mut self) {
+        self.left = self.left.saturating_sub(SIDEWAYS_STEP);
     }
 
     /// Goes to the top.
@@ -137,14 +159,11 @@ impl Page {
     }
 
     fn focus_link(&mut self, index: usize) {
-        let Some(rows) = self
-            .rendered
-            .links()
-            .get(index)
-            .map(|link| link.rows.clone())
-        else {
+        let Some(link) = self.rendered.links().get(index) else {
             return;
         };
+        let rows = link.rows.clone();
+        self.left = self.rendered.left_showing(link, self.left);
         self.focused_link = Some(index);
         self.reveal(&rows);
     }
@@ -278,6 +297,69 @@ mod tests {
         assert_eq!(page.scroll, 0);
         page.go_to_anchor("end");
         assert_eq!(shown(&page).last().map(String::as_str), Some("End"));
+    }
+
+    const WIDE_CODE: &str = "```\n0123456789012345678901234567890123456789\n```";
+
+    #[test]
+    fn sideways_scrolling_stops_at_both_ends() {
+        let mut page = page(WIDE_CODE, 30, 5);
+        page.scroll_left();
+        assert_eq!(page.left, 0);
+        page.scroll_right();
+        assert_eq!(page.left, 8);
+        page.scroll_right();
+        assert_eq!(page.left, 10);
+        page.scroll_left();
+        assert_eq!(page.left, 2);
+    }
+
+    #[test]
+    fn a_page_that_fits_does_not_scroll_sideways() {
+        let mut page = page("```\nshort\n```", 30, 5);
+        page.scroll_right();
+        assert_eq!(page.left, 0);
+    }
+
+    #[test]
+    fn a_wider_screen_takes_back_sideways_scrolling() {
+        let mut page = page(WIDE_CODE, 30, 5);
+        page.scroll_right();
+        page.scroll_right();
+        page.fit(Size::new(35, 5));
+        assert_eq!(page.left, 5);
+    }
+
+    #[test]
+    fn focusing_a_link_scrolls_sideways_in_both_directions() {
+        let filler = "x".repeat(30);
+        let markdown = format!("| [near](1.md) | {filler} | [far](2.md) |\n| - | - | - |\n");
+        let mut page = page(&markdown, 20, 5);
+        page.next_link();
+        assert_eq!(page.left, 0);
+        page.next_link();
+        assert!(shown(&page)[0].contains("far"));
+        page.next_link();
+        assert!(shown(&page)[0].contains("near"));
+    }
+
+    #[test]
+    fn a_link_on_screen_does_not_scroll_sideways() {
+        let filler = "x".repeat(30);
+        let markdown = format!("| {filler} | [a](1.md) | {filler} |\n| - | - | - |\n");
+        let mut page = page(&markdown, 50, 5);
+        page.scroll_right();
+        let left = page.left;
+        page.next_link();
+        assert_eq!(page.left, left);
+    }
+
+    #[test]
+    fn a_link_outside_a_block_leaves_blocks_scrolled() {
+        let mut page = page(&format!("[a](1.md)\n\n{WIDE_CODE}"), 30, 5);
+        page.scroll_right();
+        page.next_link();
+        assert_eq!(page.left, 8);
     }
 
     #[test]

@@ -31,7 +31,8 @@ what appears on screen, and `style?` is how it is emphasized. A `text?` of
 ## Tables and code blocks
 
 Tables are drawn with their columns aligned, and code blocks keep their text
-exactly as written.
+exactly as written. One wider than the screen is not wrapped:
+[scroll it sideways](navigation.md#scrolling-sideways) to see the rest.
 
 [//]: # "decisionTable Tui"
 
@@ -41,6 +42,24 @@ exactly as written.
 | Table separators | docs      | reference.md | \| ---               | no       |
 | Code block       | docs      | reference.md | temoc-ui docs/       | yes      |
 | Code fence       | docs      | reference.md | ```                  | no       |
+
+## Long words
+
+Text wraps between words, and never runs off the screen. A word too long for one row
+starts on a row of its own and continues on the rows below, so that all of it can be
+read. Text does not [scroll sideways](navigation.md#scrolling-sideways), and has no
+markers.
+
+[//]: # "decisionTable Tui"
+
+| # element                | workspace   | arguments    | keys    | look for         | visible? |
+| ------------------------ | ----------- | ------------ | ------- | ---------------- | -------- |
+| The start of the word    | wide-blocks | long-word.md |         | wordstart        | yes      |
+| The end of the word      | wide-blocks | long-word.md |         | wordend          | yes      |
+| It starts on its own row | wide-blocks | long-word.md |         | before wordstart | no       |
+| The text after it        | wide-blocks | long-word.md |         | and some text    | yes      |
+| No marker                | wide-blocks | long-word.md |         | ›                | no       |
+| It does not scroll       | wide-blocks | long-word.md | `Right` | wordstart        | yes      |
 
 ## Test files
 

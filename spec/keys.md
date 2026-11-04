@@ -9,6 +9,7 @@ Back to the [specification index](README.md).
 | `PageDown`, `Space` | Scroll down one page                     | [Navigation](viewer/navigation.md)           |
 | `PageUp`            | Scroll up one page                       | [Navigation](viewer/navigation.md)           |
 | `g`, `G`            | Go to the top or bottom                  | [Navigation](viewer/navigation.md)           |
+| `Left`, `Right`     | Scroll wide tables and code sideways     | [Navigation](viewer/navigation.md)           |
 | `Tab`, `Shift-Tab`  | Focus the next or previous link          | [Navigation](viewer/navigation.md)           |
 | `Enter`             | Follow the focused link                  | [Navigation](viewer/navigation.md)           |
 | `h`, `Backspace`    | Go back                                  | [Navigation](viewer/navigation.md)           |

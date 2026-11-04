@@ -23,6 +23,84 @@ These rows use a page longer than the screen.
 | Go to the bottom     | docs      | guide/long-page.md | `G`               | Line 80   | yes      |
 | Go to the top        | docs      | guide/long-page.md | `G g`             | Long Page | yes      |
 
+## Scrolling sideways
+
+Tables and code blocks are never wrapped, so one wider than the screen runs off its
+right edge. `Right` and `Left` scroll it sideways eight columns at a time, stopping
+at either end. Only these move: text and headings stay in place, and so does a table
+or code block that fits on the screen. When a page has several wide ones, they
+scroll together, and the lines of a code block always move as one.
+
+The sample table is 100 columns wide on an 80 column screen, so three presses of
+`Right` reach its last column.
+
+[//]: # "decisionTable Tui"
+
+| # action               | workspace   | arguments    | keys                         | look for        | visible? |
+| ---------------------- | ----------- | ------------ | ---------------------------- | --------------- | -------- |
+| The left shows first   | wide-blocks |              |                              | First Column    | yes      |
+| The rest is to the side | wide-blocks |             |                              | Last Column     | no       |
+| Scroll right           | wide-blocks |              | `Right`                      | First Column    | no       |
+| Scroll back left       | wide-blocks |              | `Right Left`                 | First Column    | yes      |
+| Stop at the left       | wide-blocks |              | `Left Right Left`            | First Column    | yes      |
+| Reach the last column  | wide-blocks |              | `Right Right Right`          | Last Column     | yes      |
+| Stop at the right      | wide-blocks |              | `Right Right Right Right Left` | Last Column   | no       |
+| Text stays in place    | wide-blocks |              | `Right`                      | This text stays | yes      |
+| Headings stay in place | wide-blocks |              | `Right`                      | A Wide Table    | yes      |
+| A table that fits stays | wide-blocks |             | `Right`                      | Fits            | yes      |
+| A page with no wide table | docs     | reference.md | `Right`                      | Opens a file    | yes      |
+| Code is cut off too    | wide-blocks |              |                              | end of the long line | no  |
+| Code scrolls right     | wide-blocks |              | `Right`                      | start of the long line | no |
+| Reach the end of code  | wide-blocks |              | `Right Right Right`          | end of the long line | yes |
+| Code lines move as one | wide-blocks |              | `Right`                      | short line      | no       |
+| A code block that fits stays | wide-blocks |        | `Right`                      | fits on one screen | yes   |
+
+Tables and code blocks inside quotes and lists scroll too. Only the block moves: the
+quote's bar and the list's bullet stay in place.
+
+[//]: # "decisionTable Tui"
+
+| # action                 | workspace   | arguments | keys                | look for       | visible? |
+| ------------------------ | ----------- | --------- | ------------------- | -------------- | -------- |
+| A quoted table           | wide-blocks | nested.md |                     | │ Quoted First | yes      |
+| It scrolls               | wide-blocks | nested.md | `Right`             | Quoted First   | no       |
+| The quote's bar stays    | wide-blocks | nested.md | `Right`             | │ ‹            | yes      |
+| It reaches its end       | wide-blocks | nested.md | `Right Right Right` | Quoted Last    | yes      |
+| Code in a list           | wide-blocks | nested.md |                     | • list start   | yes      |
+| It scrolls too           | wide-blocks | nested.md | `Right`             | list start     | no       |
+| The list's bullet stays  | wide-blocks | nested.md | `Right`             | • ‹            | yes      |
+| It also reaches its end  | wide-blocks | nested.md | `Right Right Right` | list end       | yes      |
+
+A row of a table or code block cut off by the edge of the screen shows a marker
+there, so that you can tell there is more to see: `›` on the right and `‹` on the
+left. The marker takes the place of the last column on that side, and goes away once
+the end of the row is showing.
+
+[//]: # "decisionTable Tui"
+
+| # action                | workspace   | arguments    | keys                | look for | visible? |
+| ----------------------- | ----------- | ------------ | ------------------- | -------- | -------- |
+| More on the right       | wide-blocks |              |                     | ›        | yes      |
+| Nothing on the left yet | wide-blocks |              |                     | ‹        | no       |
+| More on the left        | wide-blocks |              | `Right`             | ‹        | yes      |
+| More on both sides      | wide-blocks |              | `Right`             | ›        | yes      |
+| Back at the left        | wide-blocks |              | `Right Left`        | ‹        | no       |
+| Reached the right end   | wide-blocks |              | `Right Right Right` | ›        | no       |
+| Nothing is cut off      | docs        | reference.md |                     | ›        | no       |
+
+Focusing a link in a wide table scrolls the table sideways to show it. Going
+[back](#history) restores the sideways position too, and a new page starts at the
+left.
+
+[//]: # "decisionTable Tui"
+
+| # action              | workspace   | keys              | look for     | visible? |
+| --------------------- | ----------- | ----------------- | ------------ | -------- |
+| Link off to the side  | wide-blocks |                   | Far link     | no       |
+| Focus shows the link  | wide-blocks | `Tab Tab`         | Far link     | yes      |
+| New pages start left  | wide-blocks | `Right Tab Enter` | Other First  | yes      |
+| Going back restores   | wide-blocks | `Right Tab Enter h` | First Column | no     |
+
 ## Focusing links
 
 `Tab` moves through the links on the page and wraps around at either end. The

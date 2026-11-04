@@ -274,6 +274,8 @@ impl App {
             KeyCode::Char('k') | KeyCode::Up => |page| page.scroll_up(1),
             KeyCode::PageDown | KeyCode::Char(' ') => Page::page_down,
             KeyCode::PageUp => Page::page_up,
+            KeyCode::Right => Page::scroll_right,
+            KeyCode::Left => Page::scroll_left,
             KeyCode::Char('g') => Page::top,
             KeyCode::Char('G') => Page::bottom,
             KeyCode::Tab => Page::next_link,

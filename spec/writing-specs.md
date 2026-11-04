@@ -102,6 +102,7 @@ running the specification does not run them as tests too.
 | [`custom-config`](../samples/custom-config)   | Using the `--config` option.      |
 | [`many-pages`](../samples/many-pages/README.md) | A graph taller than the screen. |
 | [`link-chain`](../samples/link-chain/README.md) | A graph wider than the screen.  |
+| [`wide-blocks`](../samples/wide-blocks/README.md) | Content wider than the screen.  |
 
 The `calculator` workspace runs real temoc against a small Slim server built by
 the spec harness.
