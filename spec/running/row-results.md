@@ -29,7 +29,7 @@ mark, but not the header. In a table wider than the screen the mark can be out o
 sight until you scroll sideways, and the colour still shows.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation     | workspace  | arguments  | keys | row results?                                  |
 | --------------- | ---------- | ---------- | ---- | --------------------------------------------- |
@@ -40,7 +40,7 @@ sight until you scroll sideways, and the colour still shows.
 | Server stopped  | outcomes   | dying.md   | `R`  | 11: passed, 12: error, 13: skipped, 21: skipped |
 | A table         | calculator | failing.md | `] r` | 19: passed, 20: failed                       |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace  | arguments  | keys | look for                    | visible? |
 | ------------------ | ---------- | ---------- | ---- | --------------------------- | -------- |
@@ -53,7 +53,7 @@ sight until you scroll sideways, and the colour still shows.
 | A table that ran   | calculator | failing.md | `r`  | 1 │ 2 │ 3     ✓             | yes      |
 | A table that didn't | calculator | failing.md | `r` | ✗                           | no       |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation    | workspace  | arguments  | keys | look for  | highlight? |
 | -------------- | ---------- | ---------- | ---- | --------- | ---------- |
@@ -80,7 +80,7 @@ shows. See [how messages are worded](temoc-output.md#messages).
 
 `next line?` reads the line below the `look for` text.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation       | workspace  | arguments  | keys       | look for                        | next line?                                      |
 | ----------------- | ---------- | ---------- | ---------- | ------------------------------- | ----------------------------------------------- |
@@ -101,13 +101,13 @@ not exist. They are listed below the table's result, in the same quiet red. temo
 says that a failed import is on the line of its directive, which is above every
 table, so it goes under the first table that ran.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation      | workspace | arguments | keys  | look for                           | visible? |
 | ---------------- | --------- | --------- | ----- | ---------------------------------- | -------- |
 | A missing class  | outcomes  | errors.md | `R G` | make got exception NO_CLASS Missing | yes     |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation     | workspace | arguments | keys | table results?                                               | failures?                                                                                                                                                                         |
 | --------------- | --------- | --------- | ---- | ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -122,13 +122,13 @@ is `running` from its first row to its last, and the same goes for the file.
 The `hanging.md` page has a row that never finishes, which holds the run at the
 third row of its first table. `Wait` waits for that row to show its mark.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation     | workspace | arguments  | keys                                | row results?                        | table results?                   | file result? | status?               |
 | --------------- | --------- | ---------- | ----------------------------------- | ----------------------------------- | -------------------------------- | ------------ | --------------------- |
 | In the middle   | outcomes  | hanging.md | `R Wait "0 │ 9 │ 9              ⋯"` | 11: passed, 12: failed, 13: running | Stuck: running, Waiting: not run | running      | Running hanging.md... |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation         | workspace | arguments  | keys                                | look for                       | visible? |
 | ------------------- | --------- | ---------- | ----------------------------------- | ------------------------------ | -------- |
@@ -140,7 +140,7 @@ third row of its first table. `Wait` waits for that row to show its mark.
 The page stays usable. Results keep going to the file that is running, and only one
 run can go at a time.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation      | workspace | arguments  | keys                                                  | document?  | row results?                        | status?                  | still open? |
 | ---------------- | --------- | ---------- | ----------------------------------------------------- | ---------- | ----------------------------------- | ------------------------ | ----------- |
@@ -150,7 +150,7 @@ run can go at a time.
 Quitting stops the run. temoc-ui asks temoc to stop and gives it time to stop the
 Slim server it started, so that the server is not left behind.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation      | workspace | arguments  | keys                                  | still open? |
 | ---------------- | --------- | ---------- | ------------------------------------- | ----------- |
@@ -161,7 +161,7 @@ Slim server it started, so that the server is not left behind.
 Starting a run clears the results of what it is about to run, right away, so that
 an old result is never mistaken for a new one. Results of anything else stay.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation      | workspace | arguments  | keys                                      | table results?                  |
 | ---------------- | --------- | ---------- | ----------------------------------------- | ------------------------------- |

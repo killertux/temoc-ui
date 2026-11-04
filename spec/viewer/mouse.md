@@ -85,7 +85,7 @@ Clicking a row of a test table focuses that row and its table, so that `Ctrl-r`
 [runs it](../running/running-a-row.md). Clicking the header of a table, or anything
 else, clears the focused row.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action             | workspace  | arguments  | keys                               | focused row? | focused table? |
 | -------------------- | ---------- | ---------- | ---------------------------------- | ------------ | -------------- |
@@ -96,9 +96,9 @@ else, clears the focused row.
 
 [//]: # "decisionTable Tui"
 
-| # action           | workspace  | arguments  | keys             | temoc arguments?               |
-| ------------------ | ---------- | ---------- | ---------------- | ------------------------------ |
-| Click, then run it | calculator | passing.md | `Click "mul?" r` | -c temoc.toml -s passing.md:15 |
+| # action           | workspace  | arguments  | keys             | temoc arguments?                           |
+| ------------------ | ---------- | ---------- | ---------------- | ------------------------------------------ |
+| Click, then run it | calculator | passing.md | `Click "mul?" r` | -c temoc.toml --output jsonl passing.md:15 |
 
 ## In the file tree
 

@@ -34,10 +34,20 @@ pub fn find(buffer: &Buffer, area: Rect, text: &str) -> Option<Found> {
 pub fn highlight(buffer: &Buffer, found: Found, theme: Theme) -> &'static str {
     match buffer.cell(found.first) {
         Some(cell) if cell.modifier.contains(Modifier::REVERSED) => "reversed",
+        Some(cell) if cell.fg == theme.passed => "green",
         Some(cell) if cell.fg == theme.failed => "red",
         Some(cell) if cell.fg == theme.snoozed => "yellow",
         _ => "none",
     }
+}
+
+/// The text of a line of the screen, without the space around it.
+pub fn line(buffer: &Buffer, y: u16) -> String {
+    let area = buffer.area;
+    let row: String = (area.left()..area.right())
+        .map(|x| cell_character(buffer, x, y))
+        .collect();
+    row.trim().to_owned()
 }
 
 /// The foreground and background of a cell.
@@ -114,6 +124,13 @@ mod tests {
     fn counts_columns_not_bytes() {
         let buffer = screen(&["• item"]);
         assert_eq!(find(&buffer, buffer.area, "item").unwrap().first, (2, 0));
+    }
+
+    #[test]
+    fn a_line_is_read_without_the_space_around_it() {
+        let buffer = screen(&["          ", "  mul?    "]);
+        assert_eq!(line(&buffer, 1), "mul?");
+        assert_eq!(line(&buffer, 0), "");
     }
 
     #[test]

@@ -14,7 +14,7 @@ can see what `Ctrl-r` will run. A row can also be
 [clicked](../viewer/mouse.md#selecting-a-row).
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace  | arguments    | keys        | focused row? | focused table? |
 | ------------------ | ---------- | ------------ | ----------- | ------------ | -------------- |
@@ -29,7 +29,7 @@ can see what `Ctrl-r` will run. A row can also be
 | Moving to a table  | calculator | passing.md   | `} ]`       | none         | Multiplication |
 | Page without tests | docs       | reference.md | `}`         | none         | none           |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation      | workspace  | arguments  | keys    | look for  | highlight? |
 | ---------------- | ---------- | ---------- | ------- | --------- | ---------- |
@@ -44,7 +44,7 @@ can see what `Ctrl-r` will run. A row can also be
 `Ctrl-r` runs the focused row. temoc selects a row by its line, so that is the line
 temoc-ui passes. temoc still makes and sets up the row's table.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation     | workspace  | arguments  | keys           | temoc arguments?                          |
 | --------------- | ---------- | ---------- | -------------- | ----------------------------------------- |
@@ -57,7 +57,7 @@ Only the row that ran changes. A table's result comes from all of its rows, so u
 each row has a result the table is `partial`, unless a row did not pass. That is the
 same rule as for a [file and its tables](running-a-table.md#results).
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace  | arguments  | keys                  | row results?                       | table results?                            | file result? |
 | ------------------ | ---------- | ---------- | --------------------- | ---------------------------------- | ----------------------------------------- | ------------ |
@@ -68,7 +68,7 @@ same rule as for a [file and its tables](running-a-table.md#results).
 | The only row       | calculator | passing.md | `} Ctrl-r`            | 11: passed                         | Addition: passed, Multiplication: not run | partial      |
 | Keeps other rows   | calculator | failing.md | `R ] } Ctrl-r`        | 11: passed, 19: passed, 20: failed | Addition: passed, Multiplication: failed  | failed       |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace  | arguments  | keys       | look for  | visible? |
 | ------------------ | ---------- | ---------- | ---------- | --------- | -------- |
@@ -79,7 +79,7 @@ same rule as for a [file and its tables](running-a-table.md#results).
 A row run alone cannot see symbols set by other rows or tables, because they never
 ran. temoc reports that as an error in the row.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation      | workspace | arguments  | keys         | row results?           | failures?                                        |
 | ---------------- | --------- | ---------- | ------------ | ---------------------- | ------------------------------------------------ |
@@ -90,14 +90,14 @@ ran. temoc reports that as an error in the row.
 
 `Ctrl-r` needs a focused row.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace  | arguments  | keys                                  | temoc arguments? | status?                  |
 | ------------------ | ---------- | ---------- | ------------------------------------- | ---------------- | ------------------------ |
 | No focused row     | calculator | passing.md | `Ctrl-r`                              | none             | No test row to run       |
 | Page without tests | calculator | README.md  | `Ctrl-r`                              | none             | No test row to run       |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation     | workspace | arguments  | keys                                     | status?                  |
 | --------------- | --------- | ---------- | ---------------------------------------- | ------------------------ |

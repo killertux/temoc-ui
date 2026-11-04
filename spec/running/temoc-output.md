@@ -19,7 +19,7 @@ The result is the `status` of `run_finished`, which temoc always prints last. Th
 temoc-ui ignores event types and fields it does not know, as temoc asks of it.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable TemocOutput -- snooze until 2099-12-31"
+[//]: # "decisionTable TemocOutput"
 
 | # situation     | events                                                                                                                                                                   | stderr | exit code | result? | message?                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------ | --------- | ------- | ------------------------------------------ |
@@ -36,7 +36,7 @@ temoc-ui ignores event types and fields it does not know, as temoc asks of it.
 Anything short of a `run_finished` that temoc-ui can read is an error, and the message
 says what happened. Only the first line of `stderr` is shown.
 
-[//]: # "decisionTable TemocOutput -- snooze until 2099-12-31"
+[//]: # "decisionTable TemocOutput"
 
 | # situation       | events                              | stderr                                        | exit code | result? | message?                                                                       |
 | ----------------- | ----------------------------------- | --------------------------------------------- | --------- | ------- | ------------------------------------------------------------------------------ |
@@ -57,7 +57,7 @@ come after the line, as they do here.
 A snooze only shows while it is active. temoc reports an expired snooze as a normal
 failure.
 
-[//]: # "decisionTable TemocOutput -- snooze until 2099-12-31"
+[//]: # "decisionTable TemocOutput"
 
 | # situation     | events                                                                                                                                                                                                  | failures?                                                 |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |

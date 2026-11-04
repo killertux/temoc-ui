@@ -14,6 +14,10 @@ use std::ops::Range;
 
 /// Wide enough that a preview is never wrapped.
 const PREVIEW_WIDTH: usize = 200;
+/// How far past the end of a row its mark sits.
+const MARK_GAP: usize = 2;
+/// How wide a mark is.
+const MARK_WIDTH: usize = 1;
 
 /// How a piece of text is emphasized.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -32,6 +36,8 @@ enum Look {
     Marker,
     /// The result of a test table.
     Verdict(RunResult),
+    /// What explains a result that is not a pass.
+    Note,
 }
 
 impl Look {
@@ -47,6 +53,7 @@ impl Look {
             Self::Quote => "quote".into(),
             Self::Marker => "marker".into(),
             Self::Verdict(result) => result.to_string(),
+            Self::Note => "note".into(),
         }
     }
 
@@ -66,10 +73,14 @@ impl Look {
                 style.fg(theme.link).add_modifier(Modifier::UNDERLINED)
             }
             Self::Quote | Self::Marker => style.fg(theme.quote),
-            Self::Verdict(result @ (RunResult::Passed | RunResult::Snoozed)) => {
-                style.fg(theme.result(result))
+            Self::Verdict(result) => {
+                let style = theme.result(result).map_or(style, |color| style.fg(color));
+                match result {
+                    RunResult::Failed | RunResult::Error => style.add_modifier(Modifier::BOLD),
+                    _ => style,
+                }
             }
-            Self::Verdict(result) => style.fg(theme.result(result)).add_modifier(Modifier::BOLD),
+            Self::Note => style.fg(theme.note),
         }
     }
 
@@ -156,7 +167,9 @@ pub struct Heading {
 pub struct Marks<'page> {
     /// The focused link.
     pub link: Option<&'page Link>,
-    /// A whole row, such as the header of the focused table.
+    /// The row holding the header of the focused table.
+    pub header: Option<usize>,
+    /// The focused row of a table.
     pub row: Option<usize>,
     /// The selected text.
     pub selection: Option<(Spot, Spot)>,
@@ -286,24 +299,31 @@ impl Document {
     }
 
     /// Lays the document out for a screen of this width. Each table with a
-    /// result, given by the line it starts on, shows that result below it.
+    /// result, given by the line it starts on, shows that result in its rows
+    /// and below it.
     #[must_use]
-    pub fn render(&self, width: u16, results: &HashMap<usize, &TableResult>) -> Rendered {
+    pub fn render(&self, width: u16, results: &HashMap<usize, TableResult<'_>>) -> Rendered {
         let nodes = children(&self.root);
         let width = usize::from(width);
         let (mut rows, mut ranges) = placed_blocks(nodes, width, Look::Plain, true);
-        let mut failing = HashMap::new();
+        let mut table_rows = TableRows::default();
         let mut added = 0;
         for (node, range) in nodes.iter().zip(&mut ranges) {
             *range = range.start + added..range.end + added;
-            if let Some(result) = results.get(&line_of(node)) {
-                failing.extend(failing_rows(node, range.start, &result.failures));
-                let lines = result_rows(result, width);
-                added += lines.len();
-                let end = range.end + lines.len();
-                rows.splice(range.end..range.end, lines);
-                range.end = end;
+            if !matches!(node, Node::Table(_)) {
+                continue;
             }
+            let result = results.get(&line_of(node));
+            let mut end = range.end;
+            end += table_rows.place(&mut rows, node, range.start, result, width);
+            if let Some(result) = result {
+                let lines = result_rows(result, width);
+                let below = end;
+                end += lines.len();
+                rows.splice(below..below, lines);
+            }
+            added += end - range.end;
+            range.end = end;
         }
         Rendered {
             width,
@@ -314,7 +334,7 @@ impl Document {
                 .unwrap_or(0),
             links: links_in(&rows, &self.targets),
             blocks: nodes.iter().map(line_of).zip(ranges).collect(),
-            failing,
+            table_rows,
             rows,
         }
     }
@@ -334,9 +354,57 @@ pub struct Rendered {
     /// The rows of each top-level element, by the line of the markdown it
     /// starts on.
     blocks: HashMap<usize, Range<usize>>,
-    /// The color of each row that holds a failure.
-    failing: HashMap<usize, RunResult>,
+    table_rows: TableRows,
     links: Vec<Link>,
+}
+
+/// Where the rows of the tables ended up, leaving out their headers.
+#[derive(Debug, Clone, Default)]
+struct TableRows {
+    /// The row on screen of each row of a table, by its line of the markdown.
+    by_line: HashMap<usize, usize>,
+    /// The result of each row on screen that has one.
+    results: HashMap<usize, RunResult>,
+}
+
+impl TableRows {
+    /// Notes where the rows of a table drawn from row `start` are, and adds
+    /// what they have to show for a run. Says how many rows that added.
+    fn place(
+        &mut self,
+        rows: &mut Vec<Row>,
+        table: &Node,
+        start: usize,
+        result: Option<&TableResult<'_>>,
+        width: usize,
+    ) -> usize {
+        let cells = children(table);
+        // Every row of a table takes one row on screen, and a rule follows the
+        // first.
+        let drawn = start..=start + cells.len();
+        let results = result.map(|result| result.rows);
+        let table_width = results
+            .filter(|results| !results.is_empty())
+            .and_then(|_| make_room_for_marks(rows.get_mut(drawn)?));
+        let mut added = 0;
+        for (index, row) in cells.iter().enumerate().skip(1) {
+            let at = start + index + 1 + added;
+            let line = line_of(row);
+            self.by_line.insert(line, at);
+            let Some(row) = results.and_then(|results| results.get(&line)) else {
+                continue;
+            };
+            self.results.insert(at, row.result);
+            if let (Some(pieces), Some(table_width)) = (rows.get_mut(at), table_width) {
+                add_mark(pieces, row.result, table_width);
+            }
+            let notes = note_rows(&row.failures, width, Failure::note);
+            added += notes.len();
+            let below = at + 1;
+            rows.splice(below..below, notes);
+        }
+        added
+    }
 }
 
 impl Rendered {
@@ -356,6 +424,19 @@ impl Rendered {
     #[must_use]
     pub fn rows_of_line(&self, line: usize) -> Option<Range<usize>> {
         self.blocks.get(&line).cloned()
+    }
+
+    /// The row on screen of the row of a table on this line of the markdown.
+    #[must_use]
+    pub fn row_of_table_line(&self, line: usize) -> Option<usize> {
+        self.table_rows.by_line.get(&line).copied()
+    }
+
+    /// The line of the markdown of the row of a table at this row on screen.
+    #[must_use]
+    pub fn table_line_at(&self, row: usize) -> Option<usize> {
+        let mut rows = self.table_rows.by_line.iter();
+        rows.find_map(|(line, at)| (*at == row).then_some(*line))
     }
 
     /// The position among [`Self::links`] of the link at a column of a row, as
@@ -565,6 +646,7 @@ impl Rendered {
     ) -> Vec<Line<'static>> {
         let Marks {
             link,
+            header,
             row: focused_row,
             selection,
         } = marks;
@@ -575,11 +657,10 @@ impl Rendered {
             .skip(top)
             .take(height)
             .map(|(index, row)| {
-                let row_style = self
-                    .failing
-                    .get(&index)
-                    .map_or_else(Style::new, |result| Style::new().fg(theme.result(*result)));
-                let row_style = if Some(index) == focused_row {
+                let color = self.table_rows.results.get(&index);
+                let color = color.and_then(|result| theme.result(*result));
+                let row_style = color.map_or_else(Style::new, |color| Style::new().fg(color));
+                let row_style = if Some(index) == header || Some(index) == focused_row {
                     row_style.add_modifier(Modifier::REVERSED)
                 } else {
                     row_style
@@ -813,39 +894,55 @@ fn line_of(node: &Node) -> usize {
     node.position().map_or(0, |position| position.start.line)
 }
 
-/// The rows of a table, drawn from row `start`, that hold a failure. Every row
-/// of a table takes one row on screen, and a rule follows the first.
-fn failing_rows(table: &Node, start: usize, failures: &[Failure]) -> Vec<(usize, RunResult)> {
-    let rows = children(table).iter().enumerate();
-    rows.filter_map(|(index, row)| {
-        let line = line_of(row);
-        let failure = failures.iter().find(|failure| failure.line == Some(line))?;
-        let result = match failure.snoozed_until {
-            Some(_) => RunResult::Snoozed,
-            None => RunResult::Failed,
-        };
-        Some((start + index + usize::from(index > 0), result))
-    })
-    .collect()
+/// Widens the rows of a table, so that a mark can be scrolled into view. Gives
+/// the width of the table without the room for marks.
+fn make_room_for_marks(rows: &mut [Row]) -> Option<usize> {
+    let width = rows.iter().flatten().find_map(|piece| piece.block_width)?;
+    for piece in rows.iter_mut().flatten() {
+        piece.block_width = Some(width + MARK_GAP + MARK_WIDTH);
+    }
+    Some(width)
 }
 
-/// What a run says below a table: its result, then its failures.
-fn result_rows(table: &TableResult, width: usize) -> Vec<Row> {
-    let mark = match table.result {
-        RunResult::Passed => "✓",
-        RunResult::Snoozed => "~",
-        _ => "✗",
+/// Adds a row's mark, lined up with those of the rest of its table.
+fn add_mark(row: &mut Row, result: RunResult, table_width: usize) {
+    let gap = (table_width + MARK_GAP).saturating_sub(row_width(row));
+    let mark = Piece {
+        block_width: row.first().and_then(|piece| piece.block_width),
+        ..Piece::new(format!("{}{}", " ".repeat(gap), result.mark()), Look::Plain)
     };
-    let verdict = Piece::new(
-        format!("{mark} {}", table.result),
-        Look::Verdict(table.result),
-    );
-    let mut rows = vec![Row::new(), vec![verdict]];
-    for failure in &table.failures {
-        let text = Piece::new(failure.to_string(), Look::Plain);
-        let wrapped = wrap(vec![text], width.saturating_sub(2));
-        rows.extend(with_prefix(wrapped, "  ", "  ", Look::Plain));
+    row.push(mark);
+}
+
+/// Explains what did not pass, each in as many rows as it takes.
+fn note_rows(failures: &[Failure], width: usize, text: impl Fn(&Failure) -> String) -> Vec<Row> {
+    let mut rows = Vec::new();
+    for failure in failures {
+        let look = match failure.result {
+            RunResult::Snoozed => Look::Quote,
+            _ => Look::Note,
+        };
+        let wrapped = wrap(
+            vec![Piece::new(text(failure), look)],
+            width.saturating_sub(2),
+        );
+        rows.extend(with_prefix(wrapped, "  ", "  ", look));
     }
+    rows
+}
+
+/// What a run says below a table: its result, then what failed outside a row.
+/// A table that passed says nothing, because the marks on its rows already do.
+fn result_rows(table: &TableResult<'_>, width: usize) -> Vec<Row> {
+    if table.result == RunResult::Passed {
+        return Vec::new();
+    }
+    let verdict = format!("{} {}", table.result.mark(), table.result);
+    let mut rows = vec![
+        Row::new(),
+        vec![Piece::new(verdict, Look::Verdict(table.result))],
+    ];
+    rows.extend(note_rows(table.failures, width, ToString::to_string));
     rows
 }
 
@@ -1207,7 +1304,9 @@ fn trailing_spaces(word: &[Piece]) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::run::RowResult;
     use ratatui::style::Color;
+    use std::collections::BTreeMap;
 
     fn selected(selection: (Spot, Spot)) -> Marks<'static> {
         Marks {
@@ -1748,22 +1847,45 @@ mod tests {
         assert_eq!(selected, "89");
     }
 
-    fn failed_at(line: usize, snoozed: bool) -> TableResult {
-        TableResult {
+    const TABLE_THEN_MORE: &str = "| a |\n| - |\n| 1 |\n| 2 |\n\n[next](a.md)\n\n## After\n";
+
+    fn failure(line: usize, snoozed: bool) -> Failure {
+        Failure {
+            line,
+            message: "expected a long value, got another".into(),
+            snoozed_until: snoozed.then(|| "2099-12-31".into()),
             result: if snoozed {
                 RunResult::Snoozed
             } else {
                 RunResult::Failed
             },
-            failures: vec![Failure {
-                line: Some(line),
-                message: "expected a long value, got another".into(),
-                snoozed_until: snoozed.then(|| "2099-12-31".into()),
-            }],
         }
     }
 
-    const TABLE_THEN_MORE: &str = "| a |\n| - |\n| 1 |\n| 2 |\n\n[next](a.md)\n\n## After\n";
+    fn row(result: RunResult, failures: Vec<Failure>) -> RowResult {
+        RowResult { result, failures }
+    }
+
+    /// Renders a document whose table on line 1 has these results.
+    fn with_results(
+        markdown: &str,
+        width: u16,
+        result: RunResult,
+        rows: &BTreeMap<usize, RowResult>,
+        failures: &[Failure],
+    ) -> Rendered {
+        let document = Document::parse(markdown).unwrap();
+        let table = TableResult {
+            result,
+            rows,
+            failures,
+        };
+        document.render(width, &HashMap::from([(1, table)]))
+    }
+
+    fn with_rows(markdown: &str, width: u16, rows: &BTreeMap<usize, RowResult>) -> Rendered {
+        with_results(markdown, width, RunResult::Failed, rows, &[])
+    }
 
     fn shown(rendered: &Rendered) -> Vec<String> {
         let lines = rendered.lines(Theme::DARK, 0, usize::MAX, 0, Marks::default());
@@ -1774,8 +1896,14 @@ mod tests {
     fn a_result_goes_below_its_table_and_moves_the_rest_down() {
         let document = Document::parse(TABLE_THEN_MORE).unwrap();
         let before = document.render(60, &HashMap::new());
-        let result = failed_at(4, false);
-        let after = document.render(60, &HashMap::from([(1, &result)]));
+        let failures = [failure(1, false)];
+        let after = with_results(
+            TABLE_THEN_MORE,
+            60,
+            RunResult::Failed,
+            &BTreeMap::new(),
+            &failures,
+        );
         assert_eq!(
             shown(&after),
             [
@@ -1785,7 +1913,7 @@ mod tests {
                 "2",
                 "",
                 "✗ failed",
-                "  line 4: expected a long value, got another",
+                "  line 1: expected a long value, got another",
                 "",
                 "next",
                 "",
@@ -1802,50 +1930,234 @@ mod tests {
     }
 
     #[test]
-    fn a_long_failure_wraps_under_its_table() {
-        let document = Document::parse("| a |\n| - |\n| 1 |\n").unwrap();
-        let result = failed_at(3, false);
-        let rendered = document.render(20, &HashMap::from([(1, &result)]));
+    fn every_result_has_its_mark_below_the_table() {
+        let results = [
+            (RunResult::Failed, "✗ failed"),
+            (RunResult::Error, "! error"),
+            (RunResult::Snoozed, "~ snoozed"),
+            (RunResult::Skipped, "- skipped"),
+            (RunResult::Partial, "· partial"),
+            (RunResult::Running, "⋯ running"),
+        ];
+        for (result, line) in results {
+            let rendered = with_results(TABLE_THEN_MORE, 40, result, &BTreeMap::new(), &[]);
+            assert_eq!(shown(&rendered).get(5).map(String::as_str), Some(line));
+        }
+    }
+
+    #[test]
+    fn a_table_that_passed_has_nothing_below_it() {
+        let rows = BTreeMap::from([
+            (3, row(RunResult::Passed, Vec::new())),
+            (4, row(RunResult::Passed, Vec::new())),
+        ]);
+        let rendered = with_results(TABLE_THEN_MORE, 40, RunResult::Passed, &rows, &[]);
         assert_eq!(
-            shown(&rendered).get(5..),
+            shown(&rendered),
+            ["a", "─", "1  ✓", "2  ✓", "", "next", "", "After"]
+        );
+        assert_eq!(rendered.rows_of_line(1), Some(0..4));
+    }
+
+    #[test]
+    fn a_row_gets_a_mark_two_columns_after_the_table_and_a_note_below() {
+        let rows = BTreeMap::from([
+            (3, row(RunResult::Passed, Vec::new())),
+            (4, row(RunResult::Failed, vec![failure(4, false)])),
+        ]);
+        let rendered = with_rows(TABLE_THEN_MORE, 60, &rows);
+        assert_eq!(
+            shown(&rendered).get(..5),
             Some(
                 &[
-                    "  line 3: expected a".to_owned(),
-                    "  long value, got".to_owned(),
-                    "  another".to_owned(),
+                    "a".to_owned(),
+                    "─".to_owned(),
+                    "1  ✓".to_owned(),
+                    "2  ✗".to_owned(),
+                    "  expected a long value, got another".to_owned(),
                 ][..]
             )
         );
     }
 
-    fn row_color(rendered: &Rendered, row: usize) -> Option<Color> {
+    #[test]
+    fn marks_line_up_when_a_cell_is_narrower_than_its_column() {
+        let markdown = "| wide |\n| ---- |\n| 1    |\n| 22   |\n";
+        let rows = BTreeMap::from([
+            (3, row(RunResult::Passed, Vec::new())),
+            (4, row(RunResult::Passed, Vec::new())),
+        ]);
+        let rendered = with_rows(markdown, 40, &rows);
+        let lines = shown(&rendered);
+        assert_eq!(lines.get(2).map(String::as_str), Some("1     ✓"));
+        assert_eq!(lines.get(3).map(String::as_str), Some("22    ✓"));
+    }
+
+    #[test]
+    fn a_row_with_several_problems_has_a_note_for_each() {
+        let failures = vec![failure(3, false), failure(3, true)];
+        let rows = BTreeMap::from([(3, row(RunResult::Failed, failures))]);
+        let rendered = with_rows(TABLE_THEN_MORE, 80, &rows);
+        assert_eq!(
+            shown(&rendered).get(3..5),
+            Some(
+                &[
+                    "  expected a long value, got another".to_owned(),
+                    "  expected a long value, got another (snoozed until 2099-12-31)".to_owned(),
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn a_long_note_wraps_under_its_row() {
+        let rows = BTreeMap::from([(3, row(RunResult::Failed, vec![failure(3, false)]))]);
+        let rendered = with_rows("| a |\n| - |\n| 1 |\n", 20, &rows);
+        assert_eq!(
+            shown(&rendered).get(3..6),
+            Some(
+                &[
+                    "  expected a long".to_owned(),
+                    "  value, got another".to_owned(),
+                    String::new(),
+                ][..]
+            )
+        );
+    }
+
+    #[test]
+    fn rows_are_found_past_the_notes_above_them() {
+        let rows = BTreeMap::from([(3, row(RunResult::Failed, vec![failure(3, false)]))]);
+        let rendered = with_rows(TABLE_THEN_MORE, 60, &rows);
+        assert_eq!(rendered.row_of_table_line(3), Some(2));
+        assert_eq!(rendered.row_of_table_line(4), Some(4));
+        assert_eq!(rendered.table_line_at(4), Some(4));
+        assert_eq!(rendered.table_line_at(3), None);
+        assert_eq!(rendered.table_line_at(0), None);
+    }
+
+    #[test]
+    fn the_header_is_not_a_row() {
+        let document = Document::parse(TABLE_THEN_MORE).unwrap();
+        let rendered = document.render(40, &HashMap::new());
+        assert_eq!(rendered.row_of_table_line(1), None);
+        assert_eq!(rendered.row_of_table_line(3), Some(2));
+    }
+
+    fn colors_of(rendered: &Rendered, row: usize) -> Vec<Option<Color>> {
         let lines = rendered.lines(Theme::DARK, row, 1, 0, Marks::default());
-        lines.first()?.spans.first()?.style.fg
+        let spans = lines.first().map_or(&[][..], |line| line.spans.as_slice());
+        spans.iter().map(|span| span.style.fg).collect()
+    }
+
+    fn row_color(rendered: &Rendered, row: usize) -> Option<Color> {
+        colors_of(rendered, row).first().copied().flatten()
     }
 
     #[test]
-    fn a_failing_row_skips_the_rule_under_the_header() {
-        let document = Document::parse(TABLE_THEN_MORE).unwrap();
-        let result = failed_at(4, false);
-        let rendered = document.render(40, &HashMap::from([(1, &result)]));
+    fn a_result_colours_its_whole_row_and_not_the_header() {
+        let rows = BTreeMap::from([(4, row(RunResult::Passed, Vec::new()))]);
+        let rendered = with_rows(TABLE_THEN_MORE, 40, &rows);
+        assert_eq!(row_color(&rendered, 0), None);
         assert_eq!(row_color(&rendered, 2), None);
-        assert_eq!(row_color(&rendered, 3), Some(Theme::DARK.failed));
+        let colors = colors_of(&rendered, 3);
+        assert_ne!(colors.len(), 0);
+        assert!(colors.iter().all(|fg| *fg == Some(Theme::DARK.passed)));
     }
 
     #[test]
-    fn a_failure_on_the_header_marks_the_header() {
-        let document = Document::parse(TABLE_THEN_MORE).unwrap();
-        let result = failed_at(1, true);
-        let rendered = document.render(40, &HashMap::from([(1, &result)]));
-        assert_eq!(row_color(&rendered, 0), Some(Theme::DARK.snoozed));
+    fn each_result_has_its_row_colour() {
+        let colors = [
+            (RunResult::Passed, Some(Theme::DARK.passed)),
+            (RunResult::Failed, Some(Theme::DARK.failed)),
+            (RunResult::Error, Some(Theme::DARK.failed)),
+            (RunResult::Snoozed, Some(Theme::DARK.snoozed)),
+            (RunResult::Skipped, None),
+            (RunResult::Running, None),
+        ];
+        for (result, color) in colors {
+            let rows = BTreeMap::from([(3, row(result, Vec::new()))]);
+            let rendered = with_rows(TABLE_THEN_MORE, 40, &rows);
+            assert_eq!(row_color(&rendered, 2), color, "{result}");
+        }
+    }
+
+    fn note_color(failure: Failure) -> Option<Color> {
+        let rows = BTreeMap::from([(3, row(failure.result, vec![failure]))]);
+        let rendered = with_rows(TABLE_THEN_MORE, 80, &rows);
+        colors_of(&rendered, 3).last().copied().flatten()
     }
 
     #[test]
-    fn a_failure_outside_the_rows_marks_nothing() {
+    fn a_note_is_quieter_than_its_row() {
+        assert_eq!(note_color(failure(3, false)), Some(Theme::DARK.note));
+    }
+
+    #[test]
+    fn a_snoozed_note_uses_the_quote_colour() {
+        assert_eq!(note_color(failure(3, true)), Some(Theme::DARK.quote));
+    }
+
+    #[test]
+    fn a_failure_outside_a_row_is_as_quiet_as_a_note() {
+        let failures = [failure(1, false)];
+        let rendered = with_results(
+            TABLE_THEN_MORE,
+            80,
+            RunResult::Error,
+            &BTreeMap::new(),
+            &failures,
+        );
+        let colors = colors_of(&rendered, 6);
+        assert_eq!(colors.last().copied().flatten(), Some(Theme::DARK.note));
+    }
+
+    #[test]
+    fn a_wide_table_can_scroll_to_its_marks() {
+        let markdown = "| aaaaaaaaaaaa |\n| ------------ |\n| 1            |\n";
+        let rows = BTreeMap::from([(3, row(RunResult::Passed, Vec::new()))]);
+        let rendered = with_rows(markdown, 10, &rows);
+        assert_eq!(rendered.last_left(), 5);
+        let lines = rendered.lines(Theme::DARK, 2, 1, 5, Marks::default());
+        let text = lines.first().map(ToString::to_string).unwrap_or_default();
+        assert!(text.ends_with('✓'), "{text}");
+    }
+
+    #[test]
+    fn a_wide_table_keeps_its_colour_with_the_mark_out_of_sight() {
+        let markdown = "| aaaaaaaaaaaa |\n| ------------ |\n| 1            |\n";
+        let rows = BTreeMap::from([(3, row(RunResult::Failed, Vec::new()))]);
+        let rendered = with_rows(markdown, 10, &rows);
+        let lines = rendered.lines(Theme::DARK, 2, 1, 0, Marks::default());
+        let text = lines.first().map(ToString::to_string).unwrap_or_default();
+        assert!(!text.contains('✗'), "{text}");
+        assert_eq!(row_color(&rendered, 2), Some(Theme::DARK.failed));
+    }
+
+    #[test]
+    fn a_table_without_row_results_keeps_its_width() {
+        let rendered = with_rows("| aaaaaaaaaaaa |\n| - |\n| 1 |\n", 10, &BTreeMap::new());
+        assert_eq!(rendered.last_left(), 2);
+    }
+
+    #[test]
+    fn the_header_and_the_focused_row_are_both_reversed() {
         let document = Document::parse(TABLE_THEN_MORE).unwrap();
-        let result = failed_at(100, false);
-        let rendered = document.render(40, &HashMap::from([(1, &result)]));
-        assert!(rendered.failing.is_empty());
+        let rendered = document.render(40, &HashMap::new());
+        let marks = Marks {
+            header: Some(0),
+            row: Some(3),
+            ..Marks::default()
+        };
+        let lines = rendered.lines(Theme::DARK, 0, 4, 0, marks);
+        let reversed: Vec<bool> = lines
+            .iter()
+            .map(|line| {
+                let mut spans = line.spans.iter();
+                spans.all(|span| span.style.add_modifier.contains(Modifier::REVERSED))
+            })
+            .collect();
+        assert_eq!(reversed, [true, false, false, true]);
     }
 
     #[test]
@@ -1853,7 +2165,7 @@ mod tests {
         let document = Document::parse("| a | b |\n| - | - |\n| 1 | 2 |\n").unwrap();
         let rendered = document.render(40, &HashMap::new());
         let marks = Marks {
-            row: Some(0),
+            header: Some(0),
             ..Marks::default()
         };
         let lines = rendered.lines(Theme::DARK, 0, 1, 0, marks);

@@ -38,6 +38,8 @@ pub struct Page {
     left: usize,
     focused_link: Option<usize>,
     focused_table: Option<usize>,
+    /// The focused row, among the rows of the focused table.
+    focused_row: Option<usize>,
     selection: Option<Selection>,
 }
 
@@ -59,6 +61,7 @@ impl Page {
             scroll: 0,
             left: 0,
             focused_link: None,
+            focused_row: None,
             selection: None,
         }
     }
@@ -127,7 +130,10 @@ impl Page {
             self.left,
             Marks {
                 link: self.focused_link(),
-                row: self.focused_table_row(),
+                header: self.focused_table_row(),
+                row: self
+                    .focused_row()
+                    .and_then(|line| self.rendered.row_of_table_line(line)),
                 selection: self.selected_spots(),
             },
         )
@@ -283,7 +289,8 @@ impl Page {
     }
 
     /// Reacts to a click on the screen. A test table there gets the focus, and
-    /// so does a link. Says whether a link was clicked.
+    /// so do a row of it and a link. Anything else clears the focused row. Says
+    /// whether a link was clicked.
     pub fn click(&mut self, column: u16, row: u16) -> bool {
         if row >= self.size.height {
             return false;
@@ -296,6 +303,12 @@ impl Page {
         if let Some(index) = self.tables.iter().position(holds_row) {
             self.focused_table = Some(index);
         }
+        let clicked = self.rendered.table_line_at(row);
+        let table = self.focused_table();
+        self.focused_row = clicked.and_then(|clicked| {
+            let rows = &table?.rows;
+            rows.iter().position(|row| *row == clicked)
+        });
         let link = self.rendered.link_at(row, usize::from(column), self.left);
         if let Some(index) = link {
             self.focus_link(index);
@@ -361,6 +374,9 @@ impl Page {
     }
 
     fn focus_table(&mut self, index: usize) {
+        if self.focused_table != Some(index) {
+            self.focused_row = None;
+        }
         self.focused_table = Some(index);
         if let Some(rows) = self
             .tables
@@ -368,6 +384,41 @@ impl Page {
             .and_then(|table| self.table_rows(table))
         {
             self.reveal(&rows);
+        }
+    }
+
+    /// The line of the focused row of the focused table.
+    #[must_use]
+    pub fn focused_row(&self) -> Option<usize> {
+        self.focused_table()?.rows.get(self.focused_row?).copied()
+    }
+
+    /// Focuses the next row of the focused table, starting at the first one and
+    /// stopping at the last one.
+    pub fn next_row(&mut self) {
+        let last = self.last_row();
+        let next = self.focused_row.map_or(0, |index| index.saturating_add(1));
+        self.focus_row(last.map(|last| next.min(last)));
+    }
+
+    /// Focuses the previous row of the focused table, starting at the last one
+    /// and stopping at the first one.
+    pub fn previous_row(&mut self) {
+        let last = self.last_row();
+        let focused = self.focused_row;
+        self.focus_row(last.map(|last| focused.map_or(last, |index| index.saturating_sub(1))));
+    }
+
+    /// The position of the last row of the focused table.
+    fn last_row(&self) -> Option<usize> {
+        self.focused_table()?.rows.len().checked_sub(1)
+    }
+
+    fn focus_row(&mut self, index: Option<usize>) {
+        self.focused_row = index;
+        let line = self.focused_row();
+        if let Some(row) = line.and_then(|line| self.rendered.row_of_table_line(line)) {
+            self.reveal(&(row..row.saturating_add(1)));
         }
     }
 

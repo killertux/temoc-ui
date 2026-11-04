@@ -26,7 +26,7 @@ table is drawn reversed, so that you can see what `r` will run.
 
 Imports still apply to a table run alone, but symbols set by other tables do not.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation  | workspace  | arguments  | keys  | temoc arguments?                           |
 | ------------ | ---------- | ---------- | ----- | ------------------------------------------ |

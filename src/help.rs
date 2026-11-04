@@ -11,7 +11,7 @@ use ratatui::widgets::{Clear, Paragraph};
 const KEY_WIDTH: usize = 21;
 
 /// Every key and what it does, as `spec/keys.md` lists them.
-const KEYS: [(&str, &str); 21] = [
+const KEYS: [(&str, &str); 23] = [
     ("j, Down", "Scroll down one line"),
     ("k, Up", "Scroll up one line"),
     ("PageDown, Space", "Scroll down one page"),
@@ -25,7 +25,9 @@ const KEYS: [(&str, &str); 21] = [
     ("/", "Open search"),
     ("Ctrl-t", "In search, show only test files"),
     ("], [", "Focus the next or previous test table"),
+    ("}, {", "Focus the next or previous test row"),
     ("r", "Run the focused table"),
+    ("Ctrl-r", "Run the focused row"),
     ("R", "Run the whole file"),
     ("t", "Open the file tree"),
     ("Ctrl-g", "Enter the graph view"),
@@ -128,7 +130,7 @@ mod tests {
     #[test]
     fn every_key_shows_on_a_tall_enough_screen() {
         let mut help = Help::default();
-        let text = draw(&mut help, 23);
+        let text = draw(&mut help, 25);
         assert!(KEYS.iter().all(|(_, action)| text.contains(action)));
     }
 
@@ -148,7 +150,7 @@ mod tests {
     #[test]
     fn a_screen_that_fits_does_not_scroll() {
         let mut help = Help::default();
-        draw(&mut help, 23);
+        draw(&mut help, 25);
         help.scroll_down(1);
         assert_eq!(help.top, 0);
     }
@@ -158,7 +160,7 @@ mod tests {
         let mut help = Help::default();
         draw(&mut help, 7);
         help.scroll_down(100);
-        draw(&mut help, 23);
+        draw(&mut help, 25);
         assert_eq!(help.top, 0);
     }
 

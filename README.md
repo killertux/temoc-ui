@@ -20,7 +20,7 @@ test case:
 temoc-ui lets you read those pages the way they were meant to be read. It opens as
 a markdown viewer that makes it easy to jump between pages, follow links and find
 what you are looking for. When a page contains tests, you can also run the whole
-file or a single table and see the results in place.
+file, a single table or a single row, and watch the results appear in place.
 
 > [!NOTE]
 > temoc-ui is in early development. See [Project status](#project-status) for what
@@ -29,8 +29,8 @@ file or a single table and see the results in place.
 ## Getting started
 
 You need a recent stable [Rust](https://www.rust-lang.org/tools/install) toolchain,
-and [temoc](https://github.com/killertux/temoc/releases) on your `PATH` to run tests.
-Install temoc-ui from this repository:
+and [temoc](https://github.com/killertux/temoc/releases) 0.10 or later on your `PATH`
+to run tests. Install temoc-ui from this repository:
 
 ```sh
 cargo install --git https://github.com/killertux/temoc-ui temoc-ui
@@ -72,7 +72,9 @@ cargo run -- samples/docs
 | `Enter`                       | Follow the focused link               |
 | `h` or `Backspace`, `l`       | Go back or forward                    |
 | `]`, `[`                      | Focus the next or previous test table |
+| `}`, `{`                      | Focus the next or previous test row   |
 | `r`                           | Run the focused table                 |
+| `Ctrl-r`                      | Run the focused row                   |
 | `R`                           | Run the whole file                    |
 | `/`                           | Open search                           |
 | `t`                           | Open the file tree                    |
@@ -88,8 +90,8 @@ and `Enter` to open it, or `Esc` to close search. `Ctrl-t` shows only the files 
 contain temoc tests.
 
 The mouse works too. The wheel scrolls, and holding `Shift` or using a sideways wheel
-scrolls wide tables and code. Click a link to follow it, a test table to focus it, or
-a row of the file tree to open it.
+scrolls wide tables and code. Click a link to follow it, a test table or one of its rows
+to focus it, or a row of the file tree to open it.
 
 temoc-ui captures the mouse, so it selects text itself. Drag to select, and the text is
 copied when you let go. From the keyboard, `v` puts a cursor on the page: move it with
@@ -128,13 +130,21 @@ Running needs a temoc configuration file, which tells temoc how to start your Sl
 server. temoc-ui uses `temoc.toml` at the root of the workspace, or the file given
 with `--config`. Pages open without one, but nothing can run.
 
-The focused table has a reversed header row. After a run, each table shows its result
-below it, with its failures listed under that and the failing rows highlighted: red
-for a real failure and yellow for a snoozed one. The result for the whole file is at
-the right of the status bar.
+The focused table has a reversed header row, and the focused row is reversed too. Each
+row that runs gets a mark two columns after its end and a colour, as soon as temoc
+finishes it: a green `✓` when it passed, a red `✗` for a wrong value, a red `!` for an
+error such as an exception, a yellow `~` when it is snoozed, and a plain `-` when it never
+ran. The row temoc is working on shows `⋯`. A row that did not pass has a note below it
+saying why.
+
+Each table that did not pass shows its result below it, and the result for the whole file
+is at the right of the status bar. A table takes the worst result of its rows, and a file the worst of
+its tables. A table with only some of its rows run is `partial`, and so is a file with
+only some of its tables run, unless something did not pass.
 
 Tests run in the background, so you can keep reading, and results stay until you close
-temoc-ui or the file runs again.
+temoc-ui or that part of the file runs again. A row run by itself cannot see symbols set
+by other rows, which temoc reports as an error in the row.
 
 ## Project status
 
@@ -144,7 +154,8 @@ temoc-ui or the file runs again.
 - Scrolling, following links and going back and forward through history
 - Searching files and headings, with a filter for test files
 - Finding test tables and moving between them
-- Running a whole file or a single table, and showing the results in place
+- Running a whole file, a single table or a single row, and showing each row's result
+  in place as soon as it is known
 - A pop-up file tree
 - Mouse support
 - Selecting and copying text
@@ -154,7 +165,6 @@ temoc-ui or the file runs again.
 
 **Further out**
 
-- Running a single row, which needs a change to temoc first
 - A web interface, behind a compile-time feature flag
 
 ## The specification

@@ -40,6 +40,8 @@ pub struct Session {
     app: App,
     terminal: Terminal<TestBackend>,
     output: Vec<u8>,
+    /// Whether keys wait for a test run to finish.
+    patient: bool,
 }
 
 /// What the pretend terminal says about itself.
@@ -85,10 +87,18 @@ impl Session {
             app,
             terminal,
             output: Vec::new(),
+            patient: true,
         };
         session.settle()?;
-        for input in keys::parse(keys)? {
-            session.apply(&input)?;
+        let inputs = keys::parse(keys)?;
+        let mut inputs = inputs.iter().peekable();
+        while let Some(input) = inputs.next() {
+            // `Wait` is there to see a run in progress, so that the key that
+            // starts the run cannot wait for it.
+            if matches!(inputs.peek(), Some(Input::Wait(_))) {
+                session.patient = false;
+            }
+            session.apply(input)?;
         }
         Ok(session)
     }
@@ -118,6 +128,22 @@ impl Session {
                 let end = self.locate(to)?.first;
                 self.drag(start, end)
             }
+            Input::Wait(text) => self.wait_for(text),
+        }
+    }
+
+    /// Keeps the screen up to date until `text` is on it.
+    fn wait_for(&mut self, text: &str) -> Result<(), String> {
+        let deadline = Instant::now() + RUN_TIMEOUT;
+        loop {
+            self.settle()?;
+            if self.shows(text) {
+                return Ok(());
+            }
+            if Instant::now() > deadline {
+                return Err(format!("timed out waiting for `{text}`"));
+            }
+            sleep(POLL_INTERVAL);
         }
     }
 
@@ -148,11 +174,11 @@ impl Session {
         self.settle()
     }
 
-    /// Waits for background work, then redraws the screen.
+    /// Waits for background work, if keys do, then redraws the screen.
     fn settle(&mut self) -> Result<(), String> {
         let deadline = Instant::now() + RUN_TIMEOUT;
         self.app.update();
-        while self.app.is_busy() {
+        while self.patient && self.app.is_busy() {
             if Instant::now() > deadline {
                 return Err("timed out waiting for temoc-ui".into());
             }
@@ -189,6 +215,12 @@ impl Session {
     pub fn highlight(&self, text: &str) -> Result<&'static str, String> {
         let found = self.locate(text)?;
         Ok(screen::highlight(self.buffer(), found, self.state().theme))
+    }
+
+    /// The line below `text` on screen.
+    pub fn next_line(&self, text: &str) -> Result<String, String> {
+        let (_, y) = self.locate(text)?.first;
+        Ok(screen::line(self.buffer(), y.saturating_add(1)))
     }
 
     /// The foreground and background at `text` on screen.

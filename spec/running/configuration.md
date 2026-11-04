@@ -15,7 +15,7 @@ current folder. It must be [version 0.10 or later](temoc-output.md). A relative
 it along so that temoc finds the same file.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation                | workspace     | arguments                        | keys | temoc arguments?                           |
 | -------------------------- | ------------- | -------------------------------- | ---- | ------------------------------------------ |
@@ -26,7 +26,7 @@ it along so that temoc finds the same file.
 
 Pages still open, but nothing runs.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation             | workspace     | arguments                  | keys | temoc arguments? | status?                                                  |
 | ----------------------- | ------------- | -------------------------- | ---- | ---------------- | -------------------------------------------------------- |

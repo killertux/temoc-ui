@@ -17,7 +17,9 @@ Back to the [specification index](README.md).
 | `/`                 | Open search                              | [Search](search.md)                          |
 | `Ctrl-t`            | In search, show only test files          | [Search](search.md)                          |
 | `]`, `[`            | Focus the next or previous test table    | [Navigation](viewer/navigation.md)           |
+| `}`, `{`            | Focus the next or previous test row      | [Running a row](running/running-a-row.md)    |
 | `r`                 | Run the focused table                    | [Running a table](running/running-a-table.md) |
+| `Ctrl-r`            | Run the focused row                      | [Running a row](running/running-a-row.md)    |
 | `R`                 | Run the whole file                       | [Running a file](running/running-a-file.md)  |
 | `t`                 | Open the file tree                       | [File tree](viewer/file-tree.md)             |
 | `Ctrl-g`            | Enter the graph view                     | [Graph view](viewer/graph.md)                |

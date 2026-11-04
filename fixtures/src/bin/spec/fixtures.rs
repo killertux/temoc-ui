@@ -9,7 +9,7 @@ use std::path::Path;
 use temoc_ui::app::AppState;
 use temoc_ui::graph::GraphState;
 use temoc_ui::render::{self, Preview};
-use temoc_ui::temoc::{self, RunReport, TestFile};
+use temoc_ui::temoc::{self, Event, RunReport, TestFile, Transcript};
 use temoc_ui::theme::Rgb;
 
 const NONE: &str = "none";
@@ -150,6 +150,16 @@ impl Tui {
     }
 
     #[must_use]
+    pub fn next_line(&self) -> String {
+        self.read_session(|session| {
+            session.next_line(&self.look_for).map_or_else(
+                |problem| problem,
+                |line| or_none(Some(line).filter(|line| !line.is_empty())),
+            )
+        })
+    }
+
+    #[must_use]
     pub fn status(&self) -> String {
         match &self.outcome {
             Some(Outcome::Refused(message)) => message.clone(),
@@ -185,6 +195,23 @@ impl Tui {
     #[must_use]
     pub fn focused_table(&self) -> String {
         self.read_state(|state| or_none(state.focused_table.clone()))
+    }
+
+    #[must_use]
+    pub fn focused_row(&self) -> String {
+        self.read_state(|state| or_none(state.focused_row.map(|line| line.to_string())))
+    }
+
+    #[must_use]
+    pub fn row_results(&self) -> String {
+        self.read_state(|state| {
+            let results: Vec<String> = state
+                .row_results
+                .iter()
+                .map(|(line, result)| format!("{line}: {result}"))
+                .collect();
+            list(&results, ", ")
+        })
     }
 
     #[must_use]
@@ -431,7 +458,7 @@ impl TemocDetection {
 /// Reads temoc's output by itself.
 #[derive(Default)]
 pub struct TemocOutput {
-    stdout: String,
+    events: String,
     stderr: String,
     exit_code: i32,
 }
@@ -448,8 +475,8 @@ impl TemocOutput {
         *self = Self::default();
     }
 
-    pub fn set_stdout(&mut self, stdout: String) {
-        self.stdout = stdout;
+    pub fn set_events(&mut self, events: String) {
+        self.events = events;
     }
 
     pub fn set_stderr(&mut self, stderr: String) {
@@ -462,15 +489,21 @@ impl TemocOutput {
 
     #[must_use]
     pub fn result(&self) -> String {
-        self.read().result.to_string()
+        self.read().1.result.to_string()
+    }
+
+    #[must_use]
+    pub fn message(&self) -> String {
+        or_none(self.read().1.message)
     }
 
     #[must_use]
     pub fn failures(&self) -> String {
         let failures: Vec<String> = self
             .read()
-            .failures
+            .0
             .iter()
+            .flat_map(Event::failures)
             .map(ToString::to_string)
             .collect();
         list(&failures, "; ")
@@ -478,8 +511,11 @@ impl TemocOutput {
 }
 
 impl TemocOutput {
-    fn read(&self) -> RunReport {
-        let stdout = self.stdout.replace("\\n", "\n");
-        temoc::read_output(&stdout, &self.stderr, self.exit_code)
+    fn read(&self) -> (Vec<Event>, RunReport) {
+        let mut transcript = Transcript::default();
+        let events = self.events.replace("\\n", "\n");
+        let events = events.lines().filter_map(|line| transcript.read(line));
+        let events = events.collect();
+        (events, transcript.report(&self.stderr, self.exit_code))
     }
 }

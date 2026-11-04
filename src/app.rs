@@ -5,9 +5,9 @@ use crate::graph::{Graph, GraphState};
 use crate::help::Help;
 use crate::page::Page;
 use crate::render::{Document, Motion};
-use crate::run::{FileResults, Request, Run};
+use crate::run::{FileResults, NOT_RUN, Progress, Request, Run};
 use crate::search::Search;
-use crate::temoc::{RunReport, RunResult, TestTable};
+use crate::temoc::{RunReport, TestTable};
 use crate::theme::{Rgb, Theme};
 use crate::tree::{FileTree, Row};
 use crate::{NotImplemented, workspace};
@@ -26,8 +26,6 @@ use std::{fs, mem};
 
 /// The configuration file temoc-ui looks for in the workspace.
 const CONFIGURATION: &str = "temoc.toml";
-/// The result of a file that has no results yet.
-const NOT_RUN: &str = "not run";
 /// How many lines one step of the mouse wheel scrolls.
 const WHEEL_STEP: usize = 3;
 
@@ -90,8 +88,12 @@ pub struct AppState {
     pub search_results: Vec<String>,
     /// The name of the focused test table.
     pub focused_table: Option<String>,
+    /// The line of the focused row.
+    pub focused_row: Option<usize>,
     /// Each table's name and result, in document order.
     pub table_results: Vec<(String, String)>,
+    /// The line and result of each row that has one, in document order.
+    pub row_results: Vec<(usize, String)>,
     /// The result for the whole document.
     pub file_result: Option<String>,
     /// The failures listed on screen.
@@ -293,7 +295,7 @@ impl App {
         let page = self.page.as_ref().filter(|page| page.is_test_file());
         let page = page.ok_or("This file has no temoc tests")?;
         let (file, tables) = (page.file().to_owned(), page.tables().to_vec());
-        self.start_run(&file, file.clone(), &tables)
+        self.start_run(&file, file.clone(), &tables, None)
     }
 
     /// Runs the focused table.
@@ -303,20 +305,43 @@ impl App {
         let (file, table) = found.ok_or("No test table to run")?;
         let target = format!("{file}:{}", table.directive_line);
         let (file, table) = (file.to_owned(), table.clone());
-        self.start_run(&file, target, &[table])
+        self.start_run(&file, target, &[table], None)
     }
 
+    /// Runs the focused row.
+    fn run_row(&mut self) -> Result<(), String> {
+        let page = self.page.as_ref();
+        let found = page.and_then(|page| {
+            let table = page.focused_table()?;
+            Some((page.file(), table, page.focused_row()?))
+        });
+        let (file, table, row) = found.ok_or("No test row to run")?;
+        let target = format!("{file}:{row}");
+        let (file, table) = (file.to_owned(), table.clone());
+        self.start_run(&file, target, &[table], Some(row))
+    }
+
+    /// Starts temoc on `target`, which is these tables or one `row` of them.
     fn start_run(
         &mut self,
         file: &str,
         target: String,
         tables: &[TestTable],
+        row: Option<usize>,
     ) -> Result<(), String> {
         if self.run.is_some() {
             return Err("temoc is already running".into());
         }
-        let arguments = vec!["-c".into(), self.configuration()?, "-s".into(), target];
+        let arguments = vec![
+            "-c".into(),
+            self.configuration()?,
+            "--output".into(),
+            "jsonl".into(),
+            target,
+        ];
         self.temoc_arguments = Some(arguments.clone());
+        let results = self.results.entry(file.to_owned()).or_default();
+        results.begin(tables, row);
         let request = Request {
             folder: self.workspace.clone(),
             extra_path: self.extra_path.clone(),
@@ -325,10 +350,15 @@ impl App {
             tables: tables.to_vec(),
         };
         match Run::start(request) {
-            Ok(run) => self.run = Some(run),
-            Err(message) => self.keep_report(file, tables, RunReport::stopped(message)),
+            Ok(run) => {
+                self.run = Some(run);
+                Ok(())
+            }
+            Err(message) => {
+                results.finish(&RunReport::stopped(message.clone()));
+                Err(failed_run(&message))
+            }
         }
-        Ok(())
     }
 
     /// The configuration file to give temoc, which runs in the workspace.
@@ -355,20 +385,6 @@ impl App {
             _ => path,
         };
         Ok(path.to_string_lossy().into_owned())
-    }
-
-    /// Keeps what a run reported, and says so if it needs saying.
-    fn keep_report(&mut self, file: &str, tables: &[TestTable], report: RunReport) {
-        match (report.result, &report.error) {
-            (RunResult::Error, Some(message)) => {
-                self.status = Some(format!("temoc failed: {message}"));
-            }
-            (RunResult::Error, None) => self.status = Some("temoc failed".into()),
-            (RunResult::NoTests, _) => self.status = Some("temoc found nothing to run".into()),
-            _ => {}
-        }
-        let results = self.results.entry(file.to_owned()).or_default();
-        results.record(tables, report);
     }
 
     /// Shows what went wrong, if anything did.
@@ -593,13 +609,21 @@ impl App {
             return Ok(());
         }
         if control {
-            if key.code != KeyCode::Char('g') {
-                return Err(NotImplemented);
-            }
-            self.open_graph();
-            return Ok(());
+            return self.handle_control_key(key.code);
         }
         self.handle_page_key(key.code)
+    }
+
+    fn handle_control_key(&mut self, code: KeyCode) -> Result<(), NotImplemented> {
+        match code {
+            KeyCode::Char('g') => self.open_graph(),
+            KeyCode::Char('r') => {
+                let result = self.run_row();
+                self.report(result);
+            }
+            _ => return Err(NotImplemented),
+        }
+        Ok(())
     }
 
     fn handle_search_key(&mut self, code: KeyCode, control: bool) {
@@ -759,6 +783,8 @@ impl App {
             KeyCode::BackTab => Page::previous_link,
             KeyCode::Char(']') => Page::next_table,
             KeyCode::Char('[') => Page::previous_table,
+            KeyCode::Char('}') => Page::next_row,
+            KeyCode::Char('{') => Page::previous_row,
             _ => return Err(NotImplemented),
         };
         if let Some(page) = &mut self.page {
@@ -769,11 +795,20 @@ impl App {
 
     /// Picks up the progress of background work, such as a test run.
     pub fn update(&mut self) {
-        let Some(report) = self.run.as_mut().and_then(Run::finished) else {
+        let Some(run) = &mut self.run else {
             return;
         };
-        if let Some(run) = self.run.take() {
-            self.keep_report(run.file(), run.tables(), report);
+        let Progress { events, report } = run.progress();
+        let results = self.results.entry(run.file().to_owned()).or_default();
+        for event in events {
+            results.apply(run.tables(), event);
+        }
+        if let Some(report) = report {
+            results.finish(&report);
+            if let Some(message) = &report.message {
+                self.status = Some(failed_run(message));
+            }
+            self.run = None;
         }
     }
 
@@ -820,23 +855,20 @@ impl App {
     /// open file on the right.
     fn draw_status(&self, frame: &mut Frame, area: Rect) {
         frame.render_widget(Block::new().style(self.theme.status_bar()), area);
-        let running = self
-            .run
-            .as_ref()
-            .map(|run| format!("Running {}...", run.file()));
         let result = self.file_result().filter(|result| *result != NOT_RUN);
         let result = result.map_or_else(String::new, |result| format!("file: {result}"));
         let width = Line::from(result.as_str()).width();
         let width = u16::try_from(width).unwrap_or(area.width);
         let [message, file] =
             Layout::horizontal([Constraint::Min(0), Constraint::Length(width)]).areas(area);
-        if let Some(text) = self.message().or(running) {
+        if let Some(text) = self.message() {
             frame.render_widget(Paragraph::new(text), message);
         }
         frame.render_widget(Paragraph::new(result), file);
     }
 
-    /// The status bar message: what just happened, or else what to do next.
+    /// The status bar message: what just happened, or else what to do next,
+    /// or else what is going on.
     fn message(&self) -> Option<String> {
         let page = self.page.as_ref().filter(|page| page.is_selecting());
         let hint = page.map(|page| {
@@ -846,7 +878,9 @@ impl App {
                 "Move to the start, then press v"
             }
         });
-        self.status.clone().or(hint.map(String::from))
+        let running = self.run.as_ref();
+        let running = running.map(|run| format!("Running {}...", run.file()));
+        self.status.clone().or(hint.map(String::from)).or(running)
     }
 
     /// The result of the open file, if it has tests.
@@ -885,7 +919,13 @@ impl App {
             focused_table: page
                 .and_then(Page::focused_table)
                 .map(|table| table.name.clone()),
+            focused_row: page.and_then(Page::focused_row),
             table_results: results.by_table(tables),
+            row_results: results
+                .by_row()
+                .into_iter()
+                .map(|(line, result)| (line, result.to_string()))
+                .collect(),
             file_result: self.file_result().map(String::from),
             failures: results.failures(tables),
             temoc_arguments: self.temoc_arguments.clone(),
@@ -903,6 +943,11 @@ impl App {
             graph: self.graph.as_ref().map(Graph::state),
         }
     }
+}
+
+/// What the status bar says about a run that could not finish.
+fn failed_run(message: &str) -> String {
+    format!("temoc failed: {message}")
 }
 
 /// How a key moves the cursor in selection mode.
@@ -1641,6 +1686,13 @@ mod tests {
         assert_eq!(app.handle_event(&Event::Resize(100, 40)), Ok(()));
     }
 
+    /// What a `temoc` says for a run of the only row of a `Workspace`.
+    const PASSING_RUN: &str = r#"
+        echo '{"type":"run_started","schema":1}'
+        echo '{"type":"row_finished","table":3,"line":7,"status":"passed","checks":[]}'
+        echo '{"type":"run_finished","status":"passed"}'
+    "#;
+
     /// A workspace of its own, with a `temoc` that does what `script` says.
     struct Workspace(PathBuf);
 
@@ -1697,21 +1749,25 @@ mod tests {
         let mut app = workspace.app();
         press(&mut app, KeyCode::Char('R'));
         assert!(app.is_busy());
-        assert_eq!(status_bar(&mut app), "Running README.md...");
+        let running = "Running README.md...       file: running";
+        assert_eq!(status_bar(&mut app), running);
         press(&mut app, KeyCode::Char('j'));
         press(&mut app, KeyCode::Char('r'));
         assert_eq!(
             app.state().status.as_deref(),
             Some("temoc is already running")
         );
-        assert_eq!(status_bar(&mut app), "temoc is already running");
+        assert_eq!(
+            status_bar(&mut app),
+            "temoc is already running   file: running"
+        );
         press(&mut app, KeyCode::Char('j'));
-        assert_eq!(status_bar(&mut app), "Running README.md...");
+        assert_eq!(status_bar(&mut app), running);
     }
 
     #[test]
     fn results_go_to_the_file_that_ran_even_after_leaving_it() {
-        let workspace = Workspace::new("left", "sleep 0.3; echo 'Testing file a.md...OK'");
+        let workspace = Workspace::new("left", &format!("sleep 0.3; {PASSING_RUN}"));
         let mut app = workspace.app();
         press(&mut app, KeyCode::Char('R'));
         app.visit("other.md", None).unwrap();
@@ -1724,7 +1780,7 @@ mod tests {
 
     #[test]
     fn a_page_opened_after_a_run_shows_its_results() {
-        let workspace = Workspace::new("reopen", "echo 'Testing file a.md...OK'");
+        let workspace = Workspace::new("reopen", PASSING_RUN);
         let mut app = workspace.app();
         press(&mut app, KeyCode::Char('R'));
         settle(&mut app);
@@ -1734,21 +1790,26 @@ mod tests {
         assert_eq!(app.state().file_result.as_deref(), Some("passed"));
         assert!(app.page.as_ref().is_some_and(|page| {
             let lines = page.lines(Theme::default());
-            lines.iter().any(|l| l.to_string() == "✓ passed")
+            lines.iter().any(|l| l.to_string() == "1  ✓")
         }));
     }
 
     #[test]
     fn a_run_that_found_nothing_says_so() {
-        let workspace = Workspace::new("none", "echo 'Testing file a.md...NONE'");
+        let script = r#"
+            echo '{"type":"run_started","schema":1}'
+            echo '{"type":"run_error","kind":"no_match","message":"No table at a.md:3"}'
+            echo '{"type":"run_finished","status":"error"}'
+        "#;
+        let workspace = Workspace::new("none", script);
         let mut app = workspace.app();
         press(&mut app, KeyCode::Char('r'));
         settle(&mut app);
         assert_eq!(
             app.state().status.as_deref(),
-            Some("temoc found nothing to run")
+            Some("temoc failed: No table at a.md:3")
         );
-        assert_eq!(app.state().file_result.as_deref(), Some("not run"));
+        assert_eq!(app.state().file_result.as_deref(), Some("error"));
     }
 
     #[test]
@@ -1757,7 +1818,31 @@ mod tests {
         let mut app = workspace.app();
         press(&mut app, KeyCode::Char('R'));
         settle(&mut app);
-        assert_eq!(app.state().status.as_deref(), Some("temoc failed"));
+        assert_eq!(
+            app.state().status.as_deref(),
+            Some("temoc failed: temoc-ui needs temoc 0.10 or later")
+        );
+    }
+
+    #[test]
+    fn rows_show_up_while_the_run_goes_on() {
+        let script = r#"
+            echo '{"type":"run_started","schema":1}'
+            echo '{"type":"table_started","line":3}'
+            echo '{"type":"row_started","table":3,"line":7}'
+            sleep 30
+        "#;
+        let workspace = Workspace::new("streaming", script);
+        let mut app = workspace.app();
+        press(&mut app, KeyCode::Char('R'));
+        while app.state().row_results.is_empty() {
+            sleep(Duration::from_millis(5));
+            app.update();
+        }
+        let state = app.state();
+        assert_eq!(state.row_results, [(7, "running".to_owned())]);
+        assert_eq!(state.file_result.as_deref(), Some("running"));
+        assert!(app.is_busy());
     }
 
     #[test]

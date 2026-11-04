@@ -2,9 +2,13 @@
 
 use markdown::ParseOptions;
 use markdown::mdast::{Definition, Node};
+use serde::Deserialize;
 use std::fmt::{self, Display, Formatter};
 use std::path::Path;
-use std::{error, fs, io};
+use std::{error, fs, io, slice};
+
+/// The version of temoc's output that temoc-ui reads.
+const SCHEMA: u32 = 1;
 
 /// What temoc would find in a markdown file.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -26,6 +30,8 @@ pub struct TestTable {
     pub line: usize,
     /// The line of the nearest heading above it.
     pub heading_line: Option<usize>,
+    /// The line of each row below the header, which is how temoc selects it.
+    pub rows: Vec<usize>,
 }
 
 /// Why a markdown file could not be inspected.
@@ -91,6 +97,7 @@ pub fn tests_in(root: &Node) -> TestFile {
                         directive_line: line_of(node),
                         line: line_of(table),
                         heading_line: heading.as_ref().map(|(_, line)| *line),
+                        rows: row_lines(table),
                     });
                 }
             }
@@ -98,6 +105,12 @@ pub fn tests_in(root: &Node) -> TestFile {
         }
     }
     found
+}
+
+/// The lines of a table's rows, leaving out the header.
+fn row_lines(table: &Node) -> Vec<usize> {
+    let rows = table.children().into_iter().flatten();
+    rows.skip(1).map(line_of).collect()
 }
 
 fn line_of(node: &Node) -> usize {
@@ -119,122 +132,313 @@ fn directive_class(definition: &Definition) -> Option<&str> {
     Some(class.split_once('#').map_or(class, |(class, _)| class))
 }
 
-/// The overall result of a temoc run.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+/// The result of a row, a table, a file or a run. Results come in order from
+/// best to worst, so that the worst of several is the greatest.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 pub enum RunResult {
-    /// Everything that ran passed.
+    /// Everything matched.
     Passed,
-    /// At least one failure is real.
-    Failed,
-    /// Every failure is snoozed.
+    /// It never ran.
+    Skipped,
+    /// Whatever did not pass is under a snooze that is still active.
     Snoozed,
-    /// temoc found nothing to run.
-    NoTests,
-    /// temoc stopped without a result.
+    /// Only some of it has a result.
+    Partial,
+    /// A wrong value.
+    Failed,
+    /// Anything else that stopped it from giving an answer.
     Error,
+    /// temoc is working on it.
+    Running,
+}
+
+impl RunResult {
+    /// The word for this result.
+    #[must_use]
+    pub fn name(self) -> &'static str {
+        match self {
+            Self::Passed => "passed",
+            Self::Skipped => "skipped",
+            Self::Snoozed => "snoozed",
+            Self::Partial => "partial",
+            Self::Failed => "failed",
+            Self::Error => "error",
+            Self::Running => "running",
+        }
+    }
+
+    /// The mark that stands for this result.
+    #[must_use]
+    pub fn mark(self) -> &'static str {
+        match self {
+            Self::Passed => "✓",
+            Self::Skipped => "-",
+            Self::Snoozed => "~",
+            Self::Partial => "·",
+            Self::Failed => "✗",
+            Self::Error => "!",
+            Self::Running => "⋯",
+        }
+    }
 }
 
 impl Display for RunResult {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        f.write_str(match self {
-            Self::Passed => "passed",
-            Self::Failed => "failed",
-            Self::Snoozed => "snoozed",
-            Self::NoTests => "no tests",
-            Self::Error => "error",
-        })
+        f.write_str(self.name())
     }
 }
 
-/// One failure reported by temoc.
+/// One thing that did not pass.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Failure {
-    /// The line of the failure. temoc gives none for protocol problems.
-    pub line: Option<usize>,
+    /// The line of its row, or else of what failed to set up.
+    pub line: usize,
     /// What went wrong.
     pub message: String,
     /// The date a snoozed failure is snoozed until.
     pub snoozed_until: Option<String>,
+    /// How much it counts for.
+    pub result: RunResult,
 }
 
 impl Failure {
-    /// Reads one line of temoc's output. A line in an unknown shape is kept as
-    /// it is, so that no failure is ever lost.
-    fn read(text: &str) -> Self {
-        Self::read_known_shape(text).unwrap_or_else(|| Self {
-            line: None,
-            message: text.to_owned(),
-            snoozed_until: None,
-        })
-    }
-
-    /// Reads `Expected A, got B in FILE:LINE:COLUMN`, which may be followed by
-    /// ` for method call NAME` and then ` -- snoozed until DATE`. Values can hold
-    /// any text, so the fixed parts at the end are taken off first.
-    fn read_known_shape(text: &str) -> Option<Self> {
-        let (text, snoozed_until) = split_suffix(text, " -- snoozed until ");
-        let (text, method) = split_suffix(text, " for method call ");
-        let (outcome, place) = text.rsplit_once(" in ")?;
-        let line = place.rsplit(':').nth(1)?.parse().ok()?;
-        let (expected, got) = outcome.strip_prefix("Expected ")?.split_once(", got ")?;
-        let (expected, got) = (show_value(expected), show_value(got));
-        let message = match method {
-            Some(method) => format!("{method} expected {expected}, got {got}"),
-            None => format!("expected {expected}, got {got}"),
-        };
-        Some(Self {
-            line: Some(line),
-            message,
-            snoozed_until: snoozed_until.map(String::from),
-        })
+    /// What went wrong, without saying where.
+    #[must_use]
+    pub fn note(&self) -> String {
+        match &self.snoozed_until {
+            Some(date) => format!("{} (snoozed until {date})", self.message),
+            None => self.message.clone(),
+        }
     }
 }
 
 impl Display for Failure {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-        if let Some(line) = self.line {
-            write!(f, "line {line}: ")?;
+        write!(f, "line {}: {}", self.line, self.note())
+    }
+}
+
+/// Something that happened during a run.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Event {
+    /// temoc started on the table at the line of this directive.
+    TableStarted {
+        /// The line of its directive.
+        line: usize,
+    },
+    /// temoc started on a row.
+    RowStarted {
+        /// The line of its table's directive.
+        table: usize,
+        /// The line of the row.
+        line: usize,
+    },
+    /// A row has its result.
+    RowFinished {
+        /// The line of its table's directive.
+        table: usize,
+        /// The line of the row.
+        line: usize,
+        /// The result of the row.
+        result: RunResult,
+        /// What did not pass.
+        failures: Vec<Failure>,
+    },
+    /// temoc is done with a table.
+    TableFinished {
+        /// The line of its directive.
+        line: usize,
+    },
+    /// Something failed outside of any row.
+    SetupFailed(Failure),
+}
+
+impl Event {
+    /// What this event says did not pass.
+    #[must_use]
+    pub fn failures(&self) -> &[Failure] {
+        match self {
+            Self::RowFinished { failures, .. } => failures,
+            Self::SetupFailed(failure) => slice::from_ref(failure),
+            _ => &[],
         }
-        f.write_str(&self.message)?;
-        if let Some(date) = &self.snoozed_until {
-            write!(f, " (snoozed until {date})")?;
+    }
+}
+
+/// A line of temoc's output. temoc may add event types and fields at any time,
+/// so that anything not listed here is left out.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+enum Line {
+    RunStarted {
+        schema: u32,
+    },
+    TableStarted {
+        line: usize,
+    },
+    RowStarted {
+        table: usize,
+        line: usize,
+    },
+    RowFinished {
+        table: usize,
+        line: usize,
+        status: Status,
+        #[serde(default)]
+        checks: Vec<Check>,
+        message: Option<String>,
+    },
+    TableFinished {
+        line: usize,
+    },
+    SetupFailed {
+        line: usize,
+        phase: String,
+        status: Status,
+        actual: Option<Actual>,
+        snoozed_until: Option<String>,
+    },
+    RunError {
+        message: String,
+    },
+    RunFinished {
+        status: Status,
+    },
+    #[serde(other)]
+    Other,
+}
+
+/// A status, as temoc writes it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "snake_case")]
+enum Status {
+    Passed,
+    Failed,
+    Error,
+    Snoozed,
+    Skipped,
+    Cancelled,
+}
+
+impl Status {
+    fn result(self) -> RunResult {
+        match self {
+            Self::Passed => RunResult::Passed,
+            Self::Failed => RunResult::Failed,
+            Self::Snoozed => RunResult::Snoozed,
+            Self::Skipped => RunResult::Skipped,
+            Self::Error | Self::Cancelled => RunResult::Error,
         }
-        Ok(())
+    }
+
+    /// Whether something with this status needs explaining.
+    fn did_not_pass(self) -> bool {
+        !matches!(self, Self::Passed | Self::Skipped)
     }
 }
 
-fn split_suffix<'text>(text: &'text str, marker: &str) -> (&'text str, Option<&'text str>) {
-    text.rsplit_once(marker)
-        .map_or((text, None), |(text, suffix)| (text, Some(suffix)))
+/// One cell of a row, or a step around it.
+#[derive(Debug, Deserialize)]
+struct Check {
+    method: String,
+    status: Status,
+    expected: Option<String>,
+    actual: Option<Actual>,
+    snoozed_until: Option<String>,
 }
 
-/// Puts a value from a failure line into words.
-fn show_value(value: &str) -> String {
-    if value == "NULL or VOID" {
-        return "no value".into();
+/// What the server answered.
+#[derive(Debug, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+enum Actual {
+    Value {
+        value: String,
+    },
+    Void,
+    List {
+        value: Vec<Actual>,
+    },
+    Exception {
+        message: String,
+    },
+    MissingSymbol {
+        symbol: String,
+    },
+    ProtocolError {
+        message: String,
+    },
+    #[serde(other)]
+    Other,
+}
+
+impl Display for Actual {
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Value { value } => f.write_str(first_line(value)),
+            Self::Void => f.write_str("no value"),
+            Self::List { value } => {
+                let items: Vec<String> = value.iter().map(ToString::to_string).collect();
+                write!(f, "[{}]", items.join(", "))
+            }
+            Self::Exception { message } => write!(f, "exception {}", first_line(message)),
+            Self::MissingSymbol { symbol } => write!(f, "unknown symbol ${symbol}"),
+            Self::ProtocolError { message } => write!(f, "protocol error {}", first_line(message)),
+            Self::Other => f.write_str("an answer temoc-ui does not know"),
+        }
     }
-    if let Some(message) = value.strip_prefix("Exception ") {
-        return format!("exception {}", without_backticks(message));
+}
+
+/// The first line that has anything on it.
+fn first_line(text: &str) -> &str {
+    let mut lines = text.lines().map(str::trim);
+    lines.find(|line| !line.is_empty()).unwrap_or_default()
+}
+
+/// Says what was expected, if anything was, and what came back.
+fn describe(subject: &str, expected: Option<&str>, actual: Option<&Actual>) -> String {
+    match (expected.map(first_line), actual) {
+        (Some(expected), Some(actual)) => format!("{subject} expected {expected}, got {actual}"),
+        (Some(expected), None) => format!("{subject} expected {expected}"),
+        (None, Some(actual)) => format!("{subject} got {actual}"),
+        (None, None) => subject.to_owned(),
     }
-    without_backticks(value).into()
 }
 
-fn without_backticks(value: &str) -> &str {
-    value
-        .strip_prefix('`')
-        .and_then(|value| value.strip_suffix('`'))
-        .unwrap_or(value)
+/// What did not pass in a row, in the order temoc reported it.
+fn row_failures(line: usize, checks: &[Check], message: Option<&str>, row: Status) -> Vec<Failure> {
+    let checks = checks.iter().filter(|check| check.status.did_not_pass());
+    let mut failures: Vec<Failure> = checks
+        .map(|check| {
+            let message = describe(
+                &check.method,
+                check.expected.as_deref(),
+                check.actual.as_ref(),
+            );
+            failure(line, message, check.status, check.snoozed_until.as_ref())
+        })
+        .collect();
+    failures.extend(message.map(|message| failure(line, first_line(message).into(), row, None)));
+    failures
 }
 
-/// What a temoc run reported.
+/// A failure. A date only counts for a snooze that is still active, because
+/// temoc keeps the date of an expired one on a normal failure.
+fn failure(line: usize, message: String, status: Status, date: Option<&String>) -> Failure {
+    Failure {
+        line,
+        message,
+        snoozed_until: date.filter(|_| status == Status::Snoozed).cloned(),
+        result: status.result(),
+    }
+}
+
+/// How a temoc run ended.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RunReport {
     /// The overall result.
     pub result: RunResult,
-    /// The failures, in the order reported.
-    pub failures: Vec<Failure>,
-    /// temoc's message, when it stopped without a result.
-    pub error: Option<String>,
+    /// What stopped the run from finishing, if anything did.
+    pub message: Option<String>,
 }
 
 impl RunReport {
@@ -243,50 +447,115 @@ impl RunReport {
     pub fn stopped(message: String) -> Self {
         Self {
             result: RunResult::Error,
-            failures: Vec::new(),
-            error: Some(message),
+            message: Some(message),
         }
     }
 }
 
-/// Works out the result of a temoc run from what it printed.
-#[must_use]
-pub fn read_output(stdout: &str, stderr: &str, exit_code: i32) -> RunReport {
-    let mut lines = stdout
-        .lines()
-        .skip_while(|line| !line.starts_with("Testing file "));
-    let verdict = lines
-        .next()
-        .and_then(|line| line.rsplit_once("..."))
-        .map(|(_, verdict)| verdict);
-    let result = match (verdict, exit_code) {
-        (Some("OK"), 0) => RunResult::Passed,
-        (Some("SNOOZED"), 0) => RunResult::Snoozed,
-        (Some("NONE"), 0) => RunResult::NoTests,
-        // temoc prints SNOOZED if any failure is snoozed, even beside a real one.
-        (Some("FAIL" | "SNOOZED"), _) => RunResult::Failed,
-        _ => RunResult::Error,
-    };
-    RunReport {
-        result,
-        failures: lines
-            .filter(|line| !line.trim().is_empty())
-            .map(Failure::read)
-            .collect(),
-        error: (result == RunResult::Error)
-            .then(|| error_message(stderr))
-            .flatten(),
+/// Follows temoc's output line by line, and works out how the run ended.
+#[derive(Debug, Clone, Default)]
+pub struct Transcript {
+    started: bool,
+    finished: Option<Status>,
+    /// The first problem temoc reported with the run.
+    run_error: Option<String>,
+    /// Why the rest of the output cannot be trusted.
+    problem: Option<String>,
+}
+
+impl Transcript {
+    /// Reads one line of output, and gives the event it holds, if any.
+    pub fn read(&mut self, text: &str) -> Option<Event> {
+        if self.problem.is_some() || text.trim().is_empty() {
+            return None;
+        }
+        let Ok(line) = serde_json::from_str(text) else {
+            self.problem = Some(format!(
+                "temoc printed something temoc-ui cannot read: {text}"
+            ));
+            return None;
+        };
+        self.follow(line)
+    }
+
+    fn follow(&mut self, line: Line) -> Option<Event> {
+        match line {
+            Line::RunStarted { schema } => {
+                self.started = true;
+                if schema != SCHEMA {
+                    self.problem = Some(format!(
+                        "temoc-ui reads schema {SCHEMA} of temoc's output, \
+                         but this temoc uses schema {schema}"
+                    ));
+                }
+                None
+            }
+            Line::TableStarted { line } => Some(Event::TableStarted { line }),
+            Line::RowStarted { table, line } => Some(Event::RowStarted { table, line }),
+            Line::RowFinished {
+                table,
+                line,
+                status,
+                checks,
+                message,
+            } => Some(Event::RowFinished {
+                table,
+                line,
+                result: status.result(),
+                failures: row_failures(line, &checks, message.as_deref(), status),
+            }),
+            Line::TableFinished { line } => Some(Event::TableFinished { line }),
+            Line::SetupFailed {
+                line,
+                phase,
+                status,
+                actual,
+                snoozed_until,
+            } => {
+                let message = describe(&phase, None, actual.as_ref());
+                let failure = failure(line, message, status, snoozed_until.as_ref());
+                Some(Event::SetupFailed(failure))
+            }
+            Line::RunError { message } => {
+                self.run_error.get_or_insert(message);
+                None
+            }
+            Line::RunFinished { status } => {
+                self.finished = Some(status);
+                None
+            }
+            Line::Other => None,
+        }
+    }
+
+    /// How the run ended, once temoc has stopped with this exit code and left
+    /// this on stderr. Anything short of a `run_finished` that can be read is
+    /// an error. A temoc that printed nothing and failed did not know
+    /// `--output`, because any other failure comes with events.
+    #[must_use]
+    pub fn report(&self, stderr: &str, exit_code: i32) -> RunReport {
+        if let Some(problem) = &self.problem {
+            return RunReport::stopped(problem.clone());
+        }
+        match self.finished {
+            Some(Status::Cancelled) => RunReport::stopped("temoc was stopped".into()),
+            Some(status) => RunReport {
+                result: status.result(),
+                message: self.run_error.clone(),
+            },
+            None if self.started || exit_code == 0 => {
+                RunReport::stopped(with_stderr("temoc stopped before finishing", stderr))
+            }
+            None => RunReport::stopped(with_stderr("temoc-ui needs temoc 0.10 or later", stderr)),
+        }
     }
 }
 
-/// temoc's own error comes last, after anything the Slim server printed.
-fn error_message(stderr: &str) -> Option<String> {
-    let message = stderr
-        .lines()
-        .rev()
-        .find_map(|line| line.strip_prefix("Error: "))
-        .unwrap_or_else(|| stderr.trim());
-    (!message.is_empty()).then(|| message.to_owned())
+fn with_stderr(message: &str, stderr: &str) -> String {
+    match first_line(stderr) {
+        "" => message.to_owned(),
+        line => format!("{message}: {line}"),
+    }
 }
 
 #[cfg(test)]
@@ -368,6 +637,7 @@ Not the table.
                 directive_line: 3,
                 line: 5,
                 heading_line: Some(1),
+                rows: vec![7],
             }]
         );
     }
@@ -379,68 +649,186 @@ Not the table.
     }
 
     #[test]
-    fn a_failure_in_an_unknown_shape_is_kept() {
-        let stdout = "Testing file a.md...FAIL\nDifferent ID in response. Expected 1 but got 2\n";
-        let report = read_output(stdout, "", 1);
-        assert_eq!(report.result, RunResult::Failed);
+    fn a_table_knows_its_rows_but_not_its_header() {
+        let markdown = "[//]: # \"decisionTable B\"\n\n| a |\n| - |\n| 1 |\n| 2 |\n\n";
+        let tables = find_tests(markdown).unwrap().tables;
         assert_eq!(
-            report.failures,
-            [Failure {
-                line: None,
-                message: "Different ID in response. Expected 1 but got 2".into(),
-                snoozed_until: None,
-            }]
+            tables.first().map(|table| table.rows.clone()),
+            Some(vec![5, 6])
         );
     }
 
     #[test]
-    fn a_value_can_contain_the_words_of_a_failure_line() {
-        let stdout =
-            "Testing file a.md...FAIL\nExpected `a in b`, got `c` in a.md:3:1 for method call sum";
-        let report = read_output(stdout, "", 1);
+    fn results_are_ordered_from_best_to_worst() {
+        let results = [
+            RunResult::Passed,
+            RunResult::Skipped,
+            RunResult::Snoozed,
+            RunResult::Partial,
+            RunResult::Failed,
+            RunResult::Error,
+        ];
+        assert!(results.is_sorted());
+    }
+
+    fn events(lines: &[&str]) -> Vec<Event> {
+        let mut transcript = Transcript::default();
+        lines
+            .iter()
+            .filter_map(|line| transcript.read(line))
+            .collect()
+    }
+
+    fn report(lines: &[&str], stderr: &str) -> RunReport {
+        let mut transcript = Transcript::default();
+        for line in lines {
+            transcript.read(line);
+        }
+        transcript.report(stderr, 0)
+    }
+
+    const STARTED: &str = r#"{"type":"run_started","schema":1}"#;
+    const FINISHED: &str = r#"{"type":"run_finished","status":"passed"}"#;
+
+    #[test]
+    fn a_row_is_followed_from_start_to_finish() {
+        let lines = [
+            r#"{"type":"table_started","file":"a.md","line":7}"#,
+            r#"{"type":"row_started","file":"a.md","table":7,"line":11}"#,
+            r#"{"type":"row_finished","table":7,"line":11,"status":"passed","checks":[]}"#,
+            r#"{"type":"table_finished","line":7,"status":"passed"}"#,
+        ];
         assert_eq!(
-            report.failures.first().map(ToString::to_string).as_deref(),
-            Some("line 3: sum expected a in b, got c")
+            events(&lines),
+            [
+                Event::TableStarted { line: 7 },
+                Event::RowStarted { table: 7, line: 11 },
+                Event::RowFinished {
+                    table: 7,
+                    line: 11,
+                    result: RunResult::Passed,
+                    failures: Vec::new(),
+                },
+                Event::TableFinished { line: 7 },
+            ]
         );
     }
 
     #[test]
-    fn a_file_name_can_contain_dots() {
-        let report = read_output("Testing file a...b.md...OK\n", "", 0);
-        assert_eq!(report.result, RunResult::Passed);
+    fn a_list_inside_a_list_is_shown_in_full() {
+        let line = r#"{"type":"row_finished","table":1,"line":2,"status":"failed","checks":[{"method":"m","status":"failed","expected":"x","actual":{"kind":"list","value":[{"kind":"list","value":[{"kind":"value","value":"a"}]},{"kind":"exception","message":"b"}]}}]}"#;
+        let found = events(&[line]);
+        let failures = found.first().map_or(&[][..], Event::failures);
+        assert_eq!(
+            failures.first().map(Failure::note).as_deref(),
+            Some("m expected x, got [[a], exception b]")
+        );
     }
 
     #[test]
-    fn a_passing_word_with_a_bad_exit_code_is_an_error() {
-        let report = read_output("Testing file a.md...OK\n", "Error: closing failed", 1);
-        assert_eq!(report.result, RunResult::Error);
-        assert_eq!(report.error.as_deref(), Some("closing failed"));
+    fn an_answer_of_an_unknown_kind_does_not_lose_the_row() {
+        let line = r#"{"type":"row_finished","table":1,"line":2,"status":"error","checks":[{"method":"m","status":"error","actual":{"kind":"brand_new"}}]}"#;
+        let found = events(&[line]);
+        let failures = found.first().map_or(&[][..], Event::failures);
+        assert_eq!(
+            failures.first().map(Failure::note).as_deref(),
+            Some("m got an answer temoc-ui does not know")
+        );
     }
 
     #[test]
-    fn no_output_at_all_is_an_error() {
-        let report = read_output("", "", 127);
-        assert_eq!(report.result, RunResult::Error);
-        assert_eq!(report.error, None);
+    fn a_row_can_fail_a_check_and_lose_the_connection() {
+        let line = r#"{"type":"row_finished","table":1,"line":2,"status":"error","checks":[{"method":"m","status":"failed","expected":"1","actual":{"kind":"void"}}],"message":"Gone\nfor good"}"#;
+        let found = events(&[line]);
+        let notes: Vec<String> = found
+            .first()
+            .map_or(&[][..], Event::failures)
+            .iter()
+            .map(Failure::note)
+            .collect();
+        assert_eq!(notes, ["m expected 1, got no value", "Gone"]);
     }
 
     #[test]
-    fn the_error_is_temocs_message_not_the_servers_noise() {
-        let stderr = "server warning\nError: failed to fill whole buffer\n";
-        let report = read_output("Testing file a.md...", stderr, 1);
-        assert_eq!(report.error.as_deref(), Some("failed to fill whole buffer"));
+    fn a_setup_failure_keeps_an_active_snooze() {
+        let line = r#"{"type":"setup_failed","line":3,"phase":"make","status":"snoozed","actual":{"kind":"void"},"snoozed_until":"2099-12-31"}"#;
+        let found = events(&[line]);
+        let failure = found.first().map_or(&[][..], Event::failures).first();
+        assert_eq!(
+            failure.map(|failure| failure.result),
+            Some(RunResult::Snoozed)
+        );
+        assert_eq!(
+            failure.map(ToString::to_string).as_deref(),
+            Some("line 3: make got no value (snoozed until 2099-12-31)")
+        );
     }
 
     #[test]
-    fn an_error_without_the_usual_prefix_is_still_shown() {
-        let report = read_output("", "sh: temoc: not found\n", 127);
-        assert_eq!(report.error.as_deref(), Some("sh: temoc: not found"));
+    fn the_first_problem_with_a_run_is_the_one_shown() {
+        let lines = [
+            STARTED,
+            r#"{"type":"run_error","kind":"server_died","message":"first"}"#,
+            r#"{"type":"run_error","kind":"protocol_error","message":"second"}"#,
+            r#"{"type":"run_finished","status":"error"}"#,
+        ];
+        assert_eq!(report(&lines, "").message.as_deref(), Some("first"));
     }
 
     #[test]
-    fn the_error_is_only_for_runs_with_no_result() {
-        let stderr = "Error: Tests executed with error";
-        let stdout = "Testing file a.md...FAIL\nExpected `5`, got `4` in a.md:2:1";
-        assert_eq!(read_output(stdout, stderr, 1).error, None);
+    fn a_cancelled_run_has_no_result() {
+        let lines = [STARTED, r#"{"type":"run_finished","status":"cancelled"}"#];
+        assert_eq!(
+            report(&lines, ""),
+            RunReport::stopped("temoc was stopped".into())
+        );
+    }
+
+    #[test]
+    fn a_status_temoc_ui_does_not_know_cannot_be_trusted() {
+        let line = r#"{"type":"run_finished","status":"brand_new"}"#;
+        assert_eq!(
+            report(&[STARTED, line], "").message,
+            Some(format!(
+                "temoc printed something temoc-ui cannot read: {line}"
+            ))
+        );
+    }
+
+    #[test]
+    fn nothing_after_a_problem_is_believed() {
+        let lines = [STARTED, "not json", FINISHED];
+        assert_eq!(report(&lines, "").result, RunResult::Error);
+        let row = r#"{"type":"table_started","line":7}"#;
+        assert_eq!(events(&["not json", row]), []);
+    }
+
+    #[test]
+    fn blank_lines_are_not_a_problem() {
+        assert_eq!(
+            report(&[STARTED, "", "   ", FINISHED], "").result,
+            RunResult::Passed
+        );
+    }
+
+    #[test]
+    fn a_program_that_succeeds_in_silence_is_not_an_older_temoc() {
+        let transcript = Transcript::default();
+        assert_eq!(
+            transcript.report("", 0).message.as_deref(),
+            Some("temoc stopped before finishing")
+        );
+        assert_eq!(
+            transcript.report("", 2).message.as_deref(),
+            Some("temoc-ui needs temoc 0.10 or later")
+        );
+    }
+
+    #[test]
+    fn only_the_first_line_of_stderr_is_shown() {
+        assert_eq!(
+            report(&[STARTED], "\nfirst\nsecond\n").message.as_deref(),
+            Some("temoc stopped before finishing: first")
+        );
     }
 }

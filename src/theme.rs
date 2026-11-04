@@ -82,6 +82,8 @@ pub struct Theme {
     pub passed: Color,
     pub snoozed: Color,
     pub failed: Color,
+    /// The note under a row that did not pass: a quieter, greyer red.
+    pub note: Color,
     pub bar: Color,
     pub bar_text: Color,
 }
@@ -99,6 +101,7 @@ impl Theme {
         passed: Color::Rgb(0x6E, 0xDB, 0x8F),
         snoozed: Color::Rgb(0xF5, 0xD7, 0x6E),
         failed: Color::Rgb(0xFF, 0x8A, 0x80),
+        note: Color::Rgb(0xBF, 0x8A, 0x85),
         bar: Color::Rgb(0x87, 0xAF, 0xD7),
         bar_text: Color::Rgb(0x16, 0x18, 0x1D),
     };
@@ -115,6 +118,7 @@ impl Theme {
         passed: Color::Rgb(0x11, 0x63, 0x29),
         snoozed: Color::Rgb(0x7D, 0x4E, 0x00),
         failed: Color::Rgb(0xB3, 0x26, 0x1E),
+        note: Color::Rgb(0x8C, 0x5A, 0x55),
         bar: Color::Rgb(0x1F, 0x3A, 0x5F),
         bar_text: Color::Rgb(0xFF, 0xFF, 0xFF),
     };
@@ -131,6 +135,7 @@ impl Theme {
         passed: Color::Indexed(78),
         snoozed: Color::Indexed(221),
         failed: Color::Indexed(210),
+        note: Color::Indexed(138),
         bar: Color::Indexed(110),
         bar_text: Color::Indexed(234),
     };
@@ -147,6 +152,7 @@ impl Theme {
         passed: Color::Indexed(22),
         snoozed: Color::Indexed(94),
         failed: Color::Indexed(124),
+        note: Color::Indexed(95),
         bar: Color::Indexed(24),
         bar_text: Color::Indexed(231),
     };
@@ -207,13 +213,14 @@ impl Theme {
         Style::new().fg(self.heading).add_modifier(Modifier::BOLD)
     }
 
-    /// The colour that stands for a result.
+    /// The colour that stands for a result, if one does.
     #[must_use]
-    pub fn result(self, result: RunResult) -> Color {
+    pub fn result(self, result: RunResult) -> Option<Color> {
         match result {
-            RunResult::Passed => self.passed,
-            RunResult::Snoozed => self.snoozed,
-            _ => self.failed,
+            RunResult::Passed => Some(self.passed),
+            RunResult::Snoozed => Some(self.snoozed),
+            RunResult::Failed | RunResult::Error => Some(self.failed),
+            RunResult::Skipped | RunResult::Partial | RunResult::Running => None,
         }
     }
 

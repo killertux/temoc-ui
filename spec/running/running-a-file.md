@@ -9,7 +9,7 @@ file share a run, so symbols set by one table are available to later tables.
 temoc-ui reads.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace  | arguments  | keys | temoc arguments?                        |
 | ------------------ | ---------- | ---------- | ---- | --------------------------------------- |
@@ -23,7 +23,7 @@ The file gets one overall result, every table gets its own, and so does
 the worst result of its tables, in this order: `error`, `failed`, `partial`,
 `snoozed`, `skipped`, `passed`.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation         | workspace  | arguments  | keys | file result? | table results?                         |
 | ------------------- | ---------- | ---------- | ---- | ------------ | -------------------------------------- |
@@ -36,17 +36,18 @@ the worst result of its tables, in this order: `error`, `failed`, `partial`,
 
 ### On screen
 
-Results appear in place. Each table that has a result gets a line below it, and the
-rest of the page moves down to make room. The file result sits at the right of the
+Results appear in place. A table with any result but `passed` gets a line below it,
+and the rest of the page moves down to make room. A table that passed needs no line,
+because the marks on its rows already say so. The file result sits at the right of the
 status bar. A page that has not run looks the same as any other page.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace  | arguments  | keys | look for      | visible? |
 | ------------------ | ---------- | ---------- | ---- | ------------- | -------- |
 | No table result yet | calculator | failing.md |     | failed        | no       |
 | No file result yet | calculator | failing.md |      | file:         | no       |
-| A passing table    | calculator | failing.md | `R`  | ✓ passed      | yes      |
+| A passing table    | calculator | failing.md | `R`  | ✓ passed      | no       |
 | A failing table    | calculator | failing.md | `R`  | ✗ failed      | yes      |
 | A snoozed table    | calculator | snoozed.md | `R`  | ~ snoozed     | yes      |
 | A table with an error | outcomes | errors.md  | `R`  | ! error       | yes      |
@@ -70,7 +71,7 @@ passed, red for a real failure, and yellow for a snoozed one.
 | Snoozed        | calculator | snoozed.md | `R`  | Not Ready line 20: mul expected 5, got 4 (snoozed until 2099-12-31)   |
 | Both together  | calculator | mixed.md   | `R`  | Broken Now line 11: sum expected 9, got 3; Not Ready line 20: mul expected 5, got 4 (snoozed until 2099-12-31) |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation        | workspace  | arguments  | keys | look for      | highlight? |
 | ------------------ | ---------- | ---------- | ---- | ------------- | ---------- |
@@ -112,7 +113,7 @@ Slim server it started.
 temoc stops early when a file is malformed or the Slim server does not respond.
 That is an error, not a test failure, and temoc's message is shown.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation          | workspace      | arguments | keys | file result? | status?                                                                                          |
 | -------------------- | -------------- | --------- | ---- | ------------ | ------------------------------------------------------------------------------------------------ |
@@ -124,7 +125,7 @@ What ran before that keeps its result, and temoc reports the rest as `skipped`. 
 file that could not be read never started, so its tables have no result, whatever
 they had before. The file result stays `error` until a run finishes.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation     | workspace      | arguments | keys | file result? | table results?                         |
 | --------------- | -------------- | --------- | ---- | ------------ | -------------------------------------- |

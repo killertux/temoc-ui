@@ -20,6 +20,8 @@ pub enum Input {
     },
     Wheel(MouseEventKind, KeyModifiers),
     ClickOutside,
+    /// Stop waiting for the run, and wait until the text is on screen.
+    Wait(String),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -46,6 +48,7 @@ pub fn parse(keys: &str) -> Result<Vec<Input>, String> {
                     to: quoted(&mut tokens, "DragBack")?,
                 },
                 "ClickOutside" => Input::ClickOutside,
+                "Wait" => Input::Wait(quoted(&mut tokens, "Wait")?),
                 _ => wheel(&word)
                     .or_else(|| key(&word))
                     .ok_or_else(|| format!("unknown key `{word}`"))?,
@@ -211,6 +214,23 @@ mod tests {
                 Input::Wheel(MouseEventKind::ScrollDown, KeyModifiers::NONE),
             ]
         );
+    }
+
+    #[test]
+    fn wait_takes_its_text() {
+        assert_eq!(
+            parse(r#"R Wait "a  b""#).unwrap(),
+            vec![
+                Input::Key(KeyCode::Char('R'), KeyModifiers::SHIFT),
+                Input::Wait("a  b".into()),
+            ]
+        );
+        assert_eq!(parse("Wait j").unwrap_err(), "`Wait` needs quoted text");
+    }
+
+    #[test]
+    fn braces_are_keys() {
+        assert_eq!(parse("} {").unwrap(), ['}', '{'].map(plain).to_vec());
     }
 
     #[test]
