@@ -154,7 +154,8 @@ does not launch a web browser.
 
 `]` moves to the next [test table](../glossary.md) and `[` to the previous one,
 scrolling it into view. The first table is focused when a test file opens. Focus
-stops at the first and last tables and does not wrap around.
+stops at the first and last tables and does not wrap around. `}` and `{` do the same
+for the [rows of the focused table](../running/running-a-row.md#choosing-a-row).
 
 [//]: # "decisionTable Tui"
 

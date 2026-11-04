@@ -10,25 +10,27 @@ the [workspace](../viewer/opening.md#the-workspace). Its contents are for temoc,
 temoc-ui passes the file along without reading it.
 
 temoc itself is found through your `PATH`, and runs with the workspace as its
-current folder. A relative `--config` path starts from the folder temoc-ui was
-started in, and temoc-ui passes it along so that temoc finds the same file.
+current folder. It must be [version 0.10 or later](temoc-output.md). A relative
+`--config` path starts from the folder temoc-ui was started in, and temoc-ui passes
+it along so that temoc finds the same file.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
-| # situation                | workspace     | arguments                        | keys | temoc arguments?                       |
-| -------------------------- | ------------- | -------------------------------- | ---- | -------------------------------------- |
-| Found in the workspace     | calculator    | passing.md                       | `R`  | -c temoc.toml -s passing.md            |
-| Given with --config        | custom-config | tests.md --config ci/temoc.toml  | `R`  | -c ci/temoc.toml -s tests.md           |
+| # situation                | workspace     | arguments                        | keys | temoc arguments?                           |
+| -------------------------- | ------------- | -------------------------------- | ---- | ------------------------------------------ |
+| Found in the workspace     | calculator    | passing.md                       | `R`  | -c temoc.toml --output jsonl passing.md    |
+| Given with --config        | custom-config | tests.md --config ci/temoc.toml  | `R`  | -c ci/temoc.toml --output jsonl tests.md   |
 
 ## Without configuration
 
 Pages still open, but nothing runs.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # situation             | workspace     | arguments                  | keys | temoc arguments? | status?                                                  |
 | ----------------------- | ------------- | -------------------------- | ---- | ---------------- | -------------------------------------------------------- |
 | No configuration        | unconfigured  | tests.md                   | `R`  | none             | No temoc configuration found. Add temoc.toml or use --config. |
 | Running a single table  | unconfigured  | tests.md                   | `r`  | none             | No temoc configuration found. Add temoc.toml or use --config. |
+| Running a single row    | unconfigured  | tests.md                   | `} Ctrl-r` | none       | No temoc configuration found. Add temoc.toml or use --config. |
 | --config file is missing | unconfigured | tests.md --config nope.toml | `R` | none             | Configuration file not found: nope.toml                  |

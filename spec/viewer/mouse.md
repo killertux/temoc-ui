@@ -79,6 +79,21 @@ where it was.
 | Click outside tables | calculator | passing.md | `] Click "Passing Tests"` | Multiplication |
 | Page without tables  | docs       |            | `Click "Welcome"`        | none           |
 
+## Selecting a row
+
+Clicking a row of a test table focuses that row and its table, so that `Ctrl-r`
+[runs it](../running/running-a-row.md). Clicking the header of a table, or anything
+else, clears the focused row.
+
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+
+| # action             | workspace  | arguments  | keys                               | focused row? | focused table? |
+| -------------------- | ---------- | ---------- | ---------------------------------- | ------------ | -------------- |
+| Click a row          | calculator | passing.md | `Click "2 │ 2 │ 4"`                | 20           | Multiplication |
+| Click another table  | calculator | passing.md | `Click "2 │ 2 │ 4" Click "1 │ 2 │ 3"` | 11         | Addition       |
+| Click the header     | calculator | passing.md | `} Click "sum?"`                   | none         | Addition       |
+| Click outside tables | calculator | passing.md | `} Click "Passing Tests"`          | none         | Addition       |
+
 [//]: # "decisionTable Tui"
 
 | # action           | workspace  | arguments  | keys             | temoc arguments?               |

@@ -44,6 +44,13 @@ and then reads the screen.
 | `Ctrl-t`                                   | Hold Ctrl and press the key.  |
 | `"some text"`                              | Type each character in turn.  |
 
+Keys wait for any test run to finish before the next one is pressed, which leaves
+nothing to see of a run in progress. `Wait` is for looking at one.
+
+| Written as    | Meaning                                                                              |
+| ------------- | ------------------------------------------------------------------------------------ |
+| `Wait "text"` | Stop waiting for the run, and wait until the text is on screen. Later keys do not wait for the run either. |
+
 Mouse actions are written in the same column. They find their position from text
 on screen, searching from the top, so that they do not depend on the layout.
 
@@ -63,7 +70,8 @@ on screen, searching from the top, so that they do not depend on the layout.
 | ----------------- | ------------------------------------------------------------- |
 | `document?`       | Path of the open document within the workspace, or `none`.    |
 | `visible?`        | `yes` if the `look for` text is on screen, otherwise `no`.    |
-| `highlight?`      | How the `look for` text is highlighted: `red`, `yellow`, `reversed`, or `none`. `red` and `yellow` are the theme's colours for failed and snoozed. |
+| `highlight?`      | How the `look for` text is highlighted: `green`, `red`, `yellow`, `reversed`, or `none`. `green`, `red` and `yellow` are the theme's colours for passed, failed and snoozed. |
+| `next line?`      | The text on the screen line below the `look for` text, or `none` if it is blank. |
 | `status?`         | The status bar message, or `none`.                            |
 | `still open?`     | `yes` while temoc-ui is running, `no` after it exits.         |
 | `focused link?`   | The text of the focused link, or `none`.                      |
@@ -71,9 +79,11 @@ on screen, searching from the top, so that they do not depend on the layout.
 | `results?`        | Search results in order, separated by commas, or `none`.      |
 | `first result?`   | The top search result, or `none`.                             |
 | `focused table?`  | The name of the focused test table, or `none`.                |
+| `focused row?`    | The line of the focused row, or `none`.                       |
 | `table results?`  | Each table's name and result, separated by commas.            |
+| `row results?`    | Each row that has a result, written `line: result` and separated by commas, or `none`. |
 | `file result?`    | The result for the whole document.                            |
-| `failures?`       | Failures listed on screen, separated by semicolons, or `none`.|
+| `failures?`       | Each failure with its table and line, separated by semicolons, or `none`. |
 | `temoc arguments?`| The arguments of the last temoc command, or `none`.           |
 | `tree open?`      | `yes` while the file tree is showing.                         |
 | `tree?`           | The rows of the file tree in order, or `none`.                |
@@ -105,6 +115,7 @@ running the specification does not run them as tests too.
 | --------------------------------------------- | --------------------------------- |
 | [`docs`](../samples/docs/README.md)           | Viewing, navigating, and search.  |
 | [`calculator`](../samples/calculator/README.md) | Running real tests.             |
+| [`outcomes`](../samples/outcomes/README.md)   | Errors, symbols, and runs that hang or stop midway. |
 | [`detection`](../samples/detection)           | Recognizing test files.           |
 | [`unconfigured`](../samples/unconfigured)     | Running without configuration.    |
 | [`server-failure`](../samples/server-failure) | A Slim server that will not start.|
@@ -114,8 +125,8 @@ running the specification does not run them as tests too.
 | [`wide-blocks`](../samples/wide-blocks/README.md) | Content wider than the screen.  |
 | [`themes`](../samples/themes/README.md)       | One of each thing a theme colours. |
 
-The `calculator` workspace runs real temoc against a small Slim server built by
-the spec harness.
+The `calculator` and `outcomes` workspaces run real temoc against a small Slim server
+built by the spec harness.
 
 ## Writing a new page
 

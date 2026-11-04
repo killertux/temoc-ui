@@ -137,8 +137,10 @@ colour.
 ## Colours
 
 Each colour has one meaning. Yellow is only for snoozed results, so inline code is
-purple, and red and green are only for results. Bold, italic and struck text add their
-emphasis to the plain text colour, and the same goes for bold text in a pop-up.
+purple, and red and green are only for results. The note under a row that did not pass
+uses a quieter, greyer red, so that it explains the row without competing with it.
+The note under a snoozed row uses the quote colour. Bold, italic and struck text add
+their emphasis to the plain text colour, and the same goes for bold text in a pop-up.
 
 Focus and selection stay [reversed](../running/running-a-table.md), swapping the
 foreground and background of what they cover. That keeps its contrast, and also works
@@ -151,7 +153,7 @@ entry.
 
 ### dark
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # style        | workspace  | arguments               | keys         | look for          | foreground? | background? | contrast? |
 | -------------- | ---------- | ----------------------- | ------------ | ----------------- | ----------- | ----------- | --------- |
@@ -171,12 +173,15 @@ entry.
 | Passed table   | calculator | failing.md --theme dark | `R`          | ✓ passed          | #6EDB8F     | #16181D     | 10.3      |
 | Failed table   | calculator | failing.md --theme dark | `R`          | ✗ failed          | #FF8A80     | #16181D     | 7.8       |
 | Snoozed table  | calculator | snoozed.md --theme dark | `R`          | ~ snoozed         | #F5D76E     | #16181D     | 12.5      |
+| Passing row    | calculator | failing.md --theme dark | `R`          | 2 │ 3 │ 6         | #6EDB8F     | #16181D     | 10.3      |
 | Failing row    | calculator | failing.md --theme dark | `R`          | 2 │ 2 │ 5         | #FF8A80     | #16181D     | 7.8       |
 | Snoozed row    | calculator | snoozed.md --theme dark | `R`          | 2 │ 2 │ 5         | #F5D76E     | #16181D     | 12.5      |
+| Failure note   | calculator | failing.md --theme dark | `R`          | mul expected 5    | #BF8A85     | #16181D     | 6.1       |
+| Snoozed note   | calculator | snoozed.md --theme dark | `R`          | mul expected 5    | #A8B0BD     | #16181D     | 8.1       |
 
 ### light
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # style        | workspace  | arguments                | keys         | look for          | foreground? | background? | contrast? |
 | -------------- | ---------- | ------------------------ | ------------ | ----------------- | ----------- | ----------- | --------- |
@@ -196,12 +201,15 @@ entry.
 | Passed table   | calculator | failing.md --theme light | `R`          | ✓ passed          | #116329     | #FFFFFF     | 7.4       |
 | Failed table   | calculator | failing.md --theme light | `R`          | ✗ failed          | #B3261E     | #FFFFFF     | 6.5       |
 | Snoozed table  | calculator | snoozed.md --theme light | `R`          | ~ snoozed         | #7D4E00     | #FFFFFF     | 7.1       |
+| Passing row    | calculator | failing.md --theme light | `R`          | 2 │ 3 │ 6         | #116329     | #FFFFFF     | 7.4       |
 | Failing row    | calculator | failing.md --theme light | `R`          | 2 │ 2 │ 5         | #B3261E     | #FFFFFF     | 6.5       |
 | Snoozed row    | calculator | snoozed.md --theme light | `R`          | 2 │ 2 │ 5         | #7D4E00     | #FFFFFF     | 7.1       |
+| Failure note   | calculator | failing.md --theme light | `R`          | mul expected 5    | #8C5A55     | #FFFFFF     | 5.7       |
+| Snoozed note   | calculator | snoozed.md --theme light | `R`          | mul expected 5    | #57606A     | #FFFFFF     | 6.4       |
 
 ### dark-256
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # style        | workspace  | arguments                   | keys         | look for          | foreground? | background? | contrast? |
 | -------------- | ---------- | --------------------------- | ------------ | ----------------- | ----------- | ----------- | --------- |
@@ -221,12 +229,15 @@ entry.
 | Passed table   | calculator | failing.md --theme dark-256 | `R`          | ✓ passed          | 78          | 234         | 9.4       |
 | Failed table   | calculator | failing.md --theme dark-256 | `R`          | ✗ failed          | 210         | 234         | 7.4       |
 | Snoozed table  | calculator | snoozed.md --theme dark-256 | `R`          | ~ snoozed         | 221         | 234         | 12.3      |
+| Passing row    | calculator | failing.md --theme dark-256 | `R`          | 2 │ 3 │ 6         | 78          | 234         | 9.4       |
 | Failing row    | calculator | failing.md --theme dark-256 | `R`          | 2 │ 2 │ 5         | 210         | 234         | 7.4       |
 | Snoozed row    | calculator | snoozed.md --theme dark-256 | `R`          | 2 │ 2 │ 5         | 221         | 234         | 12.3      |
+| Failure note   | calculator | failing.md --theme dark-256 | `R`          | mul expected 5    | 138         | 234         | 5.4       |
+| Snoozed note   | calculator | snoozed.md --theme dark-256 | `R`          | mul expected 5    | 249         | 234         | 8.0       |
 
 ### light-256
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
 | # style        | workspace  | arguments                    | keys         | look for          | foreground? | background? | contrast? |
 | -------------- | ---------- | ---------------------------- | ------------ | ----------------- | ----------- | ----------- | --------- |
@@ -246,5 +257,8 @@ entry.
 | Passed table   | calculator | failing.md --theme light-256 | `R`          | ✓ passed          | 22          | 231         | 8.0       |
 | Failed table   | calculator | failing.md --theme light-256 | `R`          | ✗ failed          | 124         | 231         | 7.4       |
 | Snoozed table  | calculator | snoozed.md --theme light-256 | `R`          | ~ snoozed         | 94          | 231         | 5.7       |
+| Passing row    | calculator | failing.md --theme light-256 | `R`          | 2 │ 3 │ 6         | 22          | 231         | 8.0       |
 | Failing row    | calculator | failing.md --theme light-256 | `R`          | 2 │ 2 │ 5         | 124         | 231         | 7.4       |
 | Snoozed row    | calculator | snoozed.md --theme light-256 | `R`          | 2 │ 2 │ 5         | 94          | 231         | 5.7       |
+| Failure note   | calculator | failing.md --theme light-256 | `R`          | mul expected 5    | 95          | 231         | 5.5       |
+| Snoozed note   | calculator | snoozed.md --theme light-256 | `R`          | mul expected 5    | 59          | 231         | 6.4       |

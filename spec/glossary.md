@@ -25,7 +25,8 @@ using the Slim protocol.
 **Snoozed.** A table marked `-- snooze until <date>`. Until that date, its failures
 are reported but do not fail the run.
 
-**Focused link** and **focused table.** The link or test table that keys act on.
+**Focused link**, **focused table** and **focused row.** The link, test table or row
+of that table that keys act on.
 
 **Selection mode.** The state entered with `v`, where a cursor moves through the
 text. See [Selecting text](viewer/selecting-text.md).

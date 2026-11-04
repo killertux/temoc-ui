@@ -22,17 +22,16 @@ table is drawn reversed, so that you can see what `r` will run.
 ## Running it
 
 `r` runs the focused table. temoc selects a table by the line number of its
-`decisionTable` directive, so that is the line temoc-ui passes. Any other line
-makes temoc report success without running anything.
+`decisionTable` directive, so that is the line temoc-ui passes.
 
 Imports still apply to a table run alone, but symbols set by other tables do not.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Tui -- snooze until 2099-12-31"
 
-| # situation  | workspace  | arguments  | keys  | temoc arguments?               |
-| ------------ | ---------- | ---------- | ----- | ------------------------------ |
-| First table  | calculator | passing.md | `r`   | -c temoc.toml -s passing.md:7  |
-| Second table | calculator | passing.md | `] r` | -c temoc.toml -s passing.md:15 |
+| # situation  | workspace  | arguments  | keys  | temoc arguments?                           |
+| ------------ | ---------- | ---------- | ----- | ------------------------------------------ |
+| First table  | calculator | passing.md | `r`   | -c temoc.toml --output jsonl passing.md:7  |
+| Second table | calculator | passing.md | `] r` | -c temoc.toml --output jsonl passing.md:15 |
 
 ## Results
 

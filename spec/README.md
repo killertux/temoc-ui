@@ -3,7 +3,8 @@
 temoc-ui is a terminal interface for [temoc](https://github.com/killertux/temoc),
 which runs acceptance tests written in markdown. It opens as a markdown viewer
 that makes it easy to jump between pages. When a page contains temoc tests, you
-can run the whole file or a single table and see the results in place.
+can run the whole file, a single table or a single row and see the results in place,
+row by row, as they arrive.
 
 This specification is itself written in temoc format. Every table on these pages
 is an executable test, so a page describes how temoc-ui behaves and proves it at
@@ -31,6 +32,8 @@ New here? Read [how these pages work](writing-specs.md) and the
 - [Configuration](running/configuration.md): how temoc-ui finds the server command.
 - [Running a file](running/running-a-file.md): running every table in a page.
 - [Running a table](running/running-a-table.md): running one table in a page.
+- [Running a row](running/running-a-row.md): running one row of a table.
+- [Row results](running/row-results.md): how each row shows its result as it runs.
 - [Reading temoc's output](running/temoc-output.md): how results are worked out.
 
 ## Scope
@@ -38,10 +41,8 @@ New here? Read [how these pages work](writing-specs.md) and the
 The first version is the terminal interface. These are planned for later, and
 none of them are specified yet:
 
-- **Running a single row.** temoc can only target a whole table today, so this
-  needs a change to temoc first.
-- **Symbols across rows and tables.** A table run alone cannot see `$V` symbols
-  set by another table. This becomes more important once single rows can run.
+- **Symbols across rows and tables.** A table or row run alone cannot see `$V`
+  symbols set by another one.
 - **Web interface.** It will sit behind a compile-time feature flag and reuse the
   same behavior described here.
 - **Cancelling a run**, and **reloading a page** that changed on disk.
