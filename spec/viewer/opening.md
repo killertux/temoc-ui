@@ -3,10 +3,11 @@
 Back to the [specification index](../README.md).
 
 temoc-ui takes one optional path, plus the `--config` option described in
-[Configuration](../running/configuration.md):
+[Configuration](../running/configuration.md) and the `--theme` option described in
+[Themes](themes.md):
 
 ```sh
-temoc-ui [PATH] [--config FILE]
+temoc-ui [PATH] [--config FILE] [--theme NAME]
 ```
 
 ## The workspace

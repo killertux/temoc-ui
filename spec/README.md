@@ -22,6 +22,7 @@ New here? Read [how these pages work](writing-specs.md) and the
 - [Graph view](viewer/graph.md): seeing how every page links together.
 - [Mouse](viewer/mouse.md): scrolling, links, tables, the file tree, and the graph.
 - [Selecting text](viewer/selecting-text.md): copying with the mouse or keyboard.
+- [Themes](viewer/themes.md): dark and light, and the colours of each.
 - [Keys](keys.md): every key in one place.
 
 ## Running tests

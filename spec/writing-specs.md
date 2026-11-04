@@ -30,6 +30,8 @@ and then reads the screen.
 | `arguments` | Command line arguments for temoc-ui. Empty means none.              |
 | `keys`      | The keys to press, in order, separated by spaces.                   |
 | `look for`  | Text to check for. Used with `visible?` or `in graph?`.             |
+| `color term` | The value of `COLORTERM`. Empty means that it is not set.          |
+| `terminal background` | What the terminal answers when asked for its background, or `no answer`. Empty means `no answer`. |
 
 ### Keys notation
 
@@ -61,7 +63,7 @@ on screen, searching from the top, so that they do not depend on the layout.
 | ----------------- | ------------------------------------------------------------- |
 | `document?`       | Path of the open document within the workspace, or `none`.    |
 | `visible?`        | `yes` if the `look for` text is on screen, otherwise `no`.    |
-| `highlight?`      | How the `look for` text is highlighted: `red`, `yellow`, `reversed`, or `none`. |
+| `highlight?`      | How the `look for` text is highlighted: `red`, `yellow`, `reversed`, or `none`. `red` and `yellow` are the theme's colours for failed and snoozed. |
 | `status?`         | The status bar message, or `none`.                            |
 | `still open?`     | `yes` while temoc-ui is running, `no` after it exits.         |
 | `focused link?`   | The text of the focused link, or `none`.                      |
@@ -87,6 +89,12 @@ on screen, searching from the top, so that they do not depend on the layout.
 | `selection?`      | The selected text, or `none`.                                 |
 | `clipboard?`      | The text last copied to the clipboard, or `none`.             |
 | `clipboard sequence?` | The last clipboard escape sequence written, or `none`.    |
+| `theme?`          | The name of the theme in use.                                 |
+| `foreground?`     | The text colour at the `look for` text.                       |
+| `background?`     | The background colour at the `look for` text.                 |
+| `contrast?`       | The contrast between those two colours.                       |
+| `bar against page?` | The contrast between the status bar and the page.           |
+| `unpainted cells?` | How many cells use the terminal's default colours.           |
 
 ## Sample workspaces
 
@@ -104,6 +112,7 @@ running the specification does not run them as tests too.
 | [`many-pages`](../samples/many-pages/README.md) | A graph taller than the screen. |
 | [`link-chain`](../samples/link-chain/README.md) | A graph wider than the screen.  |
 | [`wide-blocks`](../samples/wide-blocks/README.md) | Content wider than the screen.  |
+| [`themes`](../samples/themes/README.md)       | One of each thing a theme colours. |
 
 The `calculator` workspace runs real temoc against a small Slim server built by
 the spec harness.
