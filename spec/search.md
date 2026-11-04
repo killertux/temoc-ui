@@ -13,7 +13,7 @@ is `.md` in any case. Hidden folders and folders named `target` or `node_modules
 are skipped.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # situation   | workspace | keys | search open? | results?                                                                        |
 | ------------- | --------- | ---- | ------------ | ------------------------------------------------------------------------------- |

@@ -1,10 +1,15 @@
 //! The application itself, independent of any real terminal.
 
-use crate::{NotImplemented, temoc};
-use crossterm::event::Event;
+use crate::render::Document;
+use crate::{NotImplemented, temoc, workspace};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use ratatui::Frame;
-use ratatui::layout::Rect;
-use std::path::{Component, Path, PathBuf};
+use ratatui::layout::{Margin, Rect};
+use ratatui::text::Line;
+use ratatui::widgets::{Block, Clear, Paragraph};
+use std::fmt::Display;
+use std::fs;
+use std::path::PathBuf;
 
 /// How temoc-ui was started.
 #[derive(Debug, Clone, Default)]
@@ -84,6 +89,8 @@ pub struct AppState {
 #[derive(Debug)]
 pub struct App {
     state: AppState,
+    workspace: PathBuf,
+    page: Option<Document>,
 }
 
 impl App {
@@ -92,36 +99,71 @@ impl App {
     /// # Errors
     ///
     /// Returns [`StartError::Refused`] when the path given cannot be opened.
-    /// Only opening a markdown file inside the current folder is built so far,
-    /// anything else returns [`StartError::NotImplemented`].
+    /// The `--config` option is not built yet, and returns
+    /// [`StartError::NotImplemented`].
     pub fn start(launch: &Launch) -> Result<Self, StartError> {
-        let [path] = launch.arguments.as_slice() else {
-            return Err(StartError::NotImplemented);
+        let path = match launch.arguments.as_slice() {
+            [] => None,
+            [path] if !path.starts_with('-') => Some(path.as_str()),
+            _ => return Err(StartError::NotImplemented),
         };
-        let file = launch.current_dir.join(path);
-        if !is_inside(path) || !is_markdown(&file) || !file.is_file() {
-            return Err(StartError::NotImplemented);
-        }
-        let tests = temoc::inspect_file(&file)
-            .map_err(|error| StartError::Refused(format!("Cannot read {path}: {error}")))?;
-        Ok(Self {
+        let opening = workspace::locate(&launch.current_dir, path).map_err(StartError::Refused)?;
+        let mut app = Self {
             state: AppState {
                 running: true,
-                document: Some(path.clone()),
-                focused_table: tests.tables.into_iter().next(),
                 ..AppState::default()
             },
-        })
+            workspace: opening.workspace,
+            page: None,
+        };
+        match opening.file {
+            Some(file) => app.open(&file).map_err(StartError::Refused)?,
+            None => app.open_search(),
+        }
+        Ok(app)
+    }
+
+    /// Opens a file of the workspace.
+    fn open(&mut self, file: &str) -> Result<(), String> {
+        let refuse = |error: &dyn Display| format!("Cannot read {file}: {error}");
+        let text = fs::read_to_string(self.workspace.join(file)).map_err(|e| refuse(&e))?;
+        let tests = temoc::find_tests(&text).map_err(|e| refuse(&e))?;
+        self.page = Some(Document::parse(&text).map_err(|e| refuse(&e))?);
+        self.state.document = Some(file.to_owned());
+        self.state.focused_table = tests.tables.into_iter().next();
+        Ok(())
+    }
+
+    fn open_search(&mut self) {
+        self.state.search_open = true;
+        self.state.search_results = workspace::markdown_files(&self.workspace);
     }
 
     /// Reacts to a key press or mouse action.
     ///
     /// # Errors
     ///
-    /// Fails until input is built, so that a scenario pressing keys cannot pass
-    /// because nothing happened.
-    pub fn handle_event(&mut self, _event: &Event) -> Result<(), NotImplemented> {
-        Err(NotImplemented)
+    /// Fails for input that is not built yet, so that a scenario using it
+    /// cannot pass because nothing happened.
+    pub fn handle_event(&mut self, event: &Event) -> Result<(), NotImplemented> {
+        match event {
+            Event::Key(key) if key.kind != KeyEventKind::Release => self.handle_key(key),
+            Event::Mouse(_) => Err(NotImplemented),
+            _ => Ok(()),
+        }
+    }
+
+    fn handle_key(&mut self, key: &KeyEvent) -> Result<(), NotImplemented> {
+        let control = key.modifiers.contains(KeyModifiers::CONTROL);
+        match key.code {
+            KeyCode::Char('c') if control => self.state.running = false,
+            KeyCode::Char('q') if !control && !self.state.search_open => {
+                self.state.running = false;
+            }
+            KeyCode::Char('/') if !control && !self.state.search_open => self.open_search(),
+            _ => return Err(NotImplemented),
+        }
+        Ok(())
     }
 
     /// Picks up the progress of background work, such as a test run.
@@ -134,13 +176,27 @@ impl App {
     }
 
     /// Draws the current screen.
-    ///
-    /// # Errors
-    ///
-    /// Fails until the screen is built, so that text cannot pass as hidden
-    /// because nothing was drawn.
-    pub fn draw(&self, _frame: &mut Frame) -> Result<(), NotImplemented> {
-        Err(NotImplemented)
+    pub fn draw(&self, frame: &mut Frame) {
+        let area = frame.area();
+        if let Some(page) = &self.page {
+            frame.render_widget(Paragraph::new(page.lines(area.width)), area);
+        }
+        if self.state.search_open {
+            self.draw_search(frame);
+        }
+    }
+
+    fn draw_search(&self, frame: &mut Frame) {
+        let area = frame.area().inner(Margin::new(4, 2));
+        let results = self.state.search_results.iter();
+        let lines: Vec<Line> = std::iter::once(Line::from("/"))
+            .chain(results.map(|result| Line::from(result.as_str())))
+            .collect();
+        frame.render_widget(Clear, area);
+        frame.render_widget(
+            Paragraph::new(lines).block(Block::bordered().title("Search")),
+            area,
+        );
     }
 
     /// Takes the bytes waiting to be written to the terminal, such as a
@@ -156,20 +212,10 @@ impl App {
     }
 }
 
-fn is_inside(path: &str) -> bool {
-    Path::new(path)
-        .components()
-        .all(|part| matches!(part, Component::Normal(_)))
-}
-
-fn is_markdown(file: &Path) -> bool {
-    file.extension()
-        .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::Path;
 
     fn launch(workspace: &str, arguments: &[&str]) -> Launch {
         Launch {
@@ -193,9 +239,22 @@ mod tests {
 
     #[test]
     fn what_is_not_built_says_so() {
-        for arguments in [&[][..], &["nope.md"], &["../docs/README.md"], &["data.txt"]] {
+        for arguments in [&["--config", "a.toml"][..], &["a.md", "--config", "b.toml"]] {
             let result = App::start(&launch("docs", arguments));
             assert_eq!(result.err(), Some(StartError::NotImplemented));
         }
+    }
+
+    #[test]
+    fn a_key_that_is_not_built_says_so() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        let key = Event::Key(KeyEvent::from(KeyCode::Char('j')));
+        assert_eq!(app.handle_event(&key), Err(NotImplemented));
+    }
+
+    #[test]
+    fn a_resized_terminal_is_not_a_missing_feature() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        assert_eq!(app.handle_event(&Event::Resize(100, 40)), Ok(()));
     }
 }

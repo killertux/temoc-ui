@@ -46,7 +46,11 @@ pub fn inspect_file(path: &Path) -> Result<TestFile, InspectError> {
 
 /// Looks for temoc tests in markdown, by the same rules as temoc: only
 /// top-level directives count, and a directive's table must come right after it.
-fn find_tests(markdown: &str) -> Result<TestFile, InspectError> {
+///
+/// # Errors
+///
+/// Fails when the markdown cannot be parsed.
+pub fn find_tests(markdown: &str) -> Result<TestFile, InspectError> {
     let root = markdown::to_mdast(markdown, &ParseOptions::gfm())
         .map_err(|message| InspectError::Parse(message.to_string()))?;
     let mut found = TestFile::default();

@@ -75,7 +75,7 @@ impl Tui {
 
     #[must_use]
     pub fn visible(&self) -> String {
-        self.read_screen(|session| yes_no(session.shows(&self.look_for)))
+        self.read_session(|session| yes_no(session.shows(&self.look_for)))
     }
 
     #[must_use]
@@ -216,7 +216,7 @@ impl Tui {
 
     #[must_use]
     pub fn in_graph(&self) -> String {
-        self.read_screen(|session| {
+        self.read_session(|session| {
             session.state().graph.map_or_else(
                 || yes_no(false),
                 |graph| yes_no(session.shows_in(graph.area, &self.look_for)),
@@ -253,16 +253,6 @@ impl Tui {
             Some(Outcome::Broken(problem)) => problem.clone(),
             Some(Outcome::Finished(session)) => read(session),
         }
-    }
-
-    fn read_screen(&self, read: impl FnOnce(&Session) -> String) -> String {
-        self.read_session(|session| {
-            if session.drawn() {
-                read(session)
-            } else {
-                NOT_IMPLEMENTED.into()
-            }
-        })
     }
 
     /// Reads the application's state. temoc-ui refusing to open is a valid
@@ -315,7 +305,7 @@ impl MarkdownRendering {
 impl MarkdownRendering {
     fn read(&self, nothing: &str, read: impl FnOnce(Preview) -> String) -> String {
         match render::preview(&self.markdown) {
-            Err(_) => NOT_IMPLEMENTED.into(),
+            Err(problem) => problem,
             Ok(None) => nothing.into(),
             Ok(Some(preview)) => read(preview),
         }

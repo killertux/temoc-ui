@@ -39,7 +39,6 @@ pub enum Outcome {
 pub struct Session {
     app: App,
     terminal: Terminal<TestBackend>,
-    drawn: bool,
     output: Vec<u8>,
 }
 
@@ -77,7 +76,6 @@ impl Session {
         let mut session = Self {
             app,
             terminal,
-            drawn: false,
             output: Vec::new(),
         };
         session.settle()?;
@@ -154,11 +152,9 @@ impl Session {
             self.app.update();
         }
         self.output.append(&mut self.app.take_output());
-        let mut drawn = false;
         self.terminal
-            .draw(|frame| drawn = self.app.draw(frame).is_ok())
+            .draw(|frame| self.app.draw(frame))
             .map_err(|e| e.to_string())?;
-        self.drawn = drawn;
         Ok(())
     }
 
@@ -174,11 +170,6 @@ impl Session {
     /// A snapshot of the application.
     pub fn state(&self) -> AppState {
         self.app.state()
-    }
-
-    /// Whether temoc-ui drew the screen.
-    pub fn drawn(&self) -> bool {
-        self.drawn
     }
 
     /// Whether `text` is on screen.

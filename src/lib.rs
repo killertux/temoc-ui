@@ -7,6 +7,7 @@
 pub mod app;
 pub mod render;
 pub mod temoc;
+pub mod workspace;
 
 /// A feature described by the specification that has not been built yet.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
