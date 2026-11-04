@@ -137,8 +137,8 @@ error such as an exception, a yellow `~` when it is snoozed, and a plain `-` whe
 ran. The row temoc is working on shows `⋯`. A row that did not pass has a note below it
 saying why.
 
-Each table that did not pass shows its result below it, and the result for the whole file
-is at the right of the status bar. A table takes the worst result of its rows, and a file the worst of
+Each table shows its result below it, and the result for the whole file is at the right
+of the status bar. A table takes the worst result of its rows, and a file the worst of
 its tables. A table with only some of its rows run is `partial`, and so is a file with
 only some of its tables run, unless something did not pass.
 

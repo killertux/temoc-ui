@@ -932,11 +932,7 @@ fn note_rows(failures: &[Failure], width: usize, text: impl Fn(&Failure) -> Stri
 }
 
 /// What a run says below a table: its result, then what failed outside a row.
-/// A table that passed says nothing, because the marks on its rows already do.
 fn result_rows(table: &TableResult<'_>, width: usize) -> Vec<Row> {
-    if table.result == RunResult::Passed {
-        return Vec::new();
-    }
     let verdict = format!("{} {}", table.result.mark(), table.result);
     let mut rows = vec![
         Row::new(),
@@ -1932,6 +1928,7 @@ mod tests {
     #[test]
     fn every_result_has_its_mark_below_the_table() {
         let results = [
+            (RunResult::Passed, "✓ passed"),
             (RunResult::Failed, "✗ failed"),
             (RunResult::Error, "! error"),
             (RunResult::Snoozed, "~ snoozed"),
@@ -1943,20 +1940,6 @@ mod tests {
             let rendered = with_results(TABLE_THEN_MORE, 40, result, &BTreeMap::new(), &[]);
             assert_eq!(shown(&rendered).get(5).map(String::as_str), Some(line));
         }
-    }
-
-    #[test]
-    fn a_table_that_passed_has_nothing_below_it() {
-        let rows = BTreeMap::from([
-            (3, row(RunResult::Passed, Vec::new())),
-            (4, row(RunResult::Passed, Vec::new())),
-        ]);
-        let rendered = with_results(TABLE_THEN_MORE, 40, RunResult::Passed, &rows, &[]);
-        assert_eq!(
-            shown(&rendered),
-            ["a", "─", "1  ✓", "2  ✓", "", "next", "", "After"]
-        );
-        assert_eq!(rendered.rows_of_line(1), Some(0..4));
     }
 
     #[test]

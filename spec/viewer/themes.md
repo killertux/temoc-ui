@@ -170,6 +170,7 @@ entry.
 | Pop-up border  | themes     | --theme dark            | `t`          | ┌                 | #8D96A5     | #16181D     | 6.0       |
 | Graph line     | themes     | --theme dark            | `Ctrl-g l l` | ▶                 | #8D96A5     | #16181D     | 6.0       |
 | Lit graph line | themes     | --theme dark            | `Ctrl-g`     | ▶                 | #5FD7E6     | #16181D     | 10.4      |
+| Passed table   | calculator | failing.md --theme dark | `R`          | ✓ passed          | #6EDB8F     | #16181D     | 10.3      |
 | Failed table   | calculator | failing.md --theme dark | `R`          | ✗ failed          | #FF8A80     | #16181D     | 7.8       |
 | Snoozed table  | calculator | snoozed.md --theme dark | `R`          | ~ snoozed         | #F5D76E     | #16181D     | 12.5      |
 | Passing row    | calculator | failing.md --theme dark | `R`          | 2 │ 3 │ 6         | #6EDB8F     | #16181D     | 10.3      |
@@ -197,6 +198,7 @@ entry.
 | Pop-up border  | themes     | --theme light            | `t`          | ┌                 | #6E7781     | #FFFFFF     | 4.5       |
 | Graph line     | themes     | --theme light            | `Ctrl-g l l` | ▶                 | #6E7781     | #FFFFFF     | 4.5       |
 | Lit graph line | themes     | --theme light            | `Ctrl-g`     | ▶                 | #0A6C74     | #FFFFFF     | 6.2       |
+| Passed table   | calculator | failing.md --theme light | `R`          | ✓ passed          | #116329     | #FFFFFF     | 7.4       |
 | Failed table   | calculator | failing.md --theme light | `R`          | ✗ failed          | #B3261E     | #FFFFFF     | 6.5       |
 | Snoozed table  | calculator | snoozed.md --theme light | `R`          | ~ snoozed         | #7D4E00     | #FFFFFF     | 7.1       |
 | Passing row    | calculator | failing.md --theme light | `R`          | 2 │ 3 │ 6         | #116329     | #FFFFFF     | 7.4       |
@@ -224,6 +226,7 @@ entry.
 | Pop-up border  | themes     | --theme dark-256            | `t`          | ┌                 | 246         | 234         | 5.6       |
 | Graph line     | themes     | --theme dark-256            | `Ctrl-g l l` | ▶                 | 246         | 234         | 5.6       |
 | Lit graph line | themes     | --theme dark-256            | `Ctrl-g`     | ▶                 | 80          | 234         | 9.9       |
+| Passed table   | calculator | failing.md --theme dark-256 | `R`          | ✓ passed          | 78          | 234         | 9.4       |
 | Failed table   | calculator | failing.md --theme dark-256 | `R`          | ✗ failed          | 210         | 234         | 7.4       |
 | Snoozed table  | calculator | snoozed.md --theme dark-256 | `R`          | ~ snoozed         | 221         | 234         | 12.3      |
 | Passing row    | calculator | failing.md --theme dark-256 | `R`          | 2 │ 3 │ 6         | 78          | 234         | 9.4       |
@@ -251,6 +254,7 @@ entry.
 | Pop-up border  | themes     | --theme light-256            | `t`          | ┌                 | 243         | 231         | 4.5       |
 | Graph line     | themes     | --theme light-256            | `Ctrl-g l l` | ▶                 | 243         | 231         | 4.5       |
 | Lit graph line | themes     | --theme light-256            | `Ctrl-g`     | ▶                 | 23          | 231         | 7.5       |
+| Passed table   | calculator | failing.md --theme light-256 | `R`          | ✓ passed          | 22          | 231         | 8.0       |
 | Failed table   | calculator | failing.md --theme light-256 | `R`          | ✗ failed          | 124         | 231         | 7.4       |
 | Snoozed table  | calculator | snoozed.md --theme light-256 | `R`          | ~ snoozed         | 94          | 231         | 5.7       |
 | Passing row    | calculator | failing.md --theme light-256 | `R`          | 2 │ 3 │ 6         | 22          | 231         | 8.0       |

@@ -36,9 +36,8 @@ the worst result of its tables, in this order: `error`, `failed`, `partial`,
 
 ### On screen
 
-Results appear in place. A table with any result but `passed` gets a line below it,
-and the rest of the page moves down to make room. A table that passed needs no line,
-because the marks on its rows already say so. The file result sits at the right of the
+Results appear in place. Each table that has a result gets a line below it, and the
+rest of the page moves down to make room. The file result sits at the right of the
 status bar. A page that has not run looks the same as any other page.
 
 [//]: # "decisionTable Tui"
@@ -47,7 +46,7 @@ status bar. A page that has not run looks the same as any other page.
 | ------------------ | ---------- | ---------- | ---- | ------------- | -------- |
 | No table result yet | calculator | failing.md |     | failed        | no       |
 | No file result yet | calculator | failing.md |      | file:         | no       |
-| A passing table    | calculator | failing.md | `R`  | ✓ passed      | no       |
+| A passing table    | calculator | failing.md | `R`  | ✓ passed      | yes      |
 | A failing table    | calculator | failing.md | `R`  | ✗ failed      | yes      |
 | A snoozed table    | calculator | snoozed.md | `R`  | ~ snoozed     | yes      |
 | A table with an error | outcomes | errors.md  | `R`  | ! error       | yes      |

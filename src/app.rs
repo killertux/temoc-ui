@@ -1790,7 +1790,7 @@ mod tests {
         assert_eq!(app.state().file_result.as_deref(), Some("passed"));
         assert!(app.page.as_ref().is_some_and(|page| {
             let lines = page.lines(Theme::default());
-            lines.iter().any(|l| l.to_string() == "1  ✓")
+            lines.iter().any(|l| l.to_string() == "✓ passed")
         }));
     }
 
