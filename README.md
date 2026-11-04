@@ -77,6 +77,7 @@ cargo run -- samples/docs
 | `t`                           | Open the file tree                    |
 | `Ctrl-g`                      | Open the graph of links               |
 | `v`                           | Start selecting text                  |
+| `?`                           | Show or hide help                     |
 | `q`, `Ctrl-c`                 | Quit                                  |
 
 Search looks through file paths and headings across the workspace, and the letters
@@ -106,6 +107,9 @@ to go to the top and bottom of a column, and `Enter` to open the selected file. 
 panel below lists its links, including broken ones. `Ctrl-g` or `Esc` closes the graph.
 The mouse works here too: click a file to select it, click it again to open it, and use
 the wheel to scroll.
+
+`?` lists the keys, from anywhere but search, and `?` or `Esc` hides the list. If it
+does not fit on the screen, `j`, `k`, the arrow keys and the wheel scroll it.
 
 temoc-ui never opens a web browser. External links stay on the page and show their
 address in the status line.
@@ -137,10 +141,7 @@ temoc-ui or the file runs again.
 - Mouse support
 - Selecting and copying text
 - A graph of how the pages link together
-
-**Coming next**
-
-- A help screen
+- A help screen listing the keys
 
 **Further out**
 

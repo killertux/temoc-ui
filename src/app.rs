@@ -2,6 +2,7 @@
 
 use crate::clipboard;
 use crate::graph::{Graph, GraphState};
+use crate::help::Help;
 use crate::page::Page;
 use crate::render::{Document, Motion};
 use crate::run::{FileResults, Request, Run};
@@ -112,6 +113,7 @@ pub struct App {
     search: Option<Search>,
     tree: Option<FileTree>,
     graph: Option<Graph>,
+    help: Option<Help>,
     /// Whether search shows only test files. Outlives the search box.
     only_tests: bool,
     status: Option<String>,
@@ -158,6 +160,7 @@ impl App {
             search: None,
             tree: None,
             graph: None,
+            help: None,
             only_tests: false,
             status: None,
             page_size: Size::default(),
@@ -396,7 +399,7 @@ impl App {
 
     /// Whether the page can be reached, with nothing open over it.
     fn page_is_showing(&self) -> bool {
-        self.search.is_none() && self.tree.is_none() && self.graph.is_none()
+        self.search.is_none() && self.tree.is_none() && self.graph.is_none() && self.help.is_none()
     }
 
     /// Selects from where the button went down, on a page with nothing over it.
@@ -443,7 +446,7 @@ impl App {
     }
 
     fn click(&mut self, spot: Position) {
-        if self.search.is_some() {
+        if self.search.is_some() || self.help.is_some() {
             return;
         }
         if self.tree.is_some() {
@@ -493,7 +496,13 @@ impl App {
         if self.search.is_some() {
             return;
         }
-        if let Some(tree) = &mut self.tree {
+        if let Some(help) = &mut self.help {
+            match (kind, shift) {
+                (MouseEventKind::ScrollDown, false) => help.scroll_down(WHEEL_STEP),
+                (MouseEventKind::ScrollUp, false) => help.scroll_up(WHEEL_STEP),
+                _ => {}
+            }
+        } else if let Some(tree) = &mut self.tree {
             match (kind, shift) {
                 (MouseEventKind::ScrollDown, false) => tree.scroll_down(WHEEL_STEP),
                 (MouseEventKind::ScrollUp, false) => tree.scroll_up(WHEEL_STEP),
@@ -535,6 +544,16 @@ impl App {
         }
         if self.search.is_some() {
             self.handle_search_key(key.code, control);
+            return Ok(());
+        }
+        if self.help.is_some() {
+            if !control {
+                self.handle_help_key(key.code);
+            }
+            return Ok(());
+        }
+        if key.code == KeyCode::Char('?') && !control {
+            self.help = Some(Help::default());
             return Ok(());
         }
         if self.tree.is_some() {
@@ -580,6 +599,22 @@ impl App {
                 }
                 (KeyCode::Char(character), false) => search.type_character(character),
                 _ => {}
+            }
+        }
+    }
+
+    fn handle_help_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Esc | KeyCode::Char('?') => self.help = None,
+            KeyCode::Char('q') => self.running = false,
+            code => {
+                if let Some(help) = &mut self.help {
+                    match code {
+                        KeyCode::Char('j') | KeyCode::Down => help.scroll_down(1),
+                        KeyCode::Char('k') | KeyCode::Up => help.scroll_up(1),
+                        _ => {}
+                    }
+                }
             }
         }
     }
@@ -753,6 +788,9 @@ impl App {
         }
         if let Some(tree) = &mut self.tree {
             draw_tree(tree, frame);
+        }
+        if let Some(help) = &mut self.help {
+            help.draw(frame, body);
         }
     }
 
@@ -968,9 +1006,9 @@ mod tests {
     }
 
     #[test]
-    fn a_key_that_is_not_built_says_so() {
+    fn a_key_with_no_meaning_says_so() {
         let mut app = App::start(&launch("docs", &[])).unwrap();
-        let key = Event::Key(KeyEvent::from(KeyCode::Char('?')));
+        let key = Event::Key(KeyEvent::from(KeyCode::Char('x')));
         assert_eq!(app.handle_event(&key), Err(NotImplemented));
     }
 
@@ -985,6 +1023,106 @@ mod tests {
 
     fn graph_is_open(app: &App) -> bool {
         app.state().graph.is_some()
+    }
+
+    fn help_on_screen(arguments: &[&str]) -> App {
+        let mut app = app_on_screen(arguments);
+        press(&mut app, KeyCode::Char('?'));
+        status_bar(&mut app);
+        app
+    }
+
+    #[test]
+    fn q_quits_from_help() {
+        let mut app = help_on_screen(&[]);
+        press(&mut app, KeyCode::Char('q'));
+        assert!(!app.state().running);
+    }
+
+    #[test]
+    fn ctrl_c_quits_from_help() {
+        let mut app = help_on_screen(&[]);
+        press_ctrl(&mut app, 'c').unwrap();
+        assert!(!app.state().running);
+    }
+
+    #[test]
+    fn other_keys_do_nothing_while_help_shows() {
+        let mut app = help_on_screen(&[]);
+        for character in ['/', 't', 'v', 'r', 'R', 'h', 'l', 'x'] {
+            press(&mut app, KeyCode::Char(character));
+        }
+        press(&mut app, KeyCode::Enter);
+        press(&mut app, KeyCode::Tab);
+        press_ctrl(&mut app, 'g').unwrap();
+        let state = app.state();
+        assert!(app.help.is_some());
+        assert!(!state.search_open);
+        assert_eq!(state.tree, None);
+        assert_eq!(state.graph, None);
+        assert_eq!(state.selection, None);
+        assert_eq!(state.temoc_arguments, None);
+        assert_eq!(state.document.as_deref(), Some("README.md"));
+        assert_eq!(state.focused_link, None);
+    }
+
+    #[test]
+    fn clicks_and_drags_do_nothing_while_help_shows() {
+        let mut app = help_on_screen(&[]);
+        let (column, row) = link_spot(&app, "Reference");
+        click(&mut app, column, row);
+        drag(&mut app, (0, 0), (8, 0));
+        assert!(app.help.is_some());
+        assert_eq!(app.state().document.as_deref(), Some("README.md"));
+        assert_eq!(app.state().selection, None);
+        assert_eq!(app.take_output(), [0u8; 0]);
+    }
+
+    #[test]
+    fn the_wheel_leaves_the_page_behind_help_alone() {
+        let mut app = help_on_screen(&["guide/long-page.md"]);
+        assert!(screen_text(&mut app).contains("j, Down"));
+        mouse(&mut app, MouseEventKind::ScrollDown, 0, 0);
+        assert!(!screen_text(&mut app).contains("j, Down"));
+        press(&mut app, KeyCode::Char('?'));
+        assert!(screen_text(&mut app).contains("Long Page"));
+    }
+
+    #[test]
+    fn keys_scroll_help_when_it_does_not_fit() {
+        let mut app = help_on_screen(&[]);
+        press(&mut app, KeyCode::Char('j'));
+        assert!(!screen_text(&mut app).contains("j, Down"));
+        press(&mut app, KeyCode::Up);
+        assert!(screen_text(&mut app).contains("j, Down"));
+    }
+
+    fn screen_text(app: &mut App) -> String {
+        let mut terminal = Terminal::new(TestBackend::new(40, 12)).unwrap();
+        terminal.draw(|frame| app.draw(frame)).unwrap();
+        let buffer = terminal.backend().buffer();
+        buffer.content().iter().map(Cell::symbol).collect()
+    }
+
+    #[test]
+    fn hiding_help_goes_back_to_the_selection_and_the_graph() {
+        let mut app = app_on_screen(&[]);
+        press(&mut app, KeyCode::Char('v'));
+        press(&mut app, KeyCode::Char('?'));
+        press(&mut app, KeyCode::Esc);
+        assert_eq!(
+            app.message().as_deref(),
+            Some("Move to the start, then press v")
+        );
+        press(&mut app, KeyCode::Esc);
+        press_ctrl(&mut app, 'g').unwrap();
+        press(&mut app, KeyCode::Char('l'));
+        press(&mut app, KeyCode::Char('?'));
+        press(&mut app, KeyCode::Char('?'));
+        assert_eq!(
+            selected_file(&app).as_deref(),
+            Some("guide/getting-started.md")
+        );
     }
 
     #[test]
@@ -1017,7 +1155,7 @@ mod tests {
     fn keys_for_the_page_do_nothing_in_the_graph() {
         let mut app = App::start(&launch("docs", &[])).unwrap();
         press_ctrl(&mut app, 'g').unwrap();
-        for character in ['/', 't', 'v', 'r', 'R', '?', 'x'] {
+        for character in ['/', 't', 'v', 'r', 'R', 'x'] {
             press(&mut app, KeyCode::Char(character));
         }
         press_ctrl(&mut app, 'x').unwrap();

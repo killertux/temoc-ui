@@ -34,14 +34,30 @@ are open. Their pages list what each key does there.
 quits, except in the search box, where it is typed like any other letter.
 `Ctrl-c` quits from anywhere.
 
-[//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+`?` works everywhere but the search box, where it is typed like any other letter.
+Hiding help goes back to where you were. `Esc` hides it too. While it shows, `j`, `k`,
+`Down`, `Up` and the wheel scroll it if it does not fit on the screen. Other keys and
+clicks do nothing.
 
-| # situation             | workspace | keys  | look for           | visible? |
-| ----------------------- | --------- | ----- | ------------------ | -------- |
-| Help is hidden at first | docs      |       | Run the whole file | no       |
-| Help opens              | docs      | `?`   | Run the whole file | yes      |
-| Help closes             | docs      | `? ?` | Run the whole file | no       |
+[//]: # "import Spec.Fixtures"
+[//]: # "decisionTable Tui"
+
+| # situation             | workspace | keys       | look for           | visible? |
+| ----------------------- | --------- | ---------- | ------------------ | -------- |
+| Help is hidden at first | docs      |            | Run the whole file | no       |
+| Help opens              | docs      | `?`        | Run the whole file | yes      |
+| Help closes             | docs      | `? ?`      | Run the whole file | no       |
+| Esc closes              | docs      | `? Esc`    | Run the whole file | no       |
+| Over the file tree      | docs      | `t ?`      | Run the whole file | yes      |
+| Over the graph          | docs      | `Ctrl-g ?` | Run the whole file | yes      |
+| While selecting         | docs      | `v ?`      | Run the whole file | yes      |
+| Typed in search         | docs      | `/ ?`      | Run the whole file | no       |
+
+[//]: # "decisionTable Tui"
+
+| # situation            | workspace | keys    | tree open? |
+| ---------------------- | --------- | ------- | ---------- |
+| Back to the file tree  | docs      | `t ? ?` | yes        |
 
 [//]: # "decisionTable Tui"
 

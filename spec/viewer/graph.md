@@ -72,7 +72,8 @@ website, to the same page, or out of the workspace are not shown.
 
 A panel below the graph lists the links out of the selected file and into it. A link
 to a file that does not exist has no place in the graph, so it appears only in this
-panel.
+panel. Links to anything else that exists but is not in the graph are not shown. A
+list too long for the panel ends by saying how many more there are.
 
 [//]: # "decisionTable Tui"
 
@@ -83,6 +84,12 @@ panel.
 | Only links in        | docs      | guide/long-page.md | `Ctrl-g`     | guide/long-page.md       | none                                                                           | README.md                         |
 | No links at all      | docs      | notes.MD           | `Ctrl-g`     | notes.MD                 | none                                                                           | none                              |
 | Links out of the workspace | docs | guide             | `Esc Ctrl-g` | getting-started.md       | none                                                                           | none                              |
+
+[//]: # "decisionTable Tui"
+
+| # situation         | workspace  | keys     | look for    | visible? |
+| ------------------- | ---------- | -------- | ----------- | -------- |
+| Too long for the panel | many-pages | `Ctrl-g` | and 26 more | yes   |
 
 ## Moving around
 
