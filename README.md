@@ -75,6 +75,7 @@ cargo run -- samples/docs
 | `R`                           | Run the whole file                    |
 | `/`                           | Open search                           |
 | `t`                           | Open the file tree                    |
+| `v`                           | Start selecting text                  |
 | `q`, `Ctrl-c`                 | Quit                                  |
 
 Search looks through file paths and headings across the workspace, and the letters
@@ -84,9 +85,13 @@ contain temoc tests.
 
 The mouse works too. The wheel scrolls, and holding `Shift` or using a sideways wheel
 scrolls wide tables and code. Click a link to follow it, a test table to focus it, or
-a row of the file tree to open it. temoc-ui captures the mouse, so your terminal's own
-text selection needs its usual override, which is `Shift` in most terminals, until
-selecting text is built.
+a row of the file tree to open it.
+
+temoc-ui captures the mouse, so it selects text itself. Drag to select, and the text is
+copied when you let go. From the keyboard, `v` puts a cursor on the page: move it with
+`h`, `j`, `k`, `l`, the arrow keys, `w`, `b`, `0`, `$`, `g` and `G`, press `v` to start
+the selection, and `y` to copy it. `Esc` cancels. Copying uses the OSC 52 escape
+sequence, so it works over SSH, but your terminal must allow it.
 
 The file tree shows the workspace's markdown files, with the open page selected. Use
 `j` and `k` or the arrow keys to move, `l` and `h` to open and close a folder, and
@@ -120,11 +125,11 @@ temoc-ui or the file runs again.
 - Running a whole file or a single table, and showing the results in place
 - A pop-up file tree
 - Mouse support
+- Selecting and copying text
 
 **Coming next**
 
 - A graph of how the pages link together
-- Selecting and copying text
 - A help screen
 
 **Further out**

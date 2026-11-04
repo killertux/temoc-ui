@@ -1,7 +1,8 @@
 //! The application itself, independent of any real terminal.
 
+use crate::clipboard;
 use crate::page::Page;
-use crate::render::Document;
+use crate::render::{Document, Motion};
 use crate::run::{FileResults, Request, Run};
 use crate::search::Search;
 use crate::temoc::{RunReport, RunResult, TestTable};
@@ -17,8 +18,8 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Clear, Paragraph};
 use std::collections::HashMap;
 use std::fmt::Display;
-use std::fs;
 use std::path::PathBuf;
+use std::{fs, mem};
 
 /// The configuration file temoc-ui looks for in the workspace.
 const CONFIGURATION: &str = "temoc.toml";
@@ -135,8 +136,12 @@ pub struct App {
     page_size: Size,
     /// The whole screen, as last drawn.
     screen: Rect,
-    /// Where the left mouse button went down, if this can still be a click.
+    /// Where the left mouse button went down.
     pressed: Option<Position>,
+    /// Whether the mouse has moved since then, so that this is not a click.
+    dragged: bool,
+    /// The bytes waiting to be written to the terminal.
+    output: Vec<u8>,
     /// The folder temoc-ui was started from.
     start_folder: PathBuf,
     /// The configuration file given with `--config`, as written.
@@ -174,6 +179,8 @@ impl App {
             page_size: Size::default(),
             screen: Rect::default(),
             pressed: None,
+            dragged: false,
+            output: Vec::new(),
             start_folder: launch.current_dir.clone(),
             config: arguments.config.map(String::from),
             extra_path: launch.extra_path.clone(),
@@ -371,14 +378,12 @@ impl App {
     fn handle_mouse(&mut self, mouse: MouseEvent) {
         let spot = Position::new(mouse.column, mouse.row);
         match mouse.kind {
-            MouseEventKind::Down(MouseButton::Left) => self.pressed = Some(spot),
-            MouseEventKind::Drag(MouseButton::Left) if self.pressed != Some(spot) => {
-                self.pressed = None;
+            MouseEventKind::Down(MouseButton::Left) => {
+                self.pressed = Some(spot);
+                self.dragged = false;
             }
-            MouseEventKind::Up(MouseButton::Left) if self.pressed.take() == Some(spot) => {
-                self.status = None;
-                self.click(spot);
-            }
+            MouseEventKind::Drag(MouseButton::Left) => self.drag_to(spot),
+            MouseEventKind::Up(MouseButton::Left) => self.release(spot),
             kind @ (MouseEventKind::ScrollDown
             | MouseEventKind::ScrollUp
             | MouseEventKind::ScrollLeft
@@ -390,17 +395,63 @@ impl App {
         }
     }
 
+    /// Selects from where the button went down. A pop-up has nothing to select.
+    fn drag_to(&mut self, spot: Position) {
+        let Some(start) = self.pressed.filter(|start| *start != spot) else {
+            return;
+        };
+        self.dragged = true;
+        if self.search.is_none()
+            && self.tree.is_none()
+            && let Some(page) = &mut self.page
+        {
+            page.drag((start.x, start.y), (spot.x, spot.y));
+        }
+    }
+
+    fn release(&mut self, spot: Position) {
+        let pressed = self.pressed.take();
+        if mem::take(&mut self.dragged) {
+            if self.search.is_none() && self.tree.is_none() {
+                self.copy_selection();
+            }
+        } else if pressed == Some(spot) {
+            self.status = None;
+            self.click(spot);
+        }
+    }
+
+    /// Puts the selection on the clipboard. Says whether there was any.
+    fn copy_selection(&mut self) -> bool {
+        let text = self.page.as_ref().and_then(Page::selected_text);
+        let Some(text) = text.filter(|text| !text.is_empty()) else {
+            self.status = Some("Nothing selected".into());
+            return false;
+        };
+        self.output.extend(clipboard::copy_sequence(&text));
+        let count = text.chars().count();
+        let noun = if count == 1 {
+            "character"
+        } else {
+            "characters"
+        };
+        self.status = Some(format!("Copied {count} {noun}"));
+        true
+    }
+
     fn click(&mut self, spot: Position) {
         if self.search.is_some() {
             return;
         }
         if self.tree.is_some() {
             self.click_tree(spot);
-        } else if self
-            .page
-            .as_mut()
-            .is_some_and(|page| page.click(spot.x, spot.y))
-        {
+            return;
+        }
+        let Some(page) = &mut self.page else {
+            return;
+        };
+        page.clear_selection();
+        if page.click(spot.x, spot.y) {
             let result = self.follow_focused_link();
             self.report(result);
         }
@@ -470,6 +521,12 @@ impl App {
             }
             return Ok(());
         }
+        if self.page.as_ref().is_some_and(Page::is_selecting) {
+            if !control {
+                self.handle_selection_key(key.code);
+            }
+            return Ok(());
+        }
         if control {
             return Err(NotImplemented);
         }
@@ -519,11 +576,44 @@ impl App {
         }
     }
 
+    fn handle_selection_key(&mut self, code: KeyCode) {
+        match code {
+            KeyCode::Char('q') => self.running = false,
+            KeyCode::Char('y') => {
+                if self.copy_selection()
+                    && let Some(page) = &mut self.page
+                {
+                    page.clear_selection();
+                }
+            }
+            code => {
+                if let Some(page) = &mut self.page {
+                    match (code, cursor_motion(code)) {
+                        (KeyCode::Esc, _) => page.clear_selection(),
+                        (KeyCode::Char('v'), _) => page.mark_start(),
+                        (_, Some(motion)) => page.move_cursor(motion),
+                        _ => {}
+                    }
+                }
+            }
+        }
+    }
+
     fn handle_page_key(&mut self, code: KeyCode) -> Result<(), NotImplemented> {
         match code {
             KeyCode::Char('q') => self.running = false,
             KeyCode::Char('/') => self.open_search(),
             KeyCode::Char('t') => self.open_tree(),
+            KeyCode::Char('v') => {
+                if let Some(page) = &mut self.page {
+                    page.start_selecting();
+                }
+            }
+            KeyCode::Esc => {
+                if let Some(page) = &mut self.page {
+                    page.clear_selection();
+                }
+            }
             KeyCode::Char('h') | KeyCode::Backspace => self.go_back(),
             KeyCode::Char('l') => self.go_forward(),
             KeyCode::Enter => {
@@ -622,10 +712,23 @@ impl App {
         let width = u16::try_from(width).unwrap_or(area.width);
         let [message, file] =
             Layout::horizontal([Constraint::Min(0), Constraint::Length(width)]).areas(area);
-        if let Some(text) = self.status.as_ref().or(running.as_ref()) {
-            frame.render_widget(Paragraph::new(text.as_str()), message);
+        if let Some(text) = self.message().or(running) {
+            frame.render_widget(Paragraph::new(text), message);
         }
         frame.render_widget(Paragraph::new(result), file);
+    }
+
+    /// The status bar message: what just happened, or else what to do next.
+    fn message(&self) -> Option<String> {
+        let page = self.page.as_ref().filter(|page| page.is_selecting());
+        let hint = page.map(|page| {
+            if page.has_start() {
+                "Move to the end, then press y"
+            } else {
+                "Move to the start, then press v"
+            }
+        });
+        self.status.clone().or(hint.map(String::from))
     }
 
     /// The result of the open file, if it has tests.
@@ -638,7 +741,7 @@ impl App {
     /// Takes the bytes waiting to be written to the terminal, such as a
     /// clipboard escape sequence.
     pub fn take_output(&mut self) -> Vec<u8> {
-        Vec::new()
+        mem::take(&mut self.output)
     }
 
     /// A snapshot of the application.
@@ -653,7 +756,7 @@ impl App {
         AppState {
             running: self.running,
             document: page.map(|page| page.file().to_owned()),
-            status: self.status.clone(),
+            status: self.message(),
             focused_link: page
                 .and_then(Page::focused_link)
                 .map(|link| link.text.clone()),
@@ -668,6 +771,7 @@ impl App {
             file_result: self.file_result().map(String::from),
             failures: results.failures(tables),
             temoc_arguments: self.temoc_arguments.clone(),
+            selection: page.and_then(Page::selected_text),
             tree: self
                 .tree
                 .as_ref()
@@ -679,6 +783,23 @@ impl App {
                 .map(|row| row.name.clone()),
             ..AppState::default()
         }
+    }
+}
+
+/// How a key moves the cursor in selection mode.
+fn cursor_motion(code: KeyCode) -> Option<Motion> {
+    match code {
+        KeyCode::Char('h') | KeyCode::Left => Some(Motion::Left),
+        KeyCode::Char('l') | KeyCode::Right => Some(Motion::Right),
+        KeyCode::Char('k') | KeyCode::Up => Some(Motion::Up),
+        KeyCode::Char('j') | KeyCode::Down => Some(Motion::Down),
+        KeyCode::Char('w') => Some(Motion::NextWord),
+        KeyCode::Char('b') => Some(Motion::PreviousWord),
+        KeyCode::Char('0') => Some(Motion::RowStart),
+        KeyCode::Char('$') => Some(Motion::RowEnd),
+        KeyCode::Char('g') => Some(Motion::Top),
+        KeyCode::Char('G') => Some(Motion::Bottom),
+        _ => None,
     }
 }
 
@@ -792,7 +913,7 @@ mod tests {
     #[test]
     fn a_key_that_is_not_built_says_so() {
         let mut app = App::start(&launch("docs", &[])).unwrap();
-        let key = Event::Key(KeyEvent::from(KeyCode::Char('v')));
+        let key = Event::Key(KeyEvent::from(KeyCode::Char('?')));
         assert_eq!(app.handle_event(&key), Err(NotImplemented));
     }
 
@@ -1036,6 +1157,113 @@ mod tests {
         let state = app.state();
         assert!(state.tree.is_some());
         assert_eq!(state.tree_selection.as_deref(), Some("README.md"));
+    }
+
+    fn drag(app: &mut App, from: (u16, u16), to: (u16, u16)) {
+        let button = MouseButton::Left;
+        mouse(app, MouseEventKind::Down(button), from.0, from.1);
+        mouse(app, MouseEventKind::Drag(button), to.0, to.1);
+        mouse(app, MouseEventKind::Up(button), to.0, to.1);
+    }
+
+    #[test]
+    fn dragging_over_a_pop_up_selects_nothing() {
+        let mut app = app_on_screen(&[]);
+        press(&mut app, KeyCode::Char('t'));
+        drag(&mut app, (6, 3), (9, 3));
+        assert_eq!(app.state().selection, None);
+        assert_eq!(app.take_output(), Vec::<u8>::new());
+        assert_eq!(app.state().status, None);
+        assert!(app.state().tree.is_some());
+    }
+
+    #[test]
+    fn dragging_over_blank_rows_copies_nothing() {
+        let mut app = app_on_screen(&[]);
+        drag(&mut app, (0, 1), (5, 1));
+        assert_eq!(app.take_output(), Vec::<u8>::new());
+        assert_eq!(app.state().status.as_deref(), Some("Nothing selected"));
+    }
+
+    #[test]
+    fn output_is_only_taken_once() {
+        let mut app = app_on_screen(&[]);
+        drag(&mut app, (0, 0), (3, 0));
+        assert_ne!(app.take_output(), Vec::<u8>::new());
+        assert_eq!(app.take_output(), Vec::<u8>::new());
+    }
+
+    #[test]
+    fn scrolling_keeps_a_finished_selection() {
+        let mut app = app_on_screen(&["guide/long-page.md"]);
+        drag(&mut app, (0, 0), (3, 0));
+        press(&mut app, KeyCode::Char('j'));
+        assert_eq!(app.state().selection.as_deref(), Some("Long"));
+    }
+
+    #[test]
+    fn one_character_is_not_written_as_several() {
+        let mut app = app_on_screen(&[]);
+        for key in ['v', 'v', 'y'] {
+            press(&mut app, KeyCode::Char(key));
+        }
+        assert_eq!(app.state().status.as_deref(), Some("Copied 1 character"));
+    }
+
+    #[test]
+    fn selection_mode_keeps_its_keys_to_itself() {
+        let mut app = app_on_screen(&["guide/long-page.md"]);
+        press(&mut app, KeyCode::Char('v'));
+        for key in ['/', 't', 'r', 'R', ']', '?'] {
+            press(&mut app, KeyCode::Char(key));
+        }
+        let state = app.state();
+        assert!(!state.search_open);
+        assert_eq!(state.tree, None);
+        assert_eq!(state.temoc_arguments, None);
+        assert_eq!(
+            state.status.as_deref(),
+            Some("Move to the start, then press v")
+        );
+    }
+
+    #[test]
+    fn q_quits_from_selection_mode() {
+        let mut app = app_on_screen(&[]);
+        press(&mut app, KeyCode::Char('v'));
+        press(&mut app, KeyCode::Char('q'));
+        assert!(!app.is_running());
+    }
+
+    #[test]
+    fn nothing_selected_stays_in_selection_mode() {
+        let mut app = app_on_screen(&[]);
+        press(&mut app, KeyCode::Char('v'));
+        press(&mut app, KeyCode::Char('y'));
+        assert_eq!(app.state().status.as_deref(), Some("Nothing selected"));
+        press(&mut app, KeyCode::Char('j'));
+        assert_eq!(
+            app.state().status.as_deref(),
+            Some("Move to the start, then press v")
+        );
+    }
+
+    #[test]
+    fn the_wheel_keeps_the_hint_of_selection_mode() {
+        let mut app = app_on_screen(&["guide/long-page.md"]);
+        press(&mut app, KeyCode::Char('v'));
+        mouse(&mut app, MouseEventKind::ScrollDown, 0, 0);
+        assert_eq!(
+            app.state().status.as_deref(),
+            Some("Move to the start, then press v")
+        );
+    }
+
+    #[test]
+    fn esc_on_a_page_with_nothing_selected_does_nothing() {
+        let mut app = app_on_screen(&[]);
+        press(&mut app, KeyCode::Esc);
+        assert!(app.is_running());
     }
 
     #[test]

@@ -15,7 +15,7 @@ stays highlighted until the next click or `Esc`. A selection covers what is on
 screen, so use the keyboard for anything longer.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action     | workspace | arguments                | keys                                  | selection?             | clipboard?                | status?              |
 | ------------ | --------- | ------------------------ | ------------------------------------- | ---------------------- | ------------------------- | -------------------- |
@@ -43,7 +43,7 @@ it should end and press `y` to copy. `Esc` leaves without copying.
 The view follows the cursor, so a selection can be longer than the screen. The
 selection includes the characters at both ends.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action            | workspace | arguments          | keys          | clipboard?                       |
 | ------------------- | --------- | ------------------ | ------------- | -------------------------------- |
@@ -61,7 +61,7 @@ selection includes the characters at both ends.
 
 A mouse click leaves selection mode without copying, and then acts as normal.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action           | workspace | keys                    | document?    | selection? | clipboard? |
 | ------------------ | --------- | ----------------------- | ------------ | ---------- | ---------- |
@@ -70,7 +70,7 @@ A mouse click leaves selection mode without copying, and then acts as normal.
 
 The status bar says what to do next, and reports the result.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action         | workspace | keys        | selection?  | clipboard? | status?                         |
 | ---------------- | --------- | ----------- | ----------- | ---------- | ------------------------------- |
@@ -81,7 +81,7 @@ The status bar says what to do next, and reports the result.
 | Nothing marked   | docs      | `v y`       | none        | none       | Nothing selected                |
 | Cancelled        | docs      | `v v w Esc` | none        | none       | none                            |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action           | workspace | arguments          | keys  | look for | visible? |
 | ------------------ | --------- | ------------------ | ----- | -------- | -------- |
@@ -96,7 +96,7 @@ in base64. The terminal must allow OSC 52, and some have it turned off by defaul
 `clipboard sequence?` shows what was written to the terminal, with the escape and
 bell control characters written as `ESC` and `BEL`.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action       | workspace | arguments                | keys                     | clipboard sequence?                       |
 | -------------- | --------- | ------------------------ | ------------------------ | ----------------------------------------- |

@@ -94,6 +94,8 @@ struct Piece {
     /// The width of the table or code block this is part of, if any. These
     /// are never wrapped, and scroll sideways instead.
     block_width: Option<usize>,
+    /// Whether this is part of the selection.
+    selected: bool,
 }
 
 impl Piece {
@@ -102,6 +104,15 @@ impl Piece {
             text: text.into(),
             look,
             block_width: None,
+            selected: false,
+        }
+    }
+
+    /// The same look with other text.
+    fn holding(&self, text: String) -> Self {
+        Self {
+            text,
+            ..self.clone()
         }
     }
 }
@@ -141,6 +152,40 @@ pub struct Heading {
     pub anchor: String,
     /// The line of the markdown it starts on.
     pub line: usize,
+}
+
+/// A character of the laid out text.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub struct Spot {
+    /// The row, counted from the top of the document.
+    pub row: usize,
+    /// The character, counted from the start of the row.
+    pub index: usize,
+}
+
+/// A way to move through the laid out text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Motion {
+    /// One character back.
+    Left,
+    /// One character on.
+    Right,
+    /// One row up.
+    Up,
+    /// One row down.
+    Down,
+    /// To the next word.
+    NextWord,
+    /// To the previous word.
+    PreviousWord,
+    /// To the start of the row.
+    RowStart,
+    /// To the end of the row.
+    RowEnd,
+    /// To the start of the document.
+    Top,
+    /// To the end of the document.
+    Bottom,
 }
 
 /// A link on screen.
@@ -326,9 +371,37 @@ impl Rendered {
     /// from `left`. A link too wide to show is shown from its start.
     #[must_use]
     pub fn left_showing(&self, link: &Link, left: usize) -> usize {
-        let Some(place) = &link.sideways else {
+        link.sideways
+            .as_ref()
+            .map_or(left, |place| self.left_showing_place(place, left))
+    }
+
+    /// How far to scroll sideways to show a character, moving as little as
+    /// possible from `left`.
+    #[must_use]
+    pub fn left_showing_spot(&self, spot: Spot, left: usize) -> usize {
+        let Some(row) = self.rows.get(spot.row) else {
             return left;
         };
+        let Some(end) = row_end(row) else {
+            return left;
+        };
+        let chars = self.chars(spot.row);
+        let before: usize = chars
+            .iter()
+            .take(spot.index)
+            .map(|c| character_width(*c))
+            .sum();
+        let width = chars.get(spot.index).map_or(1, |c| character_width(*c));
+        let place = SidewaysPlace {
+            link: before..before + width,
+            start: fixed_width(row),
+            end,
+        };
+        self.left_showing_place(&place, left)
+    }
+
+    fn left_showing_place(&self, place: &SidewaysPlace, left: usize) -> usize {
         let furthest = place.end.saturating_sub(self.width);
         let shift = left.min(furthest);
         // The markers at each edge take up a column.
@@ -338,8 +411,137 @@ impl Rendered {
         if shown == shift { left } else { shown }
     }
 
+    /// The characters of a row as they read, without the padding at its end.
+    fn chars(&self, row: usize) -> Vec<char> {
+        let pieces = self.rows.get(row).map_or(&[][..], Vec::as_slice);
+        let text: String = pieces.iter().map(|piece| piece.text.as_str()).collect();
+        text.trim_end().chars().collect()
+    }
+
+    fn last_index(&self, row: usize) -> usize {
+        self.chars(row).len().saturating_sub(1)
+    }
+
+    fn last_row(&self) -> usize {
+        self.rows.len().saturating_sub(1)
+    }
+
+    /// The first character at or below a row of the screen, for a cursor to
+    /// start on.
+    #[must_use]
+    pub fn first_spot(&self, top: usize, height: usize) -> Spot {
+        let row = (top..top.saturating_add(height).min(self.rows.len()))
+            .find(|row| !self.chars(*row).is_empty());
+        Spot {
+            row: row.unwrap_or(top),
+            index: 0,
+        }
+    }
+
+    /// The character at a spot of the screen when scrolled sideways by `left`.
+    /// A spot past the end of a row gives its last character.
+    #[must_use]
+    pub fn spot_at(&self, row: usize, column: usize, left: usize) -> Spot {
+        let row = row.min(self.last_row());
+        let Some(pieces) = self.rows.get(row) else {
+            return Spot::default();
+        };
+        let furthest = row_end(pieces).unwrap_or(0).saturating_sub(self.width);
+        let column = if column >= fixed_width(pieces) {
+            column + left.min(furthest)
+        } else {
+            column
+        };
+        let mut used = 0;
+        let found = self.chars(row).iter().position(|character| {
+            used += character_width(*character);
+            column < used
+        });
+        Spot {
+            row,
+            index: found.unwrap_or_else(|| self.last_index(row)),
+        }
+    }
+
+    /// Where a motion leads from a spot, staying inside the document.
+    #[must_use]
+    pub fn moved(&self, spot: Spot, motion: Motion) -> Spot {
+        let on_row = |row: usize| Spot {
+            row,
+            index: spot.index.min(self.last_index(row)),
+        };
+        match motion {
+            Motion::Left => Spot {
+                index: spot.index.saturating_sub(1),
+                ..spot
+            },
+            Motion::Right => Spot {
+                index: (spot.index + 1).min(self.last_index(spot.row)),
+                ..spot
+            },
+            Motion::Up => on_row(spot.row.saturating_sub(1)),
+            Motion::Down => on_row((spot.row + 1).min(self.last_row())),
+            Motion::NextWord => self.next_word(spot).unwrap_or(spot),
+            Motion::PreviousWord => self.previous_word(spot).unwrap_or(spot),
+            Motion::RowStart => Spot { index: 0, ..spot },
+            Motion::RowEnd => Spot {
+                index: self.last_index(spot.row),
+                ..spot
+            },
+            Motion::Top => Spot::default(),
+            Motion::Bottom => Spot {
+                row: self.last_row(),
+                index: self.last_index(self.last_row()),
+            },
+        }
+    }
+
+    fn next_word(&self, spot: Spot) -> Option<Spot> {
+        let chars = self.chars(spot.row);
+        let here = (spot.index + 1..chars.len()).find(|index| starts_word(&chars, *index));
+        here.map(|index| Spot { index, ..spot }).or_else(|| {
+            (spot.row + 1..self.rows.len()).find_map(|row| {
+                let chars = self.chars(row);
+                let index = (0..chars.len()).find(|index| starts_word(&chars, *index))?;
+                Some(Spot { row, index })
+            })
+        })
+    }
+
+    fn previous_word(&self, spot: Spot) -> Option<Spot> {
+        let chars = self.chars(spot.row);
+        let here = (0..spot.index)
+            .rev()
+            .find(|index| starts_word(&chars, *index));
+        here.map(|index| Spot { index, ..spot }).or_else(|| {
+            (0..spot.row).rev().find_map(|row| {
+                let chars = self.chars(row);
+                let index = (0..chars.len())
+                    .rev()
+                    .find(|index| starts_word(&chars, *index))?;
+                Some(Spot { row, index })
+            })
+        })
+    }
+
+    /// The text from one spot to another, including both, with rows separated
+    /// by line breaks.
+    #[must_use]
+    pub fn text_between(&self, from: Spot, to: Spot) -> String {
+        let rows: Vec<String> = (from.row..=to.row.min(self.last_row()))
+            .map(|row| {
+                let range = row_range(row, from, to);
+                let chars = self.chars(row);
+                let end = range.end.min(chars.len());
+                let start = range.start.min(end);
+                chars.get(start..end).unwrap_or_default().iter().collect()
+            })
+            .collect();
+        rows.join("\n")
+    }
+
     /// The rows from `top` on that fit in `height`, scrolled sideways by `left`,
-    /// with a link and a whole row highlighted.
+    /// with a link, a whole row and a span of text highlighted.
     #[must_use]
     pub fn lines(
         &self,
@@ -348,6 +550,7 @@ impl Rendered {
         left: usize,
         focused: Option<&Link>,
         focused_row: Option<usize>,
+        selection: Option<(Spot, Spot)>,
     ) -> Vec<Line<'static>> {
         let focused = focused.map(|link| Look::Link(link.id));
         self.rows
@@ -365,11 +568,15 @@ impl Rendered {
                 } else {
                     row_style
                 };
-                cut_to_screen(row, left, self.width)
+                let selected = selection
+                    .filter(|(from, to)| (from.row..=to.row).contains(&index))
+                    .map(|(from, to)| row_range(index, from, to));
+                let marked = selected.map(|range| with_selection(row, &range));
+                cut_to_screen(marked.as_deref().unwrap_or(row), left, self.width)
                     .into_iter()
                     .map(|piece| {
                         let style = piece.look.style().patch(row_style);
-                        let style = if Some(piece.look) == focused {
+                        let style = if Some(piece.look) == focused || piece.selected {
                             style.add_modifier(Modifier::REVERSED)
                         } else {
                             style
@@ -380,6 +587,55 @@ impl Rendered {
             })
             .collect()
     }
+}
+
+fn starts_word(chars: &[char], index: usize) -> bool {
+    let is_word = |index: usize| chars.get(index).is_some_and(|c| !c.is_whitespace());
+    is_word(index) && (index == 0 || !is_word(index - 1))
+}
+
+/// The characters of a row that lie between two spots, including both.
+fn row_range(row: usize, from: Spot, to: Spot) -> Range<usize> {
+    let start = if row == from.row { from.index } else { 0 };
+    let end = if row == to.row {
+        to.index.saturating_add(1)
+    } else {
+        usize::MAX
+    };
+    start..end
+}
+
+/// Marks the characters of a row as selected. An empty row gets a space, so
+/// that a cursor on it can be seen.
+fn with_selection(row: &[Piece], range: &Range<usize>) -> Row {
+    let mut marked = Row::new();
+    let mut index = 0;
+    for piece in row {
+        let (mut before, mut inside, mut after) = (String::new(), String::new(), String::new());
+        for character in piece.text.chars() {
+            if index < range.start {
+                before.push(character);
+            } else if index < range.end {
+                inside.push(character);
+            } else {
+                after.push(character);
+            }
+            index += 1;
+        }
+        marked.push(piece.holding(before));
+        marked.push(Piece {
+            selected: true,
+            ..piece.holding(inside)
+        });
+        marked.push(piece.holding(after));
+    }
+    if index == 0 {
+        marked.push(Piece {
+            selected: true,
+            ..Piece::new(" ", Look::Plain)
+        });
+    }
+    marked
 }
 
 /// How much of a row comes before the part that scrolls sideways. A quote's
@@ -442,8 +698,8 @@ fn split_at_column(row: &[Piece], column: usize) -> (Row, Row) {
                 used += width;
             }
         }
-        before.push(Piece::new(start, piece.look));
-        after.push(Piece::new(rest, piece.look));
+        before.push(piece.holding(start));
+        after.push(piece.holding(rest));
     }
     (before, after)
 }
@@ -940,7 +1196,7 @@ mod tests {
         Document::parse(markdown)
             .unwrap()
             .render(width, &HashMap::new())
-            .lines(0, usize::MAX, 0, None, None)
+            .lines(0, usize::MAX, 0, None, None, None)
             .iter()
             .map(ToString::to_string)
             .collect()
@@ -974,7 +1230,7 @@ mod tests {
         let rendered = Document::parse("**aa**bbbb")
             .unwrap()
             .render(3, &HashMap::new());
-        let lines = rendered.lines(0, 2, 0, None, None);
+        let lines = rendered.lines(0, 2, 0, None, None, None);
         let spans: Vec<Vec<String>> = lines
             .iter()
             .map(|line| line.spans.iter().map(ToString::to_string).collect())
@@ -1155,7 +1411,7 @@ mod tests {
         let rendered = Document::parse("[a](1.md) [b](2.md)")
             .unwrap()
             .render(20, &HashMap::new());
-        let lines = rendered.lines(0, 1, 0, rendered.links().get(1), None);
+        let lines = rendered.lines(0, 1, 0, rendered.links().get(1), None, None);
         let reversed: Vec<String> = lines
             .iter()
             .flat_map(|line| &line.spans)
@@ -1169,7 +1425,7 @@ mod tests {
         Document::parse(markdown)
             .unwrap()
             .render(width, &HashMap::new())
-            .lines(0, usize::MAX, left, None, None)
+            .lines(0, usize::MAX, left, None, None, None)
             .iter()
             .map(ToString::to_string)
             .collect()
@@ -1218,7 +1474,7 @@ mod tests {
         let rendered = Document::parse("| a |\n| - |\n| `bbbbbbbb` |\n")
             .unwrap()
             .render(5, &HashMap::new());
-        let lines = rendered.lines(2, 1, 2, None, None);
+        let lines = rendered.lines(2, 1, 2, None, None, None);
         let colors: Vec<Option<Color>> = lines
             .iter()
             .flat_map(|line| &line.spans)
@@ -1272,7 +1528,7 @@ mod tests {
         let document = Document::parse(&markdown).unwrap();
         let rendered = document.render(20, &HashMap::new());
         assert_eq!(rendered.link_at(0, 15, 0), None);
-        let line = rendered.lines(0, 1, 16, None, None);
+        let line = rendered.lines(0, 1, 16, None, None, None);
         let text = line.first().map(ToString::to_string).unwrap_or_default();
         let column = text.chars().position(|c| c == 'f').unwrap();
         assert_eq!(rendered.link_at(0, column, 16), Some(0));
@@ -1285,6 +1541,183 @@ mod tests {
         let document = Document::parse(&markdown).unwrap();
         let rendered = document.render(20, &HashMap::new());
         assert_eq!(rendered.link_at(0, 0, 2), None);
+    }
+
+    fn rendered(markdown: &str, width: u16) -> Rendered {
+        let document = Document::parse(markdown).unwrap();
+        document.render(width, &HashMap::new())
+    }
+
+    fn spot(row: usize, index: usize) -> Spot {
+        Spot { row, index }
+    }
+
+    const WORDS: &str = "one two\n\nthree  four";
+
+    #[test]
+    fn words_are_found_across_rows() {
+        let rendered = rendered(WORDS, 40);
+        let next = |at| rendered.moved(at, Motion::NextWord);
+        assert_eq!(next(spot(0, 0)), spot(0, 4));
+        assert_eq!(next(spot(0, 1)), spot(0, 4));
+        assert_eq!(next(spot(0, 4)), spot(2, 0));
+        assert_eq!(next(spot(2, 0)), spot(2, 7));
+    }
+
+    #[test]
+    fn the_last_word_has_no_next_one() {
+        let rendered = rendered(WORDS, 40);
+        assert_eq!(rendered.moved(spot(2, 7), Motion::NextWord), spot(2, 7));
+    }
+
+    #[test]
+    fn previous_words_are_found_across_rows() {
+        let rendered = rendered(WORDS, 40);
+        let previous = |at| rendered.moved(at, Motion::PreviousWord);
+        assert_eq!(previous(spot(2, 9)), spot(2, 7));
+        assert_eq!(previous(spot(2, 7)), spot(2, 0));
+        assert_eq!(previous(spot(2, 0)), spot(0, 4));
+        assert_eq!(previous(spot(0, 0)), spot(0, 0));
+    }
+
+    #[test]
+    fn moving_stays_inside_rows_and_the_document() {
+        let rendered = rendered("ab\n\nabcd", 40);
+        assert_eq!(rendered.moved(spot(0, 0), Motion::Left), spot(0, 0));
+        assert_eq!(rendered.moved(spot(0, 1), Motion::Right), spot(0, 1));
+        assert_eq!(rendered.moved(spot(0, 0), Motion::Up), spot(0, 0));
+        assert_eq!(rendered.moved(spot(2, 3), Motion::Down), spot(2, 3));
+        assert_eq!(rendered.moved(spot(2, 3), Motion::Up), spot(1, 0));
+        assert_eq!(rendered.moved(spot(0, 0), Motion::Bottom), spot(2, 3));
+        assert_eq!(rendered.moved(spot(2, 3), Motion::Top), spot(0, 0));
+    }
+
+    #[test]
+    fn an_empty_document_has_nowhere_to_go() {
+        let rendered = rendered("", 40);
+        assert_eq!(rendered.first_spot(0, 10), spot(0, 0));
+        assert_eq!(rendered.moved(spot(0, 0), Motion::Down), spot(0, 0));
+        assert_eq!(rendered.moved(spot(0, 0), Motion::NextWord), spot(0, 0));
+        assert_eq!(rendered.spot_at(3, 3, 0), spot(0, 0));
+        assert_eq!(rendered.text_between(spot(0, 0), spot(0, 0)), "");
+    }
+
+    #[test]
+    fn the_cursor_starts_on_the_first_row_with_text() {
+        let rendered = rendered("a\n\nb", 40);
+        assert_eq!(rendered.first_spot(1, 5), spot(2, 0));
+    }
+
+    #[test]
+    fn a_screen_of_blank_rows_keeps_the_cursor_at_the_top() {
+        let rendered = rendered("a\n\nb", 40);
+        assert_eq!(rendered.first_spot(1, 1), spot(1, 0));
+    }
+
+    #[test]
+    fn text_includes_both_ends_and_stops_at_each_row_end() {
+        let rendered = rendered("abc\n\ndef", 40);
+        assert_eq!(rendered.text_between(spot(0, 1), spot(0, 1)), "b");
+        assert_eq!(rendered.text_between(spot(0, 1), spot(2, 0)), "bc\n\nd");
+        assert_eq!(rendered.text_between(spot(1, 0), spot(1, 0)), "");
+    }
+
+    #[test]
+    fn padding_at_the_end_of_a_table_row_is_not_copied() {
+        let rendered = rendered("| aaaa |\n| - |\n| b |\n", 40);
+        assert_eq!(rendered.moved(spot(2, 0), Motion::RowEnd), spot(2, 0));
+        assert_eq!(rendered.text_between(spot(2, 0), spot(2, 3)), "b");
+    }
+
+    #[test]
+    fn a_wrapped_paragraph_is_copied_row_by_row() {
+        let rendered = rendered("one two", 4);
+        assert_eq!(rendered.text_between(spot(0, 0), spot(1, 2)), "one\ntwo");
+    }
+
+    #[test]
+    fn a_spot_on_screen_counts_columns_and_not_characters() {
+        let rendered = rendered("日本 a", 40);
+        assert_eq!(rendered.spot_at(0, 0, 0), spot(0, 0));
+        assert_eq!(rendered.spot_at(0, 1, 0), spot(0, 0));
+        assert_eq!(rendered.spot_at(0, 2, 0), spot(0, 1));
+        assert_eq!(rendered.spot_at(0, 5, 0), spot(0, 3));
+    }
+
+    #[test]
+    fn a_spot_past_the_row_or_page_is_the_last_one_there() {
+        let rendered = rendered("ab\n\nabcd", 40);
+        assert_eq!(rendered.spot_at(0, 30, 0), spot(0, 1));
+        assert_eq!(rendered.spot_at(9, 30, 0), spot(2, 3));
+    }
+
+    #[test]
+    fn a_spot_in_a_scrolled_block_is_found_where_it_is_shown() {
+        let rendered = rendered("```\n0123456789012345\n```", 10);
+        assert_eq!(rendered.spot_at(0, 3, 6), spot(0, 9));
+        assert_eq!(rendered.spot_at(0, 3, 0), spot(0, 3));
+    }
+
+    #[test]
+    fn a_scrolled_quote_keeps_its_bar_out_of_the_shift() {
+        let rendered = rendered("> ```\n> 0123456789012345\n> ```", 10);
+        assert_eq!(rendered.spot_at(0, 0, 4), spot(0, 0));
+        assert_eq!(rendered.spot_at(0, 3, 4), spot(0, 7));
+    }
+
+    #[test]
+    fn the_view_moves_sideways_to_show_a_spot_in_a_block() {
+        let rendered = rendered("```\n0123456789012345\n```\n\nplain", 10);
+        assert_eq!(rendered.left_showing_spot(spot(0, 15), 0), 6);
+        assert_eq!(rendered.left_showing_spot(spot(0, 0), 6), 0);
+        assert_eq!(rendered.left_showing_spot(spot(0, 4), 2), 2);
+        assert_eq!(rendered.left_showing_spot(spot(2, 0), 2), 2);
+    }
+
+    fn reversed_text(rendered: &Rendered, selection: (Spot, Spot)) -> Vec<String> {
+        let lines = rendered.lines(0, 10, 0, None, None, Some(selection));
+        lines
+            .iter()
+            .map(|line| {
+                let spans = line.spans.iter();
+                spans
+                    .filter(|span| span.style.add_modifier.contains(Modifier::REVERSED))
+                    .map(|span| span.content.as_ref())
+                    .collect()
+            })
+            .collect()
+    }
+
+    #[test]
+    fn the_selection_is_highlighted_across_looks_and_rows() {
+        let rendered = rendered("ab **cd** ef\n\nghi", 40);
+        assert_eq!(
+            reversed_text(&rendered, (spot(0, 1), spot(2, 0))),
+            ["b cd ef", " ", "g"]
+        );
+    }
+
+    #[test]
+    fn a_selection_keeps_the_look_of_what_it_covers() {
+        let rendered = rendered("ab **cd**", 40);
+        let lines = rendered.lines(0, 1, 0, None, None, Some((spot(0, 3), spot(0, 3))));
+        let spans = lines.first().map_or(&[][..], |line| line.spans.as_slice());
+        let span = spans.iter().find(|span| span.content == "c").unwrap();
+        assert!(span.style.add_modifier.contains(Modifier::BOLD));
+    }
+
+    #[test]
+    fn a_selection_in_a_scrolled_block_moves_with_it() {
+        let rendered = rendered("```\n0123456789012345\n```", 10);
+        let selection = Some((spot(0, 8), spot(0, 9)));
+        let lines = rendered.lines(0, 1, 6, None, None, selection);
+        let spans = lines.first().map_or(&[][..], |line| line.spans.as_slice());
+        let selected: String = spans
+            .iter()
+            .filter(|span| span.style.add_modifier.contains(Modifier::REVERSED))
+            .map(|span| span.content.as_ref())
+            .collect();
+        assert_eq!(selected, "89");
     }
 
     fn failed_at(line: usize, snoozed: bool) -> TableResult {
@@ -1305,7 +1738,7 @@ mod tests {
     const TABLE_THEN_MORE: &str = "| a |\n| - |\n| 1 |\n| 2 |\n\n[next](a.md)\n\n## After\n";
 
     fn shown(rendered: &Rendered) -> Vec<String> {
-        let lines = rendered.lines(0, usize::MAX, 0, None, None);
+        let lines = rendered.lines(0, usize::MAX, 0, None, None, None);
         lines.iter().map(ToString::to_string).collect()
     }
 
@@ -1358,7 +1791,7 @@ mod tests {
     }
 
     fn row_color(rendered: &Rendered, row: usize) -> Option<Color> {
-        let lines = rendered.lines(row, 1, 0, None, None);
+        let lines = rendered.lines(row, 1, 0, None, None, None);
         lines.first()?.spans.first()?.style.fg
     }
 
@@ -1391,7 +1824,7 @@ mod tests {
     fn the_focused_row_is_reversed_whole() {
         let document = Document::parse("| a | b |\n| - | - |\n| 1 | 2 |\n").unwrap();
         let rendered = document.render(40, &HashMap::new());
-        let lines = rendered.lines(0, 1, 0, None, Some(0));
+        let lines = rendered.lines(0, 1, 0, None, Some(0), None);
         let spans = lines.first().map_or(&[][..], |line| line.spans.as_slice());
         assert_ne!(spans.len(), 0);
         for span in spans {

@@ -5,6 +5,7 @@
 //! specification's fixtures drive.
 
 pub mod app;
+pub mod clipboard;
 pub mod page;
 pub mod render;
 pub mod run;

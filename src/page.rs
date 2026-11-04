@@ -1,6 +1,6 @@
 //! A document on screen: how far it is scrolled and what is focused.
 
-use crate::render::{Document, Link, Rendered};
+use crate::render::{Document, Link, Motion, Rendered, Spot};
 use crate::run::FileResults;
 use crate::temoc::TestTable;
 use ratatui::layout::Size;
@@ -10,6 +10,16 @@ use std::ops::Range;
 
 /// How many columns one step sideways moves.
 const SIDEWAYS_STEP: usize = 8;
+
+/// Text being selected.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct Selection {
+    cursor: Spot,
+    /// Where the selection starts. Before that there is only a cursor.
+    start: Option<Spot>,
+    /// Whether the keyboard is moving the cursor.
+    by_keyboard: bool,
+}
 
 /// A document on screen. Going back to a page finds it as it was left.
 #[derive(Debug, Clone)]
@@ -27,6 +37,7 @@ pub struct Page {
     left: usize,
     focused_link: Option<usize>,
     focused_table: Option<usize>,
+    selection: Option<Selection>,
 }
 
 impl Page {
@@ -47,6 +58,7 @@ impl Page {
             scroll: 0,
             left: 0,
             focused_link: None,
+            selection: None,
         }
     }
 
@@ -95,6 +107,8 @@ impl Page {
                 .collect()
         });
         self.rendered = self.document.render(self.size.width, &results);
+        // What was selected may no longer be in the same place.
+        self.selection = None;
     }
 
     fn stay_on_the_page(&mut self) {
@@ -111,6 +125,7 @@ impl Page {
             self.left,
             self.focused_link(),
             self.focused_table_row(),
+            self.selected_spots(),
         )
     }
 
@@ -181,6 +196,86 @@ impl Page {
         if let Some(rows) = heading.and_then(|heading| self.rendered.rows_of_line(heading.line)) {
             self.scroll = rows.start.min(self.last_scroll());
         }
+    }
+
+    /// The two ends of what is marked, in order. A cursor marks one character.
+    fn selected_spots(&self) -> Option<(Spot, Spot)> {
+        let selection = self.selection?;
+        let start = selection.start.unwrap_or(selection.cursor);
+        Some((start.min(selection.cursor), start.max(selection.cursor)))
+    }
+
+    /// The selected text. A cursor alone selects nothing.
+    #[must_use]
+    pub fn selected_text(&self) -> Option<String> {
+        self.selection?.start?;
+        let (from, to) = self.selected_spots()?;
+        Some(self.rendered.text_between(from, to))
+    }
+
+    /// Whether the keyboard is moving a cursor through the text.
+    #[must_use]
+    pub fn is_selecting(&self) -> bool {
+        self.selection
+            .is_some_and(|selection| selection.by_keyboard)
+    }
+
+    /// Whether the keyboard cursor has marked where the selection starts.
+    #[must_use]
+    pub fn has_start(&self) -> bool {
+        self.selection
+            .is_some_and(|selection| selection.start.is_some())
+    }
+
+    /// Puts a cursor on the first character on screen.
+    pub fn start_selecting(&mut self) {
+        let cursor = self.rendered.first_spot(self.scroll, self.screen_height());
+        self.selection = Some(Selection {
+            cursor,
+            start: None,
+            by_keyboard: true,
+        });
+        self.follow_cursor(cursor);
+    }
+
+    /// Starts the selection at the cursor.
+    pub fn mark_start(&mut self) {
+        if let Some(selection) = &mut self.selection {
+            selection.start = Some(selection.cursor);
+        }
+    }
+
+    /// Moves the cursor, and the view along with it.
+    pub fn move_cursor(&mut self, motion: Motion) {
+        if let Some(selection) = &mut self.selection {
+            selection.cursor = self.rendered.moved(selection.cursor, motion);
+            let cursor = selection.cursor;
+            self.follow_cursor(cursor);
+        }
+    }
+
+    fn follow_cursor(&mut self, cursor: Spot) {
+        self.reveal(&(cursor.row..cursor.row.saturating_add(1)));
+        self.left = self.rendered.left_showing_spot(cursor, self.left);
+    }
+
+    /// Selects what lies between two spots of the screen.
+    pub fn drag(&mut self, from: (u16, u16), to: (u16, u16)) {
+        let spot = |(column, row): (u16, u16)| {
+            let last = self.screen_height().saturating_sub(1);
+            let row = self.scroll.saturating_add(usize::from(row).min(last));
+            self.rendered.spot_at(row, usize::from(column), self.left)
+        };
+        self.selection = Some(Selection {
+            cursor: spot(to),
+            start: Some(spot(from)),
+            by_keyboard: false,
+        });
+    }
+
+    /// Forgets the selection, and any cursor.
+    pub fn clear_selection(&mut self) {
+        self.selection = None;
     }
 
     /// Reacts to a click on the screen. A test table there gets the focus, and
@@ -490,6 +585,81 @@ Between.
         let mut page = page("[link](1.md)", 20, 1);
         assert!(!page.click(0, 1));
         assert_eq!(page.focused_link(), None);
+    }
+
+    #[test]
+    fn a_cursor_alone_selects_nothing() {
+        let mut page = page("abc", 20, 5);
+        page.start_selecting();
+        assert!(page.is_selecting());
+        assert_eq!(page.selected_text(), None);
+        page.mark_start();
+        assert_eq!(page.selected_text().as_deref(), Some("a"));
+    }
+
+    #[test]
+    fn marking_again_moves_the_start() {
+        let mut page = page("abc", 20, 5);
+        page.start_selecting();
+        page.mark_start();
+        page.move_cursor(Motion::Right);
+        page.mark_start();
+        page.move_cursor(Motion::Right);
+        assert_eq!(page.selected_text().as_deref(), Some("bc"));
+    }
+
+    #[test]
+    fn the_view_follows_the_cursor_in_both_directions() {
+        let mut page = page(&numbered(9), 20, 3);
+        page.start_selecting();
+        page.move_cursor(Motion::Bottom);
+        assert_eq!(shown(&page).last().map(String::as_str), Some("line9"));
+        page.move_cursor(Motion::Top);
+        assert_eq!(page.scroll, 0);
+    }
+
+    #[test]
+    fn the_view_follows_the_cursor_sideways() {
+        let mut page = page(WIDE_CODE, 30, 5);
+        page.start_selecting();
+        page.move_cursor(Motion::RowEnd);
+        assert_eq!(page.left, 10);
+        page.move_cursor(Motion::RowStart);
+        assert_eq!(page.left, 0);
+    }
+
+    #[test]
+    fn a_drag_works_in_both_directions_and_on_a_scrolled_page() {
+        let mut page = page(&numbered(5), 20, 3);
+        page.scroll_down(2);
+        page.drag((0, 0), (3, 2));
+        assert_eq!(page.selected_text().as_deref(), Some("line2\n\nline"));
+        page.drag((3, 2), (0, 0));
+        assert_eq!(page.selected_text().as_deref(), Some("line2\n\nline"));
+        assert!(!page.is_selecting());
+    }
+
+    #[test]
+    fn a_drag_past_the_bottom_of_the_page_stops_there() {
+        let mut page = page(&numbered(5), 20, 3);
+        page.drag((0, 0), (0, 9));
+        assert_eq!(page.selected_text().as_deref(), Some("line1\n\nl"));
+    }
+
+    #[test]
+    fn a_new_layout_forgets_the_selection() {
+        let mut page = page("one two", 20, 5);
+        page.drag((0, 0), (2, 0));
+        page.fit(Size::new(3, 5));
+        assert_eq!(page.selected_text(), None);
+    }
+
+    #[test]
+    fn a_taller_screen_keeps_the_selection() {
+        let mut page = page("one two", 20, 5);
+        page.drag((0, 0), (2, 0));
+        page.fit(Size::new(20, 9));
+        assert_eq!(page.selected_text().as_deref(), Some("one"));
     }
 
     #[test]
