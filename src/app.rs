@@ -1,6 +1,7 @@
 //! The application itself, independent of any real terminal.
 
 use crate::clipboard;
+use crate::graph::{Graph, GraphState};
 use crate::page::Page;
 use crate::render::{Document, Motion};
 use crate::run::{FileResults, Request, Run};
@@ -63,25 +64,6 @@ impl<'launch> Arguments<'launch> {
     }
 }
 
-/// What the graph view currently shows.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct GraphState {
-    /// The files in each column, from left to right.
-    pub columns: Vec<Vec<String>>,
-    /// Every link in the graph, as `(from, to)`.
-    pub links: Vec<(String, String)>,
-    /// The selected file.
-    pub selected: Option<String>,
-    /// Links from the start page to the selected file, if it can be reached.
-    pub distance: Option<usize>,
-    /// The panel's list of links out of the selected file.
-    pub links_out: Vec<String>,
-    /// The panel's list of links into the selected file.
-    pub links_in: Vec<String>,
-    /// The part of the screen holding the graph, without the panel.
-    pub area: Rect,
-}
-
 /// A snapshot of the application, for anything that needs to observe it.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct AppState {
@@ -129,6 +111,7 @@ pub struct App {
     forward: Vec<Page>,
     search: Option<Search>,
     tree: Option<FileTree>,
+    graph: Option<Graph>,
     /// Whether search shows only test files. Outlives the search box.
     only_tests: bool,
     status: Option<String>,
@@ -174,6 +157,7 @@ impl App {
             forward: Vec::new(),
             search: None,
             tree: None,
+            graph: None,
             only_tests: false,
             status: None,
             page_size: Size::default(),
@@ -267,6 +251,21 @@ impl App {
             return Ok(());
         };
         self.tree = None;
+        self.visit(&file, None)
+    }
+
+    fn open_graph(&mut self) {
+        let document = self.page.as_ref().map(Page::file);
+        self.graph = Some(Graph::open(&self.workspace, document));
+    }
+
+    /// Opens the selected file, if there is one, and leaves the graph.
+    fn open_graph_selection(&mut self) -> Result<(), String> {
+        let graph = self.graph.as_ref();
+        let Some(file) = graph.and_then(Graph::chosen_file).map(String::from) else {
+            return Ok(());
+        };
+        self.graph = None;
         self.visit(&file, None)
     }
 
@@ -395,14 +394,18 @@ impl App {
         }
     }
 
-    /// Selects from where the button went down. A pop-up has nothing to select.
+    /// Whether the page can be reached, with nothing open over it.
+    fn page_is_showing(&self) -> bool {
+        self.search.is_none() && self.tree.is_none() && self.graph.is_none()
+    }
+
+    /// Selects from where the button went down, on a page with nothing over it.
     fn drag_to(&mut self, spot: Position) {
         let Some(start) = self.pressed.filter(|start| *start != spot) else {
             return;
         };
         self.dragged = true;
-        if self.search.is_none()
-            && self.tree.is_none()
+        if self.page_is_showing()
             && let Some(page) = &mut self.page
         {
             page.drag((start.x, start.y), (spot.x, spot.y));
@@ -412,7 +415,7 @@ impl App {
     fn release(&mut self, spot: Position) {
         let pressed = self.pressed.take();
         if mem::take(&mut self.dragged) {
-            if self.search.is_none() && self.tree.is_none() {
+            if self.page_is_showing() {
                 self.copy_selection();
             }
         } else if pressed == Some(spot) {
@@ -445,6 +448,13 @@ impl App {
         }
         if self.tree.is_some() {
             self.click_tree(spot);
+            return;
+        }
+        if let Some(graph) = &mut self.graph {
+            if graph.click(spot) {
+                let result = self.open_graph_selection();
+                self.report(result);
+            }
             return;
         }
         let Some(page) = &mut self.page else {
@@ -489,6 +499,18 @@ impl App {
                 (MouseEventKind::ScrollUp, false) => tree.scroll_up(WHEEL_STEP),
                 _ => {}
             }
+        } else if let Some(graph) = &mut self.graph {
+            match (kind, shift) {
+                (MouseEventKind::ScrollDown, false) => graph.scroll_down(WHEEL_STEP),
+                (MouseEventKind::ScrollUp, false) => graph.scroll_up(WHEEL_STEP),
+                (MouseEventKind::ScrollRight, _) | (MouseEventKind::ScrollDown, true) => {
+                    graph.scroll_right();
+                }
+                (MouseEventKind::ScrollLeft, _) | (MouseEventKind::ScrollUp, true) => {
+                    graph.scroll_left();
+                }
+                _ => {}
+            }
         } else if let Some(page) = &mut self.page {
             match (kind, shift) {
                 (MouseEventKind::ScrollDown, false) => page.scroll_down(WHEEL_STEP),
@@ -521,6 +543,10 @@ impl App {
             }
             return Ok(());
         }
+        if self.graph.is_some() {
+            self.handle_graph_key(key.code, control);
+            return Ok(());
+        }
         if self.page.as_ref().is_some_and(Page::is_selecting) {
             if !control {
                 self.handle_selection_key(key.code);
@@ -528,7 +554,11 @@ impl App {
             return Ok(());
         }
         if control {
-            return Err(NotImplemented);
+            if key.code != KeyCode::Char('g') {
+                return Err(NotImplemented);
+            }
+            self.open_graph();
+            return Ok(());
         }
         self.handle_page_key(key.code)
     }
@@ -573,6 +603,31 @@ impl App {
                     }
                 }
             }
+        }
+    }
+
+    fn handle_graph_key(&mut self, code: KeyCode, control: bool) {
+        match (code, control) {
+            (KeyCode::Esc, false) | (KeyCode::Char('g'), true) => self.graph = None,
+            (KeyCode::Char('q'), false) => self.running = false,
+            (KeyCode::Enter, false) => {
+                let result = self.open_graph_selection();
+                self.report(result);
+            }
+            (code, false) => {
+                if let Some(graph) = &mut self.graph {
+                    match code {
+                        KeyCode::Char('j') | KeyCode::Down => graph.choose_next(),
+                        KeyCode::Char('k') | KeyCode::Up => graph.choose_previous(),
+                        KeyCode::Char('l') | KeyCode::Right => graph.choose_right(),
+                        KeyCode::Char('h') | KeyCode::Left => graph.choose_left(),
+                        KeyCode::Char('g') => graph.choose_first(),
+                        KeyCode::Char('G') => graph.choose_last(),
+                        _ => {}
+                    }
+                }
+            }
+            _ => {}
         }
     }
 
@@ -685,7 +740,9 @@ impl App {
         let [body, status] =
             Layout::vertical([Constraint::Min(0), Constraint::Length(1)]).areas(frame.area());
         self.page_size = body.as_size();
-        if let Some(page) = &mut self.page {
+        if let Some(graph) = &mut self.graph {
+            graph.draw(frame, body);
+        } else if let Some(page) = &mut self.page {
             page.show_results(self.results.get(page.file()));
             page.fit(self.page_size);
             frame.render_widget(Paragraph::new(page.lines()), body);
@@ -781,7 +838,7 @@ impl App {
                 .as_ref()
                 .and_then(FileTree::selection)
                 .map(|row| row.name.clone()),
-            ..AppState::default()
+            graph: self.graph.as_ref().map(Graph::state),
         }
     }
 }
@@ -919,6 +976,114 @@ mod tests {
 
     fn press(app: &mut App, code: KeyCode) {
         app.handle_event(&Event::Key(KeyEvent::from(code))).unwrap();
+    }
+
+    fn press_ctrl(app: &mut App, character: char) -> Result<(), NotImplemented> {
+        let key = KeyEvent::new(KeyCode::Char(character), KeyModifiers::CONTROL);
+        app.handle_event(&Event::Key(key))
+    }
+
+    fn graph_is_open(app: &App) -> bool {
+        app.state().graph.is_some()
+    }
+
+    #[test]
+    fn a_control_key_with_no_meaning_says_so() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        assert_eq!(press_ctrl(&mut app, 'x'), Err(NotImplemented));
+    }
+
+    #[test]
+    fn the_graph_does_not_open_over_search_or_the_tree() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        press(&mut app, KeyCode::Char('/'));
+        press_ctrl(&mut app, 'g').unwrap();
+        assert!(!graph_is_open(&app));
+        press(&mut app, KeyCode::Esc);
+        press(&mut app, KeyCode::Char('t'));
+        press_ctrl(&mut app, 'g').unwrap();
+        assert!(!graph_is_open(&app));
+    }
+
+    #[test]
+    fn q_quits_from_the_graph() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        press_ctrl(&mut app, 'g').unwrap();
+        press(&mut app, KeyCode::Char('q'));
+        assert!(!app.state().running);
+    }
+
+    #[test]
+    fn keys_for_the_page_do_nothing_in_the_graph() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        press_ctrl(&mut app, 'g').unwrap();
+        for character in ['/', 't', 'v', 'r', 'R', '?', 'x'] {
+            press(&mut app, KeyCode::Char(character));
+        }
+        press_ctrl(&mut app, 'x').unwrap();
+        let state = app.state();
+        assert!(!state.search_open);
+        assert_eq!(state.tree, None);
+        assert_eq!(state.temoc_arguments, None);
+        assert_eq!(state.status, None);
+        assert!(graph_is_open(&app));
+    }
+
+    #[test]
+    fn enter_with_nothing_selected_leaves_the_graph_open() {
+        let folder = env::temp_dir().join(format!("temoc-ui-graph-empty-{}", process::id()));
+        fs::create_dir_all(&folder).unwrap();
+        let mut app = App::start(&Launch {
+            current_dir: folder.clone(),
+            ..Launch::default()
+        })
+        .unwrap();
+        press(&mut app, KeyCode::Esc);
+        press_ctrl(&mut app, 'g').unwrap();
+        press(&mut app, KeyCode::Enter);
+        assert!(graph_is_open(&app));
+        fs::remove_dir_all(folder).unwrap();
+    }
+
+    #[test]
+    fn opening_a_file_that_cannot_be_read_says_why() {
+        let workspace = Workspace::new("graph-unreadable", "exit 0");
+        fs::write(workspace.0.join("bad.md"), [0xff, 0xfe]).unwrap();
+        let mut app = workspace.app();
+        press_ctrl(&mut app, 'g').unwrap();
+        status_bar(&mut app);
+        press(&mut app, KeyCode::Char('l'));
+        assert_eq!(selected_file(&app).as_deref(), Some("bad.md"));
+        press(&mut app, KeyCode::Enter);
+        let status = app.state().status.unwrap();
+        assert!(status.starts_with("Cannot read bad.md"), "{status}");
+        assert_eq!(app.state().document.as_deref(), Some("README.md"));
+    }
+
+    fn selected_file(app: &App) -> Option<String> {
+        app.state().graph.and_then(|graph| graph.selected)
+    }
+
+    #[test]
+    fn a_drag_in_the_graph_selects_nothing_and_copies_nothing() {
+        let mut app = App::start(&launch("docs", &[])).unwrap();
+        press_ctrl(&mut app, 'g').unwrap();
+        status_bar(&mut app);
+        drag(&mut app, (0, 0), (8, 0));
+        assert_eq!(app.state().selection, None);
+        assert_eq!(app.state().status, None);
+        assert_eq!(app.take_output(), [0u8; 0]);
+    }
+
+    #[test]
+    fn a_run_finishes_while_the_graph_is_open() {
+        let workspace = Workspace::new("graph-run", "exit 0");
+        let mut app = workspace.app();
+        press(&mut app, KeyCode::Char('R'));
+        press_ctrl(&mut app, 'g').unwrap();
+        settle(&mut app);
+        assert!(graph_is_open(&app));
+        assert!(!app.is_busy());
     }
 
     #[test]

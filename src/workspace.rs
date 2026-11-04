@@ -125,11 +125,7 @@ pub fn follow_link(workspace: &Path, document: &str, target: &str) -> Result<Pla
     let (written, anchor) = target
         .split_once('#')
         .map_or((target, None), |(path, anchor)| (path, Some(anchor)));
-    let file = if written.is_empty() {
-        document.to_owned()
-    } else {
-        resolve(document, written)
-    };
+    let file = file_of(document, written);
     let path = workspace.join(&file);
     if !path.is_file() {
         return Err(format!("Link target not found: {written}"));
@@ -141,6 +137,25 @@ pub fn follow_link(workspace: &Path, document: &str, target: &str) -> Result<Pla
         file,
         anchor: anchor.map(String::from),
     })
+}
+
+/// The path a link in `document` leads to, relative to the workspace and
+/// without its anchor, unless it leads to a website.
+#[must_use]
+pub fn link_path(document: &str, target: &str) -> Option<String> {
+    if is_external(target) {
+        return None;
+    }
+    let written = target.split_once('#').map_or(target, |(path, _)| path);
+    Some(file_of(document, written))
+}
+
+fn file_of(document: &str, written: &str) -> String {
+    if written.is_empty() {
+        document.to_owned()
+    } else {
+        resolve(document, written)
+    }
 }
 
 /// Whether a link target starts with a URL scheme, such as `https:`.
@@ -232,6 +247,15 @@ mod tests {
         ] {
             assert_eq!(follow("README.md", target), Err(message.to_owned()));
         }
+    }
+
+    #[test]
+    fn a_link_path_loses_its_anchor_and_stays_on_the_page_without_a_path() {
+        let path = |target| link_path("guide/a.md", target);
+        assert_eq!(path("b.md#top").as_deref(), Some("guide/b.md"));
+        assert_eq!(path("../c.md").as_deref(), Some("c.md"));
+        assert_eq!(path("#top").as_deref(), Some("guide/a.md"));
+        assert_eq!(path("https://example.com/a.md"), None);
     }
 
     #[test]

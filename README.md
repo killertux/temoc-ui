@@ -75,6 +75,7 @@ cargo run -- samples/docs
 | `R`                           | Run the whole file                    |
 | `/`                           | Open search                           |
 | `t`                           | Open the file tree                    |
+| `Ctrl-g`                      | Open the graph of links               |
 | `v`                           | Start selecting text                  |
 | `q`, `Ctrl-c`                 | Quit                                  |
 
@@ -96,6 +97,15 @@ sequence, so it works over SSH, but your terminal must allow it.
 The file tree shows the workspace's markdown files, with the open page selected. Use
 `j` and `k` or the arrow keys to move, `l` and `h` to open and close a folder, and
 `Enter` to open a file or folder. `t` or `Esc` closes it.
+
+The graph shows every markdown file of the workspace and the links between them.
+Files are in columns by how many links away they are from the start page, which is the
+workspace's `README.md`, or else its first file. Files that cannot be reached are in a
+final column of their own. Use `j`, `k`, `h`, `l` or the arrow keys to move, `g` and `G`
+to go to the top and bottom of a column, and `Enter` to open the selected file. The
+panel below lists its links, including broken ones. `Ctrl-g` or `Esc` closes the graph.
+The mouse works here too: click a file to select it, click it again to open it, and use
+the wheel to scroll.
 
 temoc-ui never opens a web browser. External links stay on the page and show their
 address in the status line.
@@ -126,10 +136,10 @@ temoc-ui or the file runs again.
 - A pop-up file tree
 - Mouse support
 - Selecting and copying text
+- A graph of how the pages link together
 
 **Coming next**
 
-- A graph of how the pages link together
 - A help screen
 
 **Further out**

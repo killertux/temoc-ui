@@ -127,7 +127,7 @@ nothing.
 The wheel scrolls the graph without changing the selection. To scroll sideways, use
 a sideways wheel or hold `Shift` while turning the wheel. Each step moves one column.
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action           | workspace | keys                                              | document?          | graph open? | selected file?     |
 | ------------------ | --------- | ------------------------------------------------- | ------------------ | ----------- | ------------------ |
@@ -138,7 +138,7 @@ a sideways wheel or hold `Shift` while turning the wheel. Each step moves one co
 | Click the panel    | docs      | `Ctrl-g Click "missing.md (missing)"`             | README.md          | yes         | README.md          |
 | Go back after opening | docs   | `Ctrl-g Click "notes.MD" Click "notes.MD" h`      | README.md          | no          | none               |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action               | workspace  | keys                        | look for   | visible? | selected file? |
 | ---------------------- | ---------- | --------------------------- | ---------- | -------- | -------------- |
@@ -146,7 +146,7 @@ a sideways wheel or hold `Shift` while turning the wheel. Each step moves one co
 | Wheel scrolls the graph | many-pages | `Ctrl-g l WheelDown`       | page-02.md | no       | page-01.md     |
 | Wheel scrolls back     | many-pages | `Ctrl-g l WheelDown WheelUp` | page-02.md | yes     | page-01.md     |
 
-[//]: # "decisionTable Tui -- snooze until 2099-12-31"
+[//]: # "decisionTable Tui"
 
 | # action             | workspace  | keys                          | look for  | in graph? | selected file? |
 | -------------------- | ---------- | ----------------------------- | --------- | --------- | -------------- |

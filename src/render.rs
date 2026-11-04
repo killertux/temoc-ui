@@ -272,6 +272,11 @@ impl Document {
             .collect()
     }
 
+    /// Where the links of the document point, as written in the markdown.
+    pub fn link_urls(&self) -> impl Iterator<Item = &str> {
+        self.targets.values().map(|target| target.url.as_str())
+    }
+
     /// Lays the document out for a screen of this width. Each table with a
     /// result, given by the line it starts on, shows that result below it.
     #[must_use]

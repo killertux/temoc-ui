@@ -6,6 +6,7 @@
 
 pub mod app;
 pub mod clipboard;
+pub mod graph;
 pub mod page;
 pub mod render;
 pub mod run;

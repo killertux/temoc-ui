@@ -4,7 +4,8 @@ use crate::clipboard;
 use crate::session::{Outcome, Session};
 use rust_slim::fixture;
 use std::path::Path;
-use temoc_ui::app::{AppState, GraphState};
+use temoc_ui::app::AppState;
+use temoc_ui::graph::GraphState;
 use temoc_ui::render::{self, Preview};
 use temoc_ui::temoc::{self, RunReport, TestFile};
 
