@@ -1,0 +1,4 @@
+# This server exits immediately, so temoc cannot connect to it.
+execute_server_command = "false"
+port = 1
+pool_size = 1

@@ -1,0 +1,4 @@
+# calculator-server is built by the spec harness and placed on the PATH.
+execute_server_command = "calculator-server %p"
+port = 1
+pool_size = 1
