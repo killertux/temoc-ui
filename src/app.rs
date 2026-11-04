@@ -1,9 +1,10 @@
 //! The application itself, independent of any real terminal.
 
+use crate::{NotImplemented, temoc};
 use crossterm::event::Event;
 use ratatui::Frame;
 use ratatui::layout::Rect;
-use std::path::PathBuf;
+use std::path::{Component, Path, PathBuf};
 
 /// How temoc-ui was started.
 #[derive(Debug, Clone, Default)]
@@ -91,12 +92,37 @@ impl App {
     /// # Errors
     ///
     /// Returns [`StartError::Refused`] when the path given cannot be opened.
-    pub fn start(_launch: &Launch) -> Result<Self, StartError> {
-        Err(StartError::NotImplemented)
+    /// Only opening a markdown file inside the current folder is built so far,
+    /// anything else returns [`StartError::NotImplemented`].
+    pub fn start(launch: &Launch) -> Result<Self, StartError> {
+        let [path] = launch.arguments.as_slice() else {
+            return Err(StartError::NotImplemented);
+        };
+        let file = launch.current_dir.join(path);
+        if !is_inside(path) || !is_markdown(&file) || !file.is_file() {
+            return Err(StartError::NotImplemented);
+        }
+        let tests = temoc::inspect_file(&file)
+            .map_err(|error| StartError::Refused(format!("Cannot read {path}: {error}")))?;
+        Ok(Self {
+            state: AppState {
+                running: true,
+                document: Some(path.clone()),
+                focused_table: tests.tables.into_iter().next(),
+                ..AppState::default()
+            },
+        })
     }
 
     /// Reacts to a key press or mouse action.
-    pub fn handle_event(&mut self, _event: &Event) {}
+    ///
+    /// # Errors
+    ///
+    /// Fails until input is built, so that a scenario pressing keys cannot pass
+    /// because nothing happened.
+    pub fn handle_event(&mut self, _event: &Event) -> Result<(), NotImplemented> {
+        Err(NotImplemented)
+    }
 
     /// Picks up the progress of background work, such as a test run.
     pub fn update(&mut self) {}
@@ -108,7 +134,14 @@ impl App {
     }
 
     /// Draws the current screen.
-    pub fn draw(&self, _frame: &mut Frame) {}
+    ///
+    /// # Errors
+    ///
+    /// Fails until the screen is built, so that text cannot pass as hidden
+    /// because nothing was drawn.
+    pub fn draw(&self, _frame: &mut Frame) -> Result<(), NotImplemented> {
+        Err(NotImplemented)
+    }
 
     /// Takes the bytes waiting to be written to the terminal, such as a
     /// clipboard escape sequence.
@@ -120,5 +153,49 @@ impl App {
     #[must_use]
     pub fn state(&self) -> AppState {
         self.state.clone()
+    }
+}
+
+fn is_inside(path: &str) -> bool {
+    Path::new(path)
+        .components()
+        .all(|part| matches!(part, Component::Normal(_)))
+}
+
+fn is_markdown(file: &Path) -> bool {
+    file.extension()
+        .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn launch(workspace: &str, arguments: &[&str]) -> Launch {
+        Launch {
+            current_dir: Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("samples")
+                .join(workspace),
+            arguments: arguments.iter().map(ToString::to_string).collect(),
+            extra_path: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn opening_a_test_file_focuses_its_first_table() {
+        let state = App::start(&launch("calculator", &["passing.md"]))
+            .unwrap()
+            .state();
+        assert!(state.running);
+        assert_eq!(state.document.as_deref(), Some("passing.md"));
+        assert_eq!(state.focused_table.as_deref(), Some("Addition"));
+    }
+
+    #[test]
+    fn what_is_not_built_says_so() {
+        for arguments in [&[][..], &["nope.md"], &["../docs/README.md"], &["data.txt"]] {
+            let result = App::start(&launch("docs", arguments));
+            assert_eq!(result.err(), Some(StartError::NotImplemented));
+        }
     }
 }

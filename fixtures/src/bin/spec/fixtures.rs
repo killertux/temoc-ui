@@ -1,16 +1,13 @@
 //! The fixtures used by the pages in `spec/`.
 
 use crate::clipboard;
-use crate::session::{Outcome, Session};
+use crate::session::{NOT_IMPLEMENTED, Outcome, Session};
 use rust_slim::fixture;
 use std::path::Path;
 use temoc_ui::app::{AppState, GraphState};
 use temoc_ui::render::{self, Preview};
 use temoc_ui::temoc::{self, RunReport, TestFile};
 
-/// Reported for anything not built yet. No test expects this value, so a test
-/// cannot pass by accident while the feature is missing.
-const NOT_IMPLEMENTED: &str = "not implemented";
 const NONE: &str = "none";
 
 fn yes_no(value: bool) -> String {
@@ -78,7 +75,7 @@ impl Tui {
 
     #[must_use]
     pub fn visible(&self) -> String {
-        self.read_session(|session| yes_no(session.shows(&self.look_for)))
+        self.read_screen(|session| yes_no(session.shows(&self.look_for)))
     }
 
     #[must_use]
@@ -219,7 +216,7 @@ impl Tui {
 
     #[must_use]
     pub fn in_graph(&self) -> String {
-        self.read_session(|session| {
+        self.read_screen(|session| {
             session.state().graph.map_or_else(
                 || yes_no(false),
                 |graph| yes_no(session.shows_in(graph.area, &self.look_for)),
@@ -256,6 +253,16 @@ impl Tui {
             Some(Outcome::Broken(problem)) => problem.clone(),
             Some(Outcome::Finished(session)) => read(session),
         }
+    }
+
+    fn read_screen(&self, read: impl FnOnce(&Session) -> String) -> String {
+        self.read_session(|session| {
+            if session.drawn() {
+                read(session)
+            } else {
+                NOT_IMPLEMENTED.into()
+            }
+        })
     }
 
     /// Reads the application's state. temoc-ui refusing to open is a valid
@@ -340,7 +347,7 @@ impl TemocDetection {
 
     #[must_use]
     pub fn tables(&self) -> String {
-        self.read(|found| found.tables.to_string())
+        self.read(|found| found.tables.len().to_string())
     }
 }
 
@@ -349,7 +356,7 @@ impl TemocDetection {
         let path = Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../samples/detection")
             .join(&self.file);
-        temoc::inspect_file(&path).map_or_else(|_| NOT_IMPLEMENTED.into(), read)
+        temoc::inspect_file(&path).map_or_else(|error| error.to_string(), read)
     }
 }
 
@@ -387,19 +394,24 @@ impl TemocOutput {
 
     #[must_use]
     pub fn result(&self) -> String {
-        self.read(|report| report.result)
+        self.read().result.to_string()
     }
 
     #[must_use]
     pub fn failures(&self) -> String {
-        self.read(|report| list(&report.failures, "; "))
+        let failures: Vec<String> = self
+            .read()
+            .failures
+            .iter()
+            .map(ToString::to_string)
+            .collect();
+        list(&failures, "; ")
     }
 }
 
 impl TemocOutput {
-    fn read(&self, read: impl FnOnce(RunReport) -> String) -> String {
+    fn read(&self) -> RunReport {
         let stdout = self.stdout.replace("\\n", "\n");
         temoc::read_output(&stdout, &self.stderr, self.exit_code)
-            .map_or_else(|_| NOT_IMPLEMENTED.into(), read)
     }
 }

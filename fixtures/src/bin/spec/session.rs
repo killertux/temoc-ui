@@ -19,6 +19,10 @@ const HEIGHT: u16 = 24;
 const RUN_TIMEOUT: Duration = Duration::from_mins(1);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
 
+/// Reported for anything not built yet. No test expects this value, so a test
+/// cannot pass by accident while the feature is missing.
+pub const NOT_IMPLEMENTED: &str = "not implemented";
+
 /// What happened when a scenario ran.
 pub enum Outcome {
     /// The application has not been built yet.
@@ -35,6 +39,7 @@ pub enum Outcome {
 pub struct Session {
     app: App,
     terminal: Terminal<TestBackend>,
+    drawn: bool,
     output: Vec<u8>,
 }
 
@@ -72,6 +77,7 @@ impl Session {
         let mut session = Self {
             app,
             terminal,
+            drawn: false,
             output: Vec::new(),
         };
         session.settle()?;
@@ -130,7 +136,9 @@ impl Session {
         if !self.app.state().running {
             return Err("temoc-ui has already quit".into());
         }
-        self.app.handle_event(event);
+        self.app
+            .handle_event(event)
+            .map_err(|_| NOT_IMPLEMENTED.to_owned())?;
         self.settle()
     }
 
@@ -146,9 +154,11 @@ impl Session {
             self.app.update();
         }
         self.output.append(&mut self.app.take_output());
+        let mut drawn = false;
         self.terminal
-            .draw(|frame| self.app.draw(frame))
+            .draw(|frame| drawn = self.app.draw(frame).is_ok())
             .map_err(|e| e.to_string())?;
+        self.drawn = drawn;
         Ok(())
     }
 
@@ -164,6 +174,11 @@ impl Session {
     /// A snapshot of the application.
     pub fn state(&self) -> AppState {
         self.app.state()
+    }
+
+    /// Whether temoc-ui drew the screen.
+    pub fn drawn(&self) -> bool {
+        self.drawn
     }
 
     /// Whether `text` is on screen.
