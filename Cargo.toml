@@ -1,15 +1,24 @@
+[workspace]
+members = ["fixtures"]
+
 [package]
 name = "temoc-ui"
 version = "0.1.0"
 edition = "2024"
 
-[dependencies]
+[lints]
+workspace = true
 
-[lints.rust]
+[dependencies]
+crossterm = "0.29.0"
+markdown = "1.0.0"
+ratatui = "0.30.2"
+
+[workspace.lints.rust]
 unsafe_code = "deny"
 unused_must_use = "deny"
 
-[lints.clippy]
+[workspace.lints.clippy]
 # Lint groups. Priority -1 lets the individual lints below override them.
 all = { level = "deny", priority = -1 }
 pedantic = { level = "warn", priority = -1 }

@@ -1,0 +1,9 @@
+# Runs the specification in spec/. See spec/writing-specs.md.
+# The build step also makes calculator-server, which the spec starts itself.
+execute_server_command = "cargo build --quiet -p temoc-ui-fixtures && cargo run --quiet -p temoc-ui-fixtures --bin spec -- %p"
+# SliM reserves port 1 for communication over the child process's stdin/stdout.
+port = 1
+pool_size = 1
+test_dir = "spec/"
+recursive = true
+show_snoozed = true

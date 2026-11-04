@@ -10,8 +10,8 @@ All of these must pass:
 
 ```sh
 cargo fmt --all --check
-cargo clippy --all-targets --all-features -- -D warnings
-cargo test --all-features
+cargo clippy --workspace --all-targets --all-features -- -D warnings
+cargo test --workspace --all-features
 ```
 
 Report any failure honestly. Do not describe work as done while a check fails.

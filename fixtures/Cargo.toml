@@ -1,0 +1,15 @@
+[package]
+name = "temoc-ui-fixtures"
+version = "0.1.0"
+edition = "2024"
+description = "The Slim servers that run the temoc-ui specification"
+publish = false
+
+[dependencies]
+crossterm = "0.29.0"
+ratatui = "0.30.2"
+rust_slim = { version = "0.3.0", features = ["macros"] }
+temoc-ui = { path = ".." }
+
+[lints]
+workspace = true
