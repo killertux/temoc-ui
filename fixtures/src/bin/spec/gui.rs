@@ -8,7 +8,7 @@ use egui_kittest::{Harness, Node};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use temoc_ui::app::Launch;
-use temoc_ui::gui::egui::accesskit::Role;
+use temoc_ui::gui::egui::accesskit::{Role, Toggled};
 use temoc_ui::gui::egui::{
     Event, Key, Modifiers, MouseWheelSource, MouseWheelUnit, PointerButton, Pos2, Rect, Theme,
     ThemePreference, TouchPhase, Vec2, ViewportEvent, ViewportId,
@@ -438,6 +438,23 @@ impl Scene {
     /// The text of the focused link.
     pub fn focused_link(&self) -> Option<String> {
         self.first_tagged(tags::FOCUSED_LINK)
+    }
+
+    /// Each task list item and whether it is ticked.
+    pub fn checked(&self) -> Vec<(String, bool)> {
+        let boxes = self.harness.query_all_by_role(Role::CheckBox);
+        boxes
+            .map(|task| {
+                let toggled = task.accesskit_node().toggled();
+                (label_of(&task), toggled == Some(Toggled::True))
+            })
+            .collect()
+    }
+
+    /// The pictures drawn on the page.
+    pub fn pictures(&self) -> Vec<String> {
+        let pictures = self.harness.query_all_by_role(Role::Image);
+        pictures.map(|picture| label_of(&picture)).collect()
     }
 
     /// The focused test table, by its name.

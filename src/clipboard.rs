@@ -8,6 +8,18 @@ pub fn copy_sequence(text: &str) -> Vec<u8> {
     format!("\x1b]52;c;{}\x07", base64(text.as_bytes())).into_bytes()
 }
 
+/// What to say once `text` is on the clipboard.
+#[must_use]
+pub fn copied(text: &str) -> String {
+    let count = text.chars().count();
+    let noun = if count == 1 {
+        "character"
+    } else {
+        "characters"
+    };
+    format!("Copied {count} {noun}")
+}
+
 fn base64(bytes: &[u8]) -> String {
     let mut encoded = String::with_capacity(bytes.len().div_ceil(3) * 4);
     for chunk in bytes.chunks(3) {

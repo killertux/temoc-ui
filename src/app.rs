@@ -360,13 +360,7 @@ impl App {
             return false;
         };
         self.output.extend(clipboard::copy_sequence(&text));
-        let count = text.chars().count();
-        let noun = if count == 1 {
-            "character"
-        } else {
-            "characters"
-        };
-        self.status = Some(format!("Copied {count} {noun}"));
+        self.status = Some(clipboard::copied(&text));
         true
     }
 

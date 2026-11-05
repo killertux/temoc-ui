@@ -95,6 +95,20 @@ impl Document {
     pub fn targets(&self) -> &HashMap<usize, LinkTarget> {
         &self.targets
     }
+
+    /// Where a definition with this identifier points, however it is used.
+    #[must_use]
+    pub fn definition(&self, identifier: &str) -> Option<&str> {
+        let mut found = None;
+        walk(&self.root, &mut |node| {
+            if let Node::Definition(definition) = node
+                && definition.identifier == identifier
+            {
+                found = found.or(Some(definition.url.as_str()));
+            }
+        });
+        found
+    }
 }
 
 /// Finds what each link says. Links can use a definition written anywhere in

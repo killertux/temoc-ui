@@ -378,6 +378,25 @@ impl Gui {
     }
 
     #[must_use]
+    pub fn checked(&self) -> String {
+        self.read(|scene| {
+            let items = scene.checked().into_iter();
+            let items = items.map(|(item, ticked)| format!("{item}: {}", yes_no(ticked)));
+            list(&items.collect::<Vec<_>>(), ", ")
+        })
+    }
+
+    #[must_use]
+    pub fn image_shown(&self) -> String {
+        self.read(|scene| list(&scene.pictures(), ", "))
+    }
+
+    #[must_use]
+    pub fn clipboard(&self) -> String {
+        self.read(|scene| or_none(scene.window().copied().map(String::from)))
+    }
+
+    #[must_use]
     pub fn page_scroll(&self) -> String {
         self.read(|scene| match scene.window().page_position() {
             Some(Position::Start) => "top".into(),

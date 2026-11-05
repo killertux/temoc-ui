@@ -6,6 +6,7 @@
 //! in the gutter and the run buttons at the row ends. That keeps them in view
 //! however far the cells are scrolled.
 
+use super::extras::top_corners;
 use super::{BODY, Drawing, STRONG, Style};
 use crate::document::{children, line_of};
 use crate::gui::icons::{self, RunLook};
@@ -19,7 +20,7 @@ use eframe::egui::{
     RichText, Sense, Shape, Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2, WidgetInfo,
     pos2, vec2,
 };
-use markdown::mdast::{Node, Table};
+use markdown::mdast::{AlignKind, Node, Table};
 
 /// How wide the column of marks is.
 const GUTTER: f32 = 36.0;
@@ -72,6 +73,7 @@ impl Drawing<'_> {
             let widths = column_widths(ui, table, room);
             let cells = Cells {
                 widths: &widths,
+                aligns: &table.align,
                 width: room.max(widths.iter().sum()),
                 index,
                 test,
@@ -158,8 +160,14 @@ impl Drawing<'_> {
                 ui.visuals_mut().override_text_color = Some(self.palette.bar_text);
             }
             ui.horizontal(|ui| {
-                for (cell, width) in children(row).iter().zip(cells.widths) {
-                    self.cell(ui, cell, *width, style);
+                let columns = children(row).iter().zip(cells.widths);
+                for (column, (cell, width)) in columns.enumerate() {
+                    let spot = Spot {
+                        width: *width,
+                        height: ROW,
+                        align: cells.aligns.get(column).copied().unwrap_or(AlignKind::None),
+                    };
+                    self.cell(ui, cell, spot, style);
                 }
             });
             if let (Some(line), Some(result)) = (line, result) {
@@ -179,12 +187,19 @@ impl Drawing<'_> {
         }
     }
 
-    fn cell(&mut self, ui: &mut Ui, cell: &Node, width: f32, style: Style) {
-        let size = vec2(width, ROW);
+    pub(super) fn cell(&mut self, ui: &mut Ui, cell: &Node, spot: Spot, style: Style) {
+        let room = spot.width - 2.0 * CELL_PADDING;
+        let spare = (room - text_width(ui, cell)).max(0.0);
+        let lead = match spot.align {
+            AlignKind::Right => spare,
+            AlignKind::Center => spare / 2.0,
+            AlignKind::Left | AlignKind::None => 0.0,
+        };
+        let size = vec2(spot.width, spot.height);
         let layout = Layout::left_to_right(Align::Center);
         ui.allocate_ui_with_layout(size, layout, |ui| {
             ui.set_min_size(size);
-            ui.add_space(CELL_PADDING);
+            ui.add_space(CELL_PADDING + lead);
             for node in children(cell) {
                 self.inline(ui, node, style);
             }
@@ -232,11 +247,7 @@ impl Drawing<'_> {
             tint.or(hovered.then_some(palette.hover))?
         };
         let corners = if row.line.is_none() {
-            CornerRadius {
-                nw: CORNER,
-                ne: CORNER,
-                ..CornerRadius::ZERO
-            }
+            top_corners(CORNER)
         } else {
             CornerRadius::ZERO
         };
@@ -365,9 +376,18 @@ impl Drawing<'_> {
     }
 }
 
+/// Where a cell goes in its row.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Spot {
+    pub width: f32,
+    pub height: f32,
+    pub align: AlignKind,
+}
+
 /// What every row of a table goes by.
 struct Cells<'results, 'table> {
     widths: &'table [f32],
+    aligns: &'table [AlignKind],
     /// How wide a row is.
     width: f32,
     /// The position of the table among the tests of the page.
@@ -376,17 +396,21 @@ struct Cells<'results, 'table> {
     result: Option<&'table TableResult<'results>>,
 }
 
+/// How wide the text of a cell is, in the widest face.
+fn text_width(ui: &Ui, cell: &Node) -> f32 {
+    let font = FontId::new(BODY, FontFamily::Name(STRONG.into()));
+    let painter = ui.painter();
+    let text = painter.layout_no_wrap(cell.to_string(), font, Color32::PLACEHOLDER);
+    text.size().x
+}
+
 /// How wide each column is: wide enough for its text, with spare room shared
 /// out from the left.
-fn column_widths(ui: &Ui, table: &Table, room: f32) -> Vec<f32> {
-    let font = FontId::new(BODY, FontFamily::Name(STRONG.into()));
+pub(super) fn column_widths(ui: &Ui, table: &Table, room: f32) -> Vec<f32> {
     let mut widths: Vec<f32> = Vec::new();
     for row in &table.children {
         for (index, cell) in children(row).iter().enumerate() {
-            let text =
-                ui.painter()
-                    .layout_no_wrap(cell.to_string(), font.clone(), Color32::PLACEHOLDER);
-            let needed = (text.size().x + 2.0 * CELL_PADDING).max(NARROWEST);
+            let needed = (text_width(ui, cell) + 2.0 * CELL_PADDING).max(NARROWEST);
             match widths.get_mut(index) {
                 Some(width) => *width = width.max(needed),
                 None => widths.push(needed),

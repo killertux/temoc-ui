@@ -3,9 +3,11 @@
 mod icons;
 mod look;
 mod markdown;
+mod pictures;
 mod view;
 
 use crate::app::{Arguments, Launch};
+use crate::clipboard;
 use crate::focus::Focus;
 use crate::history::History;
 use crate::search::Search;
@@ -22,6 +24,7 @@ use egui::{
 };
 use icons::Icon;
 use look::Palette;
+use pictures::Pictures;
 use std::collections::BTreeMap;
 use std::time::Duration;
 pub use view::Position;
@@ -32,7 +35,7 @@ const WINDOW: [f32; 2] = [1440.0, 900.0];
 /// How often a run is looked at while nothing else happens.
 const TICK: Duration = Duration::from_millis(100);
 /// How far the page sits from its edges.
-const PAGE_MARGIN: i8 = 32;
+const PAGE_MARGIN: i8 = 40;
 /// The widest the search box gets.
 const SEARCH_WIDTH: f32 = 640.0;
 /// The keys listed by help, as in `spec/gui/keys.md`.
@@ -113,6 +116,10 @@ enum Command {
     Open(String),
     Follow(String),
     FollowFocused,
+    /// Scrolls to a heading or footnote on this line.
+    GoToLine(usize),
+    /// Puts text on the clipboard.
+    Copy(String),
     NextLink,
     PreviousLink,
     Scroll(Scroll),
@@ -158,8 +165,8 @@ struct Visit {
     focused_link: Option<usize>,
     /// Whether to bring the focused link into view.
     reveal_link: bool,
-    /// The line of the heading to scroll to.
-    heading: Option<usize>,
+    /// The line of the heading or footnote to scroll to.
+    go_to: Option<usize>,
     /// The offset to scroll the page to.
     scroll_to: Option<f32>,
     /// The line of a block to scroll sideways, and the offset to go to.
@@ -213,6 +220,9 @@ pub struct Gui {
     hovered_link: Option<String>,
     /// The last address opened in the web browser.
     opened_url: Option<String>,
+    /// The text last put on the clipboard.
+    copied: Option<String>,
+    pictures: Pictures,
     /// How many visits there have been.
     visits: u64,
     commands: Vec<Command>,
@@ -291,6 +301,8 @@ impl Gui {
             failure: None,
             hovered_link: None,
             opened_url: None,
+            copied: None,
+            pictures: Pictures::default(),
             visits: 0,
             commands: Vec::new(),
             installed: false,
@@ -319,6 +331,12 @@ impl Gui {
     #[must_use]
     pub fn opened_url(&self) -> Option<&str> {
         self.opened_url.as_deref()
+    }
+
+    /// The text last put on the clipboard.
+    #[must_use]
+    pub fn copied(&self) -> Option<&str> {
+        self.copied.as_deref()
     }
 
     /// Where the page is scrolled to.
@@ -405,7 +423,7 @@ impl Gui {
         self.pages.visit(Visit {
             id: self.visits,
             focus: Focus::first_of(opened.tables()),
-            heading: heading.map(|heading| heading.line),
+            go_to: heading.map(|heading| heading.line),
             opened,
             reveal: false,
             focused_link: None,
@@ -432,14 +450,28 @@ impl Gui {
         }
     }
 
-    /// Starts a run, which is a clean start for what the status bar says.
-    fn run(
-        &mut self,
-        start: impl FnOnce(&mut Session, Option<&Visit>) -> Result<(), String>,
-    ) -> Result<(), String> {
+    /// Starts what a command asks to run.
+    fn start_run(&mut self, command: &Command) -> Result<(), String> {
         self.status = None;
         self.failure = None;
-        start(&mut self.session, self.pages.current())
+        let visit = self.pages.current();
+        let session = &mut self.session;
+        match command {
+            Command::RunRow(line) => session.run_row(visit.map(|visit| (&visit.opened, *line))),
+            Command::RunFocused => {
+                let focus = visit.map(|visit| (visit, visit.opened.tables()));
+                let row = focus
+                    .and_then(|(visit, tables)| Some((&visit.opened, visit.focus.row(tables)?)));
+                if row.is_some() {
+                    return session.run_row(row);
+                }
+                session.run_table(focus.and_then(|(visit, tables)| {
+                    let table = visit.focus.table(tables)?;
+                    Some((&visit.opened, table.directive_line))
+                }))
+            }
+            _ => session.run_file(visit.map(|visit| &visit.opened)),
+        }
     }
 
     fn open_search(&mut self) {
@@ -495,13 +527,16 @@ impl Gui {
             Command::Follow(target) => self.follow(ctx, &target)?,
             Command::FollowFocused => {
                 let visit = self.pages.current();
-                let links = visit.and_then(|visit| {
-                    let link = visit.view.links.get(visit.focused_link?)?;
-                    Some(link.clone())
-                });
-                if let Some(target) = links {
-                    self.follow(ctx, &target)?;
+                let link = visit.and_then(|visit| visit.view.links.get(visit.focused_link?));
+                if let Some(link) = link.cloned() {
+                    self.apply(ctx, link)?;
                 }
+            }
+            Command::GoToLine(line) => self.in_visit(|visit| visit.go_to = Some(line)),
+            Command::Copy(text) => {
+                ctx.copy_text(text.clone());
+                self.status = Some(clipboard::copied(&text));
+                self.copied = Some(text);
             }
             Command::NextLink => self.in_visit(|visit| {
                 visit.move_link(|focused, count| match focused {
@@ -555,23 +590,9 @@ impl Gui {
                 focus.focus_table(table);
                 focus.focus_line(tables, line);
             }),
-            Command::RunFile => {
-                self.run(|session, visit| session.run_file(visit.map(|visit| &visit.opened)))?;
+            Command::RunFile | Command::RunFocused | Command::RunRow(_) => {
+                self.start_run(&command)?;
             }
-            Command::RunFocused => self.run(|session, visit| {
-                let focus = visit.map(|visit| (visit, visit.opened.tables()));
-                let row = focus
-                    .and_then(|(visit, tables)| Some((&visit.opened, visit.focus.row(tables)?)));
-                if row.is_some() {
-                    return session.run_row(row);
-                }
-                session.run_table(focus.and_then(|(visit, tables)| {
-                    let table = visit.focus.table(tables)?;
-                    Some((&visit.opened, table.directive_line))
-                }))
-            })?,
-            Command::RunRow(line) => self
-                .run(|session, visit| session.run_row(visit.map(|visit| (&visit.opened, line))))?,
             Command::ToggleTree => self.panels.tree = !self.panels.tree,
             Command::ToggleTests => self.panels.tests = !self.panels.tests,
             Command::ToggleHelp => self.panels.help = !self.panels.help,
@@ -802,7 +823,7 @@ impl Gui {
                 visit: visit.id,
                 focused_link: visit.focused_link,
                 reveal_link: std::mem::take(&mut visit.reveal_link),
-                heading: visit.heading.take(),
+                go_to: visit.go_to.take(),
                 nudge: visit.nudge.take(),
             };
         }
@@ -824,13 +845,20 @@ impl Gui {
                 return;
             };
             let opened = &visit.opened;
-            let tests = markdown::Tests {
-                tables: opened.tables(),
-                results: self.session.results(opened.file()),
-                focus: visit.focus,
-                busy,
-                reveal,
+            let page = markdown::Page {
+                document: opened.document(),
+                file: opened.file(),
+                workspace: self.session.workspace(),
+                tests: markdown::Tests {
+                    tables: opened.tables(),
+                    results: self.session.results(opened.file()),
+                    focus: visit.focus,
+                    busy,
+                    reveal,
+                },
+                wanted,
             };
+            let pictures = &mut self.pictures;
             let mut area = ScrollArea::vertical()
                 .id_salt(("page", visit.id))
                 .auto_shrink(false);
@@ -838,7 +866,7 @@ impl Gui {
                 area = area.vertical_scroll_offset(offset);
             }
             let shown = area.show(ui, |ui| {
-                happened = markdown::show(ui, opened.document(), tests, wanted, palette);
+                happened = markdown::show(ui, page, pictures, palette);
             });
             let rect = shown.inner_rect;
             let size = shown.content_size.y;

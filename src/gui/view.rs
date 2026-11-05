@@ -1,6 +1,7 @@
 //! How a page sits in the window: where it is scrolled to and where its wide
 //! blocks are, as of the last frame.
 
+use super::Command;
 use eframe::egui::{Pos2, Rect};
 
 /// How far one press of `j` or `k` scrolls.
@@ -85,8 +86,8 @@ pub(super) struct View {
     pub rect: Rect,
     pub reach: Reach,
     pub blocks: Vec<Block>,
-    /// Where each link of the page points, in document order.
-    pub links: Vec<String>,
+    /// What following each link of the page does, in document order.
+    pub links: Vec<Command>,
 }
 
 impl Default for View {

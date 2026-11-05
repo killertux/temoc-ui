@@ -150,6 +150,17 @@ pub fn link_path(document: &str, target: &str) -> Option<String> {
     Some(file_of(document, written))
 }
 
+/// The file a picture in `document` is in. Only a file inside the workspace
+/// counts, whatever the path or any link on the way says, so that opening a
+/// page reaches nothing else.
+#[must_use]
+pub fn picture_path(workspace: &Path, document: &str, target: &str) -> Option<PathBuf> {
+    let file = link_path(document, target)?;
+    let root = workspace.canonicalize().ok()?;
+    let path = root.join(file).canonicalize().ok()?;
+    (path.starts_with(&root) && path.is_file()).then_some(path)
+}
+
 fn file_of(document: &str, written: &str) -> String {
     if written.is_empty() {
         document.to_owned()
@@ -187,6 +198,35 @@ fn resolve(document: &str, path: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    mod pictures {
+        use super::super::picture_path;
+        use std::path::Path;
+
+        fn elements() -> &'static Path {
+            Path::new("samples/elements")
+        }
+
+        #[test]
+        fn a_file_of_the_workspace_is_found() {
+            let found = picture_path(elements(), "README.md", "picture.png");
+            assert!(found.is_some_and(|path| path.ends_with("picture.png")));
+        }
+
+        #[test]
+        fn nothing_else_is() {
+            for target in [
+                "lost.png",
+                "https://example.com/remote.png",
+                "../calculator/README.md",
+                "../../Cargo.toml",
+                "/etc/hosts",
+            ] {
+                let found = picture_path(elements(), "README.md", target);
+                assert_eq!(found, None, "{target}");
+            }
+        }
+    }
+
     use super::*;
 
     fn sample(name: &str) -> PathBuf {

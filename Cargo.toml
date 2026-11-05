@@ -11,7 +11,7 @@ workspace = true
 
 [features]
 # The graphical interface, opened with --gui. See spec/gui/opening.md.
-gui = ["dep:eframe", "dep:egui_extras", "dep:image"]
+gui = ["dep:eframe", "dep:image"]
 
 [dependencies]
 crossterm = "0.29.0"
@@ -24,8 +24,6 @@ eframe = { version = "0.37", optional = true, default-features = false, features
     "wayland",
     "x11",
 ] }
-# Only the image loader: the http one would let a page reach the network.
-egui_extras = { version = "0.37", optional = true, default-features = false, features = ["image"] }
 image = { version = "0.25", optional = true, default-features = false, features = ["jpeg", "png"] }
 markdown = "1.0.0"
 ratatui = "0.30.2"
