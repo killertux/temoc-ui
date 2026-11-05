@@ -23,6 +23,10 @@ const POLL_INTERVAL: Duration = Duration::from_millis(10);
 const WHEEL_STEP: f32 = 40.0;
 /// How far one step sideways goes, which is a nudge on a trackpad.
 const TRACKPAD_STEP: f32 = 10.0;
+/// How far `Drag node` and `Drag graph` take what they drag.
+const DRAGGED_BY: Vec2 = Vec2::new(60.0, 40.0);
+/// How far a file has to be from where it was to count as moved.
+const MOVED: f32 = 0.5;
 
 /// One of the actions described in `spec/gui/writing-specs.md`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -40,6 +44,12 @@ enum Action {
     Drag(String, String),
     Hover(String),
     HoverRow(String),
+    ClickNode(String),
+    HoverNode(String),
+    /// Dragging a file of the graph to another place.
+    DragNode(String),
+    /// Dragging the background of the graph.
+    DragGraph,
     /// Turning the wheel over text, which moves the page by this much.
     Wheel(String, Vec2),
     MouseButton(PointerButton),
@@ -70,18 +80,28 @@ impl Action {
                         Some(Token::Word(word)) if word == "row" => {
                             Self::ClickRow(line(tokens.next(), "Click row")?)
                         }
+                        Some(Token::Word(word)) if word == "node" => {
+                            Self::ClickNode(quoted(tokens.next(), "Click node")?)
+                        }
                         _ => return Err(NOT_IMPLEMENTED.into()),
                     },
                     "Drag" => match tokens.next() {
                         Some(Token::Quoted(from)) => {
                             Self::Drag(from, quoted(tokens.next(), "Drag")?)
                         }
+                        Some(Token::Word(word)) if word == "node" => {
+                            Self::DragNode(quoted(tokens.next(), "Drag node")?)
+                        }
+                        Some(Token::Word(word)) if word == "graph" => Self::DragGraph,
                         _ => return Err(NOT_IMPLEMENTED.into()),
                     },
                     "Hover" => match tokens.next() {
                         Some(Token::Quoted(text)) => Self::Hover(text),
                         Some(Token::Word(word)) if word == "row" => {
                             Self::HoverRow(line(tokens.next(), "Hover row")?)
+                        }
+                        Some(Token::Word(word)) if word == "node" => {
+                            Self::HoverNode(quoted(tokens.next(), "Hover node")?)
                         }
                         _ => return Err(NOT_IMPLEMENTED.into()),
                     },
@@ -195,6 +215,8 @@ pub struct Scene {
     harness: Harness<'static, Window>,
     /// Whether actions wait for a run to finish. See `Wait row`.
     waits_for_runs: bool,
+    /// The file last dragged in the graph, and where every file was before that.
+    dragged: Option<(String, Vec<(String, Pos2)>)>,
 }
 
 impl Played {
@@ -239,6 +261,7 @@ impl Scene {
         let mut scene = Self {
             harness,
             waits_for_runs: true,
+            dragged: None,
         };
         scene.settle()?;
         Ok(scene)
@@ -288,6 +311,18 @@ impl Scene {
                 let start = self.character(from, Edge::Start)?;
                 let end = self.character(to, Edge::End)?;
                 self.drag(start, end);
+            }
+            Action::ClickNode(file) => self.node(file)?.click(),
+            Action::HoverNode(file) => self.node(file)?.hover(),
+            Action::DragNode(file) => {
+                let places = self.graph_places();
+                let start = self.node(file)?.rect().center();
+                self.dragged = Some((file.clone(), places));
+                self.drag(start, start + DRAGGED_BY);
+            }
+            Action::DragGraph => {
+                let start = Pos2::new(WIDTH / 2.0, HEIGHT - 60.0);
+                self.drag(start, start + DRAGGED_BY);
             }
             Action::Hover(text) => self.named(text)?.hover(),
             Action::HoverRow(line) => self.row(line)?.hover(),
@@ -382,8 +417,63 @@ impl Scene {
             self.harness.step();
             sleep(POLL_INTERVAL);
         }
+        while self.harness.state().graph_is_moving() {
+            if Instant::now() > deadline {
+                return Err("the graph did not settle".into());
+            }
+            self.harness.step();
+        }
         self.harness.run_ok();
         Ok(())
+    }
+
+    /// The file with this name in the graph.
+    fn node(&self, file: &str) -> Result<Node<'_>, String> {
+        let mut nodes = self.graph_nodes();
+        let found = nodes.find(|node| label_of(node) == file);
+        found.ok_or(format!("`{file}` is not in the graph"))
+    }
+
+    fn graph_nodes(&self) -> impl Iterator<Item = Node<'_>> {
+        let tag = Some(tags::GRAPH_NODE);
+        self.harness
+            .query_all_by(move |node| node.description().as_deref() == tag)
+    }
+
+    /// Where each file of the graph is on screen.
+    pub fn graph_places(&self) -> Vec<(String, Pos2)> {
+        let nodes = self.graph_nodes();
+        nodes
+            .map(|node| (label_of(&node), node.rect().center()))
+            .collect()
+    }
+
+    /// The file selected in the graph.
+    pub fn selected_file(&self) -> Option<String> {
+        let mut nodes = self.graph_nodes();
+        let selected = nodes.find(|node| node.accesskit_node().is_selected() == Some(true));
+        selected.map(|node| label_of(&node))
+    }
+
+    /// The result the graph shows for a file.
+    pub fn node_result(&self, file: &str) -> Option<String> {
+        let node = self.node(file).ok()?;
+        node.accesskit_node().value()
+    }
+
+    /// Whether the dragged file is somewhere else, and whether any other is.
+    pub fn moved_by_dragging(&self) -> (bool, bool) {
+        let Some((dragged, before)) = &self.dragged else {
+            return (false, false);
+        };
+        let now = self.graph_places();
+        let moved = |(file, place): &(String, Pos2)| {
+            let there = now.iter().find(|(name, _)| name == file);
+            there.is_some_and(|(_, there)| (*there - *place).length() > MOVED)
+        };
+        let mine = before.iter().filter(|(file, _)| file == dragged);
+        let others = before.iter().filter(|(file, _)| file != dragged);
+        (mine.into_iter().any(&moved), others.into_iter().any(&moved))
     }
 
     /// The window itself.

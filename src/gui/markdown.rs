@@ -17,6 +17,7 @@ use eframe::egui::{
     Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2, vec2,
 };
 use markdown::mdast::{AlignKind, List, Node, Table};
+use std::collections::HashSet;
 use std::path::Path;
 
 const BODY: f32 = 14.0;
@@ -81,6 +82,8 @@ pub(super) struct Page<'page> {
     /// The file it comes from, relative to the workspace.
     pub file: &'page str,
     pub workspace: &'page Path,
+    /// The links to files that do not exist, as they are written.
+    pub missing: &'page HashSet<String>,
     pub tests: Tests<'page>,
     pub wanted: Wanted,
 }
@@ -103,6 +106,7 @@ pub(super) fn show(
         document: page.document,
         file: page.file,
         workspace: page.workspace,
+        missing: page.missing,
         tests: page.tests,
         wanted: page.wanted,
         pictures,
@@ -125,6 +129,7 @@ struct Drawing<'page> {
     document: &'page Document,
     file: &'page str,
     workspace: &'page Path,
+    missing: &'page HashSet<String>,
     tests: Tests<'page>,
     wanted: Wanted,
     pictures: &'page mut Pictures,

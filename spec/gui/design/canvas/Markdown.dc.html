@@ -191,7 +191,7 @@ temoc -c temoc.toml</pre>
           <pre style="margin: 0; padding: 12px 14px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">No language here.</pre>
         </div>
       </div>
-      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">Frame, a header row, then a monospace Label. Tabs become four spaces, as in the terminal. Copy uses ctx.copy_text and says so in the status bar. Code stays plain text, with no syntax colours.</div>
+      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">Frame, a header row, then a monospace Label. Tabs become four spaces, as in the terminal. Copy uses ctx.copy_text, says so in the status bar, and turns into ✓ Copied for a moment. Code stays plain text, with no syntax colours.</div>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
@@ -216,7 +216,7 @@ temoc -c temoc.toml</pre>
           <span style="padding: 7px 12px; text-align: right">20</span>
         </div>
       </div>
-      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">egui_extras TableBuilder or a Grid. table.align sets each column. Cells hold inline text, so they use the same LayoutJob code as a paragraph, and links in them work.</div>
+      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">Rows of cells drawn by hand, sharing the code of test tables. table.align sets each column. Cells hold inline text, so they use the same LayoutJob code as a paragraph, and links in them work.</div>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
@@ -262,7 +262,7 @@ temoc -c temoc.toml</pre>
           </div>
         </div>
       </div>
-      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">Made-up columns, to show the rule. Only the cells scroll. The result gutter and the Run row button are painted outside the ScrollArea, so scrolling never hides a mark. The directive line draws nothing.</div>
+      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">Made-up columns, to show the rule. Only the cells scroll. The result gutter and the run buttons in it are painted outside the ScrollArea, so scrolling never hides a mark. The directive line draws nothing.</div>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
@@ -276,7 +276,7 @@ temoc -c temoc.toml</pre>
           <span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px">images/missing.png</span>
         </div>
       </div>
-      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">The terminal shows only the alt text. The GUI draws the picture with egui::Image and the image loaders from egui_extras, scaled down to the reading column and never up. Only files in the workspace load, so opening a page makes no network request. Anything else falls back to its alt text and path.</div>
+      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">The terminal shows only the alt text. The GUI decodes the picture with the image crate and draws it with egui::Image, scaled down to the reading column and never up. Only files in the workspace load, so opening a page makes no network request. Anything else falls back to its alt text and path.</div>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">

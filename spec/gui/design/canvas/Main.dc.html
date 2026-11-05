@@ -32,11 +32,17 @@ body{margin:0}
     <span style="color: {{c.line}}">/</span>
     <span style="font-weight: 600">{{file}}</span>
   </div>
-  <button onClick="{{openSearch}}" style="flex: 1 1 220px; max-width: 420px; height: 32px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.page}}; color: {{c.quote}}; font: inherit; font-size: 13px; text-align: left; cursor: pointer">
-    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg>
-    <span style="flex: 1 1 auto">Search files and headings</span>
-    <span style="min-width: 20px; padding: 0 5px; border: 1px solid {{c.hair}}; border-radius: 4px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; text-align: center">/</span>
-  </button>
+  <sc-if value="{{isSearch}}" hint-placeholder-val="{{ false }}">
+    <label style="flex: 1 1 220px; max-width: 420px; height: 32px; margin: 0 auto; box-sizing: border-box; display: flex; align-items: center; padding: 0 10px; border: 1px solid {{c.bar}}; border-radius: 6px; background: {{c.page}}">
+      <span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Search files and headings</span>
+      <input value="{{query}}" onChange="{{onQuery}}" onKeyDown="{{onSearchKey}}" placeholder="Search…" style="width: 100%; border: 0; outline: 0; padding: 0; background: transparent; color: {{c.text}}; font: inherit; font-size: 13px; line-height: 20px">
+    </label>
+  </sc-if>
+  <sc-if value="{{notSearch}}" hint-placeholder-val="{{ true }}">
+    <button aria-label="Search files and headings" onClick="{{openSearch}}" style="flex: 1 1 220px; max-width: 420px; height: 32px; margin: 0 auto; display: flex; align-items: center; padding: 0 10px; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.page}}; color: {{c.quote}}; font: inherit; font-size: 13px; text-align: left; cursor: pointer">
+      <span style="flex: 1 1 auto">Search…</span>
+    </button>
+  </sc-if>
   <div style="display: flex; align-items: center; gap: 8px">
     <div style="display: flex; padding: 2px; border: 1px solid {{c.hair}}; border-radius: 7px">
       <button onClick="{{showDoc}}" style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: {{docTabBg}}; color: {{docTabFg}}; font: inherit; font-size: 13px; cursor: pointer">Page</button>
@@ -45,15 +51,15 @@ body{margin:0}
     <button aria-label="Swap between dark and light" onClick="{{swapTone}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{c.quote}}; cursor: pointer">
       <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 2.5v11a5.5 5.5 0 0 0 0-11Z" fill="currentColor" stroke="none"></path></svg>
     </button>
-    <button aria-label="Show help" onClick="{{openHelp}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{c.quote}}; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">?</button>
+    <button aria-label="Show help" onClick="{{openHelp}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{c.quote}}; cursor: pointer">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="7"></circle><path d="M5.5 6.5a2.5 2.5 0 1 1 2.5 2.5v.5"></path><circle cx="8" cy="12" r="0.9" fill="currentColor" stroke="none"></circle></svg>
+    </button>
     <sc-if value="{{isTestPage}}" hint-placeholder-val="{{ true }}">
       <button aria-label="Show or hide the tests panel" onClick="{{toggleTests}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: {{testsBtnBg}}; color: {{c.quote}}; cursor: pointer">
         <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5"></rect><path d="M10 3v10"></path></svg>
       </button>
-      <button onClick="{{runFile}}" disabled="{{isBusy}}" style="height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 10px; border: 0; border-radius: 6px; background: {{runBg}}; color: {{runFg}}; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer">
-        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
-        <span>{{runLabel}}</span>
-        <span style="min-width: 18px; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 600; line-height: 16px; text-align: center">R</span>
+      <button aria-label="Run file" title="Run file" onClick="{{runFile}}" disabled="{{isBusy}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{runIcon}}; cursor: pointer">
+        <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
       </button>
     </sc-if>
   </div>
@@ -155,27 +161,26 @@ body{margin:0}
           <sc-if value="{{b.isTest}}" hint-placeholder-val="{{ false }}">
             <section aria-label="Test table {{b.name}}" style="border: 1px solid {{b.c.hair}}; border-radius: 6px; overflow: hidden; background: {{b.c.panel}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">
               <div style="display: flex; align-items: center; background: {{b.headBg}}; color: {{b.headFg}}">
-                <span style="flex: 0 0 36px"></span>
+                <button aria-label="Run table {{b.name}}" title="Run table" onClick="{{b.run}}" style="flex: 0 0 36px; height: 34px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
+                </button>
                 <button aria-label="Focus table {{b.name}}" onClick="{{b.pick}}" style="flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: {{b.cols}}; padding: 7px 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer">
                   <sc-for list="{{b.head}}" as="h" hint-placeholder-count="3"><span style="padding: 0 12px">{{h.t}}</span></sc-for>
-                </button>
-                <button onClick="{{b.run}}" style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-right: 6px; padding: 3px 8px; border: 0; border-radius: 4px; background: transparent; color: inherit; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; cursor: pointer">
-                  <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
-                  <span>Run table</span>
                 </button>
               </div>
               <sc-for list="{{b.rows}}" as="r" hint-placeholder-count="2">
                 <div onMouseEnter="{{r.enter}}" onMouseLeave="{{r.leave}}" style="display: flex; align-items: center; min-height: 34px; border-top: 1px solid {{r.c.hair}}; background: {{r.bg}}; color: {{r.fg}}">
-                  <span title="{{r.result}}" style="flex: 0 0 36px; color: {{r.markColor}}; font-size: 14px; font-weight: 600; text-align: center">{{r.mark}}</span>
+                  <sc-if value="{{r.showMark}}" hint-placeholder-val="{{ true }}">
+                    <span title="{{r.result}}" style="flex: 0 0 36px; color: {{r.markColor}}; font-size: 14px; font-weight: 600; text-align: center">{{r.mark}}</span>
+                  </sc-if>
+                  <sc-if value="{{r.showRun}}" hint-placeholder-val="{{ false }}">
+                    <button aria-label="Run row on line {{r.line}}" title="Run row" onClick="{{r.run}}" disabled="{{r.busy}}" style="flex: 0 0 36px; height: 34px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; background: transparent; color: inherit; cursor: pointer">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
+                    </button>
+                  </sc-if>
                   <button aria-label="Focus row on line {{r.line}}" onClick="{{r.pick}}" style="flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: {{r.cols}}; padding: 7px 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer">
                     <sc-for list="{{r.cells}}" as="cell" hint-placeholder-count="3"><span style="padding: 0 12px">{{cell.t}}</span></sc-for>
                   </button>
-                  <sc-if value="{{r.showRun}}" hint-placeholder-val="{{ false }}">
-                    <button aria-label="Run row on line {{r.line}}" onClick="{{r.run}}" disabled="{{r.busy}}" style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-right: 6px; padding: 3px 8px; border: 0; border-radius: 4px; background: {{r.runBg}}; color: {{r.runFg}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; cursor: pointer">
-                      <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
-                      <span>Run row</span>
-                    </button>
-                  </sc-if>
                 </div>
                 <sc-if value="{{r.hasNote}}" hint-placeholder-val="{{ false }}">
                   <div style="padding: 0 12px 8px 48px; background: {{r.noteBg}}; color: {{r.noteFg}}; font-size: 12.5px">{{r.note}}</div>
@@ -285,18 +290,10 @@ body{margin:0}
 </footer>
 
 <sc-if value="{{isSearch}}" hint-placeholder-val="{{ false }}">
-  <div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-start; padding: 88px 16px 16px; background: {{c.scrim}}">
-    <div role="dialog" aria-label="Search" style="width: 100%; max-width: 640px; box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid {{c.hair}}; border-radius: 8px; overflow: hidden; background: {{c.raised}}; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35)">
-      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid {{c.hair}}">
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="flex: 0 0 auto; color: {{c.quote}}"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg>
-        <label style="flex: 1 1 auto; display: flex; min-width: 0">
-          <span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Search files and headings</span>
-          <input value="{{query}}" onChange="{{onQuery}}" onKeyDown="{{onSearchKey}}" placeholder="Search files and headings" style="width: 100%; border: 0; outline: 0; padding: 0; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; line-height: 26px">
-        </label>
-        <button onClick="{{toggleOnlyTests}}" style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid {{onlyBorder}}; border-radius: 6px; background: {{onlyBg}}; color: {{onlyFg}}; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer">
-          <span>Test files only</span>
-          <span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 11px">Ctrl-t</span>
-        </button>
+  <div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-start; padding: 52px 16px 16px; pointer-events: none">
+    <div role="dialog" aria-label="Search results" style="width: 100%; max-width: 420px; box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid {{c.hair}}; border-radius: 8px; overflow: hidden; background: {{c.raised}}; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35); pointer-events: auto">
+      <div style="display: flex; align-items: center; padding: 8px 10px; border-bottom: 1px solid {{c.hair}}">
+        <button onClick="{{toggleOnlyTests}}" style="flex: 0 0 auto; height: 26px; padding: 0 8px; border: 1px solid {{onlyBorder}}; border-radius: 6px; background: {{onlyBg}}; color: {{onlyFg}}; font: inherit; font-size: 12px; font-weight: 600; cursor: pointer">Test files only</button>
       </div>
       <div style="max-height: 400px; overflow: auto; padding: 6px; display: flex; flex-direction: column; gap: 1px; font-size: 14px; line-height: 20px">
         <sc-for list="{{hits}}" as="h" hint-placeholder-count="5">
@@ -322,7 +319,7 @@ body{margin:0}
 </sc-if>
 
 <sc-if value="{{isHelp}}" hint-placeholder-val="{{ false }}">
-  <div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-start; padding: 64px 16px 16px; overflow: auto; background: {{c.scrim}}">
+  <div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-start; padding: 64px 16px 16px; overflow: auto">
     <div role="dialog" aria-label="Keys" style="width: 100%; max-width: 1160px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 18px 22px 20px; border: 1px solid {{c.hair}}; border-radius: 8px; background: {{c.raised}}; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35)">
       <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
         <h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600">Keys</h2>
@@ -620,23 +617,22 @@ const WORKSPACES = {
 
 const HELP = [
   { title: 'Reading', keys: [
-    ['j, Down', 'Scroll down one line'], ['k, Up', 'Scroll up one line'], ['PageDown, Space', 'Scroll down one page'],
-    ['PageUp', 'Scroll up one page'], ['g, G', 'Go to the top or bottom'], ['Left, Right', 'Scroll wide tables and code sideways']
+    ['Up, Down', 'Scroll up or down one line'], ['PageDown, Space', 'Scroll down one page'], ['PageUp', 'Scroll up one page'],
+    ['Home, End', 'Go to the top or bottom'], ['Left, Right', 'Scroll a wide table or code sideways']
   ] },
   { title: 'Links and history', keys: [
     ['Tab, Shift-Tab', 'Focus the next or previous link'], ['Enter', 'Follow the focused link'],
-    ['h, Backspace', 'Go back'], ['l', 'Go forward']
+    ['Alt-Left, Ctrl-[', 'Go back'], ['Alt-Right, Ctrl-]', 'Go forward']
   ] },
   { title: 'Tests', keys: [
-    ['], [', 'Focus the next or previous test table'], ['}, {', 'Focus the next or previous test row'],
-    ['r', 'Run the focused table'], ['Ctrl-r', 'Run the focused row'], ['R', 'Run the whole file']
+    ['Alt-Down, Alt-Up', 'Focus the next or previous test table'], ['Alt-Shift-Down, Alt-Shift-Up', 'Focus the next or previous test row'],
+    ['Ctrl-Enter', 'Run the focused row, or else the focused table'], ['Ctrl-r', 'Run the whole file']
   ] },
   { title: 'Finding things', keys: [
-    ['/', 'Open search'], ['Ctrl-t', 'In search, show only test files'],
-    ['t', 'Show or hide the file tree'], ['Ctrl-g', 'Show the graph']
+    ['Ctrl-k, /', 'Open search'], ['Ctrl-b', 'Show or hide the file tree'], ['Ctrl-g', 'Show or hide the graph']
   ] },
   { title: 'Window', keys: [
-    ['T', 'Swap between dark and light'], ['Ctrl-c', 'Copy the selected text'], ['?', 'Show or hide help'], ['q, Ctrl-q', 'Quit']
+    ['Ctrl-c', 'Copy the selected text'], ['F1, ?', 'Show or hide help'], ['Ctrl-q', 'Quit']
   ] }
 ];
 
@@ -1035,7 +1031,7 @@ class Component extends DCLogic {
           bg: isFocused ? c.bar : isHovered && !out ? c.hover : this.tintOf(c, out),
           fg: isFocused ? c.barText : c.text,
           focused: isFocused,
-          showRun: isFocused || isHovered,
+          showRun: isHovered, showMark: !isHovered,
           busy,
           runBg: isFocused ? 'transparent' : busy ? c.raised : c.bar,
           runFg: isFocused ? c.barText : busy ? c.quote : c.barText,
@@ -1335,7 +1331,7 @@ class Component extends DCLogic {
     return {
       c, file, wsName: ws.name,
       isDocView: view !== 'graph', isGraphView: view === 'graph',
-      isSearch: overlay === 'search', isHelp: overlay === 'help',
+      isSearch: overlay === 'search', notSearch: overlay !== 'search', isHelp: overlay === 'help',
       showTree: treeOn, showTests: testPage && testsOn && view !== 'graph',
       isTestPage: testPage, isBusy: Boolean(busy),
       showNoConfig: testPage && !ws.config, hasFail: Boolean(failure), failMessage: failure ? 'temoc failed: ' + failure : '',
@@ -1347,7 +1343,7 @@ class Component extends DCLogic {
       backFg: at <= 0 ? c.hair : c.quote, forwardFg: at >= history.length - 1 ? c.hair : c.quote,
       docTabBg: view !== 'graph' ? c.sel : 'transparent', docTabFg: view !== 'graph' ? c.text : c.quote,
       graphTabBg: view === 'graph' ? c.sel : 'transparent', graphTabFg: view === 'graph' ? c.text : c.quote,
-      runBg: busy ? c.raised : c.bar, runFg: busy ? c.quote : c.barText, runLabel: busy ? 'Running' : 'Run file',
+      runIcon: busy ? c.quote : c.passed,
       fileVerdict: result === 'not run' ? 'not run' : result ? (MARKS[result] + ' ' + result) : '',
       fileColor: this.colourOf(c, result),
       fileStatus: shownResult ? 'file: ' + result : '', hasFileResult: Boolean(shownResult),

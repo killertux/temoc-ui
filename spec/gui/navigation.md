@@ -92,7 +92,8 @@ Clicking a link follows it, and so does `Enter` on the focused link. See
 A link to a website opens in the web browser, and the page stays as it was. Hovering any
 link shows where it goes in the status bar.
 
-A link to a file that does not exist stays on the page and says why.
+A link to a file that does not exist looks quiet and dashed. Following it stays on the
+page and says why.
 
 [//]: # "decisionTable Gui"
 

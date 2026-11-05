@@ -125,20 +125,20 @@ const GROUPS = [
     ['Richer elements', 'Images show their alt text, [!NOTE] shows as a quote, and task items as [x].', 'Real images, alert boxes, checkboxes, and a Copy button on code blocks.', 'New', 'new'],
     ['Hidden directives', 'temoc directives and imports draw nothing.', 'The same rule in the new renderer.', 'Rebuild', 'render.rs is_comment'],
     ['Wrapping', 'Its own wrapper breaks long words across rows.', 'egui wraps text itself.', 'Drop', 'render.rs Wrapper'],
-    ['Scrolling', 'j, k, Space, PageUp, PageDown, g, G, wheel.', 'A ScrollArea for the page, with the same keys moving it.', 'Rebuild', 'page.rs'],
+    ['Scrolling', 'j, k, Space, PageUp, PageDown, g, G, wheel.', 'A ScrollArea for the page. Up, Down, Space, PageUp, PageDown, Home, End, wheel.', 'Rebuild', 'page.rs'],
     ['Wide tables and code', 'Left and Right move every wide block together, 8 columns at a time, with ‹ and › markers.', 'Each wide block has its own horizontal ScrollArea and scrollbar, and only that block moves. Left and Right act on the block under the pointer, or the focused table.', 'Rethink', 'page.rs, render.rs'],
     ['Heading anchors', 'Links and search results scroll to a heading.', 'Record each heading rect while drawing, then scroll_to_rect.', 'Rebuild', 'page.rs go_to_anchor'],
     ['Restoring a page', 'Back restores scroll, sideways position and the focused link.', 'History is generic, so it holds the new page state.', 'Rebuild', 'history.rs, page.rs']
   ] },
   { title: 'Links and history', rows: [
     ['Following links', 'Relative paths, anchors, links out of the workspace.', 'Unchanged.', 'Reuse', 'session.rs follow, workspace.rs'],
-    ['Focused link', 'Tab and Shift-Tab wrap around, Enter follows, the view follows the focus.', 'Same keys. egui has its own Tab focus, which must stay out of the page.', 'Rebuild', 'page.rs'],
+    ['Focused link', 'Tab and Shift-Tab wrap around, Enter follows, the view follows the focus.', 'Tab, Shift-Tab and Enter. egui has its own Tab focus, which must stay out of the page.', 'Rebuild', 'page.rs'],
     ['Missing and external links', 'Both stay on the page and explain in the status bar. A browser is never launched.', 'Missing files still stay and explain. External links open in the browser with ctx.open_url.', 'Rethink', 'workspace.rs, spec/viewer/links.md'],
-    ['Back and forward', 'h, Backspace and l.', 'Same keys, plus toolbar buttons.', 'Rebuild', 'app.rs']
+    ['Back and forward', 'h, Backspace and l.', 'Alt-Left, Alt-Right, Ctrl-[ and Ctrl-], plus toolbar and mouse buttons.', 'Rebuild', 'app.rs']
   ] },
   { title: 'Search', rows: [
     ['Search model', 'Fuzzy match on paths and headings, files first, a test-file filter.', 'Unchanged.', 'Reuse', 'search.rs'],
-    ['Search box', '/ opens a pop-up. Up, Down, Enter, Esc. Ctrl-t is remembered until closing.', 'An overlay with a TextEdit, same keys, a toggle for the filter. The toolbar field opens it too.', 'Rebuild', 'app.rs draw_search']
+    ['Search box', '/ opens a pop-up. Up, Down, Enter, Esc. Ctrl-t is remembered until closing.', 'A field in the toolbar, opened with Ctrl-k, / or a click, with the results under it and a toggle for the filter. Up, Down, Enter, Esc, or a click anywhere else closes it.', 'Rebuild', 'app.rs draw_search']
   ] },
   { title: 'File tree', rows: [
     ['Tree model', 'Folders first, reveals the open page, folders open and close.', 'Unchanged, apart from first_shown, which is only viewport arithmetic.', 'Reuse', 'tree.rs'],
@@ -149,15 +149,15 @@ const GROUPS = [
     ['Graph data', 'Files, links in and out, broken links, distance from the start page.', 'Unchanged. LinkGraph already has all of it, and the columns are simply not used.', 'Reuse', 'links.rs'],
     ['Layout', 'Fixed columns by distance, unreachable files last.', 'A force-directed layout: linked files pull together, all files push apart, and unreachable files float free. About 100 lines of our own, stepped each frame until it settles.', 'Rethink', 'new, replaces graph/drawing.rs'],
     ['Drawing', 'Lines routed on a character grid, arrowheads, one line for links both ways, lit lines for the selection.', 'Circles sized by link count, straight lines, labels. Test files are rings and files with a result take its colour and mark. Arrowheads show only on lines touching the selected or hovered file, and everything else fades.', 'Rethink', 'graph/drawing.rs'],
-    ['Moving around', 'h, j, k, l, g, G within columns. The view follows. Click selects, a second click opens.', 'Drag a file to move it, drag the background to pan, wheel to zoom, Fit to reset, from egui::Scene. Arrow keys and h, j, k, l go to the nearest file that way, and g to the start page. Click selects, a second click opens.', 'Rethink', 'graph.rs'],
+    ['Moving around', 'h, j, k, l, g, G within columns. The view follows. Click selects, a second click opens.', 'Drag a file to move it, drag the background to pan, wheel to zoom, Fit to reset, with our own pan and zoom. Arrow keys go to the nearest file that way, and Home to the start page. Click selects, a second click opens.', 'Rethink', 'graph.rs'],
     ['Links panel', 'A panel below lists links out and in, ending with "and N more".', 'A side panel, so the graph keeps its height. The lists scroll, so "and N more" goes. Each link selects its file, and the distance is shown as text.', 'Rethink', 'graph.rs draw_panel']
   ] },
   { title: 'Running tests', rows: [
     ['Starting a run', 'R, r and Ctrl-r call the session.', 'The same session calls, from keys and buttons.', 'Reuse', 'session.rs'],
     ['Live updates', 'A 100 ms poll picks up events and redraws.', 'Call Session::update each frame, and request_repaint_after while a run is going.', 'Rebuild', 'main.rs, app.rs update'],
     ['Focused table and row', '] [ } { move focus, kept in Page. Headers and rows are reversed.', 'The same rules in the new page state, drawn in the bar colour. A click focuses.', 'Split', 'page.rs'],
-    ['Run buttons', 'Keys only.', 'Run file in the toolbar and Run table on each table header.', 'New', 'new'],
-    ['Run row on hover', 'Focus a row with } and {, then Ctrl-r.', 'Hovering a row shows a Run row button at its right end, so one click runs it without focusing first. The focused row shows it too. It is disabled during a run.', 'New', 'new'],
+    ['Run buttons', 'Keys only.', 'A green Run file triangle in the toolbar, and a Run table triangle in the gutter of each table header.', 'New', 'new'],
+    ['Run row on hover', 'Focus a row with } and {, then Ctrl-r.', 'Hovering a row shows a Run row triangle in its gutter, in place of its mark, so one click runs it without focusing first. It is disabled during a run.', 'New', 'new'],
     ['Row marks and colour', 'A mark two columns after the row, and the row coloured. A wide table can hide the mark.', 'The mark sits in a pinned left gutter that never scrolls away, and the row gets a tint.', 'Rethink', 'render.rs add_mark'],
     ['Notes', 'A line below the row, first line of the message only. Quiet red, or the quote colour when snoozed.', 'Same content and colours, inside the row tint.', 'Rebuild', 'render.rs note_rows'],
     ['Table results', 'A line below the table, then failures outside any row.', 'A footer inside the table.', 'Rebuild', 'render.rs result_rows'],
@@ -175,7 +175,7 @@ const GROUPS = [
     ['Key routing', 'Crossterm events by hand. Letters are typed in search, not acted on.', 'egui input, checking wants_keyboard_input first.', 'Rebuild', 'app.rs handle_event'],
     ['Ctrl keys', 'Ctrl-c quits. Ctrl-r, Ctrl-g and Ctrl-t act.', 'Ctrl-c copies and Ctrl-q quits. Modifiers::command gives Cmd on macOS.', 'Rethink', 'spec/tui/keys.md'],
     ['Mouse handling', 'Hit testing by hand for wheel, clicks and drags.', 'Comes with the widgets.', 'Drop', 'app.rs, page.rs click'],
-    ['Help', '? shows a scrolling list, tested against the spec.', 'A modal grouped by topic, with its own key list, tested against spec/gui/ the same way.', 'Rebuild', 'help.rs']
+    ['Help', '? shows a scrolling list, tested against the spec.', 'One list over the page, with its own keys, tested against spec/gui/ the same way.', 'Rebuild', 'help.rs']
   ] },
   { title: 'Themes', rows: [
     ['Dark and light', 'Four terminal themes held as ratatui Color.', 'A separate GUI palette with a dark and a light mode, set through egui Visuals. theme.rs stays with the terminal.', 'New', 'new'],
@@ -186,7 +186,7 @@ const GROUPS = [
     ['Contrast rules', 'Tests hold text to 4.5 and lines to 3.', 'The same limits as tests on the GUI palette, including text over tints.', 'Rebuild', 'theme.rs tests']
   ] },
   { title: 'The project', rows: [
-    ['Build', 'ratatui and crossterm, always built.', 'A gui feature adds eframe 0.37, egui_extras for images and embedded JetBrains Mono. Without it, --gui says the feature is not built.', 'New', 'Cargo.toml'],
+    ['Build', 'ratatui and crossterm, always built.', 'A gui feature adds eframe 0.37, image for pictures and embedded JetBrains Mono. Without it, --gui says the feature is not built.', 'New', 'Cargo.toml'],
     ['Specification', 'spec/tui/ and a Tui fixture driving a headless terminal.', 'spec/gui/ is written and snoozed. Still to build: a Gui fixture, with egui_kittest driving the UI headless.', 'New', 'spec/gui/, fixtures/'],
     ['Core pages', 'spec/viewer/graph.md put columns in core, and spec/viewer/links.md said no browser is launched.', 'Done. Columns moved to spec/tui/graph.md, and the browser rule is now up to each interface. Distance stays in core.', 'Rethink', 'spec/viewer/'],
     ['Web interface', 'Was listed as planned in the README and spec/README.md.', 'Done. Both pages now point at the GUI instead.', 'Drop', 'README.md, spec/README.md'],

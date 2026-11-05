@@ -10,7 +10,7 @@ use eframe::egui::accesskit::Role;
 use eframe::egui::text::{CCursor, LayoutJob, TextFormat};
 use eframe::egui::{
     Align, Color32, CursorIcon, FontFamily, FontId, Galley, Label, Pos2, Rect, Response, Sense,
-    Stroke, StrokeKind, TextWrapMode, Ui, WidgetInfo,
+    Shape, Stroke, StrokeKind, TextWrapMode, Ui, WidgetInfo,
 };
 use markdown::mdast::Node;
 use std::ops::Range;
@@ -29,8 +29,16 @@ struct Link {
     follow: Command,
     /// Where it points, to say so when the pointer is over it.
     target: Option<String>,
-    /// The colour of the line under it, if it has one.
-    underline: Option<Color32>,
+    /// The line under it, if it has one.
+    underline: Option<Underline>,
+}
+
+/// The line under a link.
+#[derive(Debug, Clone, Copy)]
+struct Underline {
+    colour: Color32,
+    /// Whether it is dashed, which says that the link leads nowhere.
+    dashed: bool,
 }
 
 /// A piece of text being put together.
@@ -174,8 +182,12 @@ impl Drawing<'_> {
         };
         // The text colour of the look would win, and a focused row sets its own.
         let on_focused_row = ui.visuals().override_text_color == Some(self.palette.bar_text);
+        let url = &target.url;
+        let dashed = self.missing.contains(url);
         let colour = if on_focused_row {
             self.palette.bar_text
+        } else if dashed {
+            self.palette.quote
         } else {
             self.palette.link
         };
@@ -184,13 +196,12 @@ impl Drawing<'_> {
             line_height: piece.line,
             ..format(ui, Style::default())
         };
-        let url = &target.url;
         let link = Link {
             name,
             characters: 0..0,
             follow: Command::Follow(url.clone()),
             target: Some(url.clone()),
-            underline: Some(colour),
+            underline: Some(Underline { colour, dashed }),
         };
         piece.link(plain.clone(), link);
         if is_website(url) {
@@ -263,6 +274,11 @@ impl Drawing<'_> {
             let id = text.id.with(link.characters.start);
             let node = ui.interact(*first, id, Sense::hover());
             node.widget_info(|| WidgetInfo::labeled(Role::Link, true, &link.name));
+            if link.underline.is_some_and(|underline| underline.dashed) {
+                ui.ctx().accesskit_node_builder(node.id, |node| {
+                    node.set_description(tags::MISSING_LINK);
+                });
+            }
             if focused {
                 ui.ctx().accesskit_node_builder(node.id, |node| {
                     node.set_description(tags::FOCUSED_LINK);
@@ -272,12 +288,9 @@ impl Drawing<'_> {
                 }
             }
         }
-        if let Some(colour) = link.underline {
-            // The text would draw it at the bottom of the line, far below itself.
+        if let Some(underline) = link.underline {
             for rect in rects {
-                let stroke = Stroke::new(1.0, colour);
-                let height = rect.center().y + UNDERLINE;
-                ui.painter().hline(rect.x_range(), height, stroke);
+                paint_underline(ui, *rect, underline);
             }
         }
         if focused {
@@ -298,6 +311,23 @@ impl Drawing<'_> {
             self.happened.commands.push(link.follow);
         }
         followed
+    }
+}
+
+/// Draws the line under part of a link. The text would draw it at the bottom of
+/// the line it is on, far below itself.
+fn paint_underline(ui: &Ui, rect: Rect, underline: Underline) {
+    let stroke = Stroke::new(1.0, underline.colour);
+    let height = rect.center().y + UNDERLINE;
+    if underline.dashed {
+        let ends = [
+            Pos2::new(rect.left(), height),
+            Pos2::new(rect.right(), height),
+        ];
+        let dashes = Shape::dashed_line(&ends, stroke, 3.0, 2.0);
+        ui.painter().extend(dashes);
+    } else {
+        ui.painter().hline(rect.x_range(), height, stroke);
     }
 }
 

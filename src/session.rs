@@ -158,6 +158,13 @@ impl Session {
         workspace::follow_link(&self.workspace, document, target)
     }
 
+    /// Whether a link of `document` leads to a file that does not exist.
+    #[must_use]
+    pub fn link_is_missing(&self, document: &str, target: &str) -> bool {
+        workspace::link_path(document, target)
+            .is_some_and(|file| !self.workspace.join(file).is_file())
+    }
+
     /// Runs every table of a file.
     ///
     /// # Errors

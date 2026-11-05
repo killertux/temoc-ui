@@ -95,12 +95,6 @@ body{margin:0}
             <span style="flex: 0 0 36px; color: {{s.markColor}}; font-size: 14px; font-weight: 600; text-align: center">{{s.mark}}</span>
             <span style="flex: 0 0 220px; padding: 7px 12px">{{s.name}}</span>
             <span style="flex: 1 1 auto; padding: 7px 12px">{{s.how}}</span>
-            <sc-if value="{{s.hasRun}}" hint-placeholder-val="{{ false }}">
-              <button style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-right: 6px; padding: 3px 8px; border: 0; border-radius: 4px; background: {{s.runBg}}; color: {{s.runFg}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600">
-                <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
-                <span>Run row</span>
-              </button>
-            </sc-if>
           </div>
           <sc-if value="{{s.hasNote}}" hint-placeholder-val="{{ false }}">
             <div style="padding: 0 12px 8px 48px; background: {{s.bg}}; color: {{s.noteFg}}; font-size: 12.5px">{{s.note}}</div>
@@ -124,20 +118,16 @@ body{margin:0}
     <section style="display: flex; flex-direction: column; gap: 12px">
       <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Controls and text</h2>
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
-        <button style="height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 6px; background: {{c.bar}}; color: {{c.barText}}; font: inherit; font-size: 13px; font-weight: 600">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
-          <span>Run file</span>
+        <button aria-label="Run file" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{c.passed}}">
+          <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
         </button>
-        <button disabled="{{ true }}" style="height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 6px; background: {{c.raised}}; color: {{c.quote}}; font: inherit; font-size: 13px; font-weight: 600">
-          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
-          <span>Running</span>
+        <button aria-label="Run file, during a run" disabled="{{ true }}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{c.quote}}">
+          <svg width="14" height="14" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
         </button>
-        <button style="height: 28px; padding: 0 10px; border: 1px solid {{c.hair}}; border-radius: 6px; background: transparent; color: {{c.text}}; font: inherit; font-size: 13px">Close</button>
         <div style="display: flex; padding: 2px; border: 1px solid {{c.hair}}; border-radius: 7px">
           <button style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: {{c.sel}}; color: {{c.text}}; font: inherit; font-size: 13px">Page</button>
           <button style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: {{c.quote}}; font: inherit; font-size: 13px">Graph</button>
         </div>
-        <span style="min-width: 20px; padding: 0 5px; border: 1px solid {{c.hair}}; border-radius: 4px; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; text-align: center">/</span>
       </div>
       <div style="max-width: 800px; display: flex; flex-direction: column; gap: 12px; font-size: 15px; line-height: 24px">
         <div>Selected text: <span style="background: {{c.sel}}">Run the installer</span>.</div>
@@ -200,7 +190,7 @@ const TOKEN_ROWS = [
   ['code', 'code', 'Inline code'],
   ['link', 'link', 'Links, hyperlink_color'],
   ['Accent'],
-  ['accent', 'bar', 'Focused header and row, Run buttons, lit graph lines, selected file'],
+  ['accent', 'bar', 'Focused header and row, Open file, lit graph lines, selected file'],
   ['on_accent', 'barText', 'Text on accent'],
   ['selection', 'sel', 'Selected text, open file, active toggle, running row, alert fill'],
   ['hover', 'hover', 'A row or list item under the pointer'],
@@ -214,22 +204,21 @@ const TOKEN_ROWS = [
   ['tint_snoozed', 'tintSnoozed', 'Row background'],
   ['Graph and overlays'],
   ['line', 'line', 'Node borders, plain page nodes'],
-  ['edge', 'edge', 'Graph lines that are not lit'],
-  ['scrim', 'scrim', 'Behind search and help']
+  ['edge', 'edge', 'Graph lines that are not lit']
 ];
 
 const PART_ROWS = [
-  ['Top bar', '48 high, controls 32', 'A top panel with a horizontal layout'],
-  ['File tree', '248 wide, resizable, rows 30', 'A left side panel. Custom rows, FileTree underneath'],
+  ['Top bar', '33 high, controls 28', 'A top panel with a horizontal layout'],
+  ['File tree', '248 wide, resizable, rows 24', 'A left side panel. Custom rows, FileTree underneath'],
   ['Tests panel', '296 wide, resizable, test pages only', 'A right side panel, fed by Session::outcome'],
-  ['Page', 'Reading column up to 800, centred', 'The central panel with a vertical ScrollArea'],
+  ['Page', 'Reading column up to 720, centred', 'The central panel with a vertical ScrollArea'],
   ['Inline text', '', 'One LayoutJob per paragraph, so links, code and emphasis share a line. Link hit testing uses the Galley'],
   ['Test table', 'Gutter 36, rows from 34, columns 88 to 170', 'Frame with a horizontal ScrollArea for the cells. The gutter is painted outside it, so marks stay in view'],
-  ['Run row', 'Pill at the row end, pinned', 'Shown when response.hovered() or the row is focused. Painted outside the ScrollArea, like the gutter'],
-  ['Graph', 'Nodes 16 to 44 across, by link count', 'egui::Scene for pan and zoom, with a force layout stepped each frame until it settles. Painter circles and lines, interact rects for dragging'],
+  ['Run buttons', 'A triangle, 28 wide', 'Run table in the gutter of the header, and Run row in the gutter of a row while the pointer is over it, in place of its mark. Painted outside the ScrollArea. Run file is a green triangle in the toolbar'],
+  ['Graph', 'Nodes 16 to 44 across, by link count', 'Our own pan and zoom, so that the wheel zooms, with a force layout stepped each frame until it settles. Painter circles and lines, interact rects for dragging'],
   ['Graph details', '296 wide', 'The right side panel, in place of the Tests panel, while the graph shows'],
-  ['Search', '640 wide, 88 from the top', 'egui::Modal or an Area at Order::Foreground, with a TextEdit'],
-  ['Help', '1160 wide', 'egui::Modal with a Grid per topic'],
+  ['Search', '420 wide, in the toolbar', 'A TextEdit in the field, the results in an Area under it, and a backdrop that closes it on a click anywhere else'],
+  ['Help', 'One list, over the page', 'An Area at Order::Foreground with a Grid of the keys'],
   ['Status bar', '26 high', 'A bottom panel, with the file result in its colour'],
   ['Icons', '16, stroke 1.5', 'Drawn with Painter, so no icon font is needed'],
   ['Font', 'Regular, SemiBold and their italics', 'JetBrains Mono through FontDefinitions, for both the proportional and monospace families, under its OFL licence'],
@@ -261,8 +250,8 @@ class Component extends DCLogic {
         state('~', 'snoozed', 'yellow mark, yellow tint, quiet note', c.snoozed, c.tintSnoozed, 'mul expected 5, got 4 (snoozed until 2099-12-31)', c.quote),
         state('-', 'skipped', 'plain mark, no tint', c.quote, 'transparent'),
         state('⋯', 'running', 'plain mark, selection tint', c.quote, c.sel),
-        { ...state('', 'hovered', 'hover tint, Run row appears', c.quote, c.hover), hasRun: true, runBg: c.bar, runFg: c.barText },
-        { c, mark: '✗', name: 'focused', how: 'accent fill, over any result', markColor: c.barText, bg: c.bar, fg: c.barText, hasNote: false, hasRun: true, runBg: 'transparent', runFg: c.barText }
+        state('▶', 'hovered', 'hover tint, the mark gives way to Run row', c.text, c.hover),
+        { c, mark: '✗', name: 'focused', how: 'accent fill, over any result', markColor: c.barText, bg: c.bar, fg: c.barText, hasNote: false }
       ],
       nodes: [
         { c, name: 'A page', size: 16, fill: c.line, stroke: c.line, halo: 'transparent', mark: '', opacity: 1 },

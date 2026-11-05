@@ -1,5 +1,6 @@
 //! The graphical interface, built with egui. See `spec/gui/`.
 
+mod graph;
 mod icons;
 mod look;
 mod markdown;
@@ -11,6 +12,7 @@ use crate::app::{Arguments, Launch};
 use crate::clipboard;
 use crate::focus::Focus;
 use crate::history::History;
+use crate::run::NOT_RUN;
 use crate::search::Search;
 use crate::session::{Opened, Session, Start};
 use crate::temoc::{Failure, RunResult, TestTable};
@@ -19,14 +21,16 @@ use crate::workspace;
 pub use eframe::egui;
 use egui::accesskit::Role;
 use egui::{
-    Align, Area, Button, CentralPanel, Color32, Context, Event, Frame, Id, Key, Label, Layout,
-    Modifiers, OpenUrl, Order, Panel, PointerButton, Response, RichText, ScrollArea, Sense,
-    TextEdit, Theme, Ui, UiBuilder, Vec2, ViewportCommand, WidgetInfo, vec2,
+    Align, Align2, Area, Button, CentralPanel, Color32, Context, CursorIcon, Event, FontId, Frame,
+    Id, Key, Label, Layout, Modifiers, OpenUrl, Order, Panel, PointerButton, Rect, Response,
+    RichText, ScrollArea, Sense, Stroke, StrokeKind, TextEdit, Theme, Ui, UiBuilder, Vec2,
+    ViewportCommand, WidgetInfo, vec2,
 };
+use graph::{Asked, GraphView, Heading, Look};
 use icons::Icon;
 use look::Palette;
 use pictures::Pictures;
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
 use std::time::Duration;
 pub use view::Position;
 use view::{Reach, Scroll, Sideways, View};
@@ -38,7 +42,12 @@ const TICK: Duration = Duration::from_millis(100);
 /// How far the page sits from its edges.
 const PAGE_MARGIN: i8 = 40;
 /// The widest the search box gets.
-const SEARCH_WIDTH: f32 = 640.0;
+/// The widest the search field gets, and how tall it is.
+const FIELD_SIZE: Vec2 = vec2(420.0, 26.0);
+/// What the search field says while it is empty.
+const FIELD_HINT: &str = "Search…";
+/// The narrowest the results of a search get, even under a narrow field.
+const RESULTS_WIDTH: f32 = 420.0;
 /// The keys listed by help, as in `spec/gui/keys.md`.
 const KEYS: [(&str, &str); 19] = [
     ("Up, Down", "Scroll up or down one line"),
@@ -71,6 +80,16 @@ const KEYS: [(&str, &str); 19] = [
 /// What the fixture finds things by, in the description of a widget. Each one
 /// says what the widget is to anyone who cannot see where it sits.
 pub mod tags {
+    /// The graph, while it shows.
+    pub const GRAPH: &str = "graph";
+    /// A file in the graph.
+    pub const GRAPH_NODE: &str = "graph node";
+    /// How far the selected file of the graph is from the start page.
+    pub const GRAPH_DISTANCE: &str = "graph distance";
+    /// A link out of the selected file of the graph.
+    pub const GRAPH_LINK_OUT: &str = "graph link out";
+    /// A link into the selected file of the graph.
+    pub const GRAPH_LINK_IN: &str = "graph link in";
     /// The path of the open document.
     pub const DOCUMENT: &str = "document";
     /// The status bar message.
@@ -101,6 +120,8 @@ pub mod tags {
     pub const TEST_TABLE: &str = "test table";
     /// A test row, named after its line.
     pub const TEST_ROW: &str = "test row";
+    /// A link to a file that does not exist.
+    pub const MISSING_LINK: &str = "missing link";
     /// The mark of a test row, written `line: mark`.
     pub const MARK: &str = "mark";
     /// A note under a test row, written `line: note`.
@@ -150,8 +171,28 @@ enum Command {
     ToggleTests,
     ToggleHelp,
     CloseHelp,
+    Graph(GraphCommand),
     SwapMode,
     Quit,
+}
+
+/// Something asked of the graph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum GraphCommand {
+    Toggle,
+    Show,
+    Close,
+    OpenSelected,
+    Select(Heading),
+    SelectStart,
+}
+
+/// What is open, which changes what a key does.
+#[derive(Debug, Clone, Copy)]
+struct Open {
+    search: bool,
+    help: bool,
+    graph: bool,
 }
 
 /// A page, and how it was left.
@@ -172,6 +213,8 @@ struct Visit {
     scroll_to: Option<f32>,
     /// The line of a block to scroll sideways, and the offset to go to.
     nudge: Option<(usize, f32)>,
+    /// The links of the page to files that do not exist, as they are written.
+    missing: HashSet<String>,
     view: View,
 }
 
@@ -209,6 +252,10 @@ pub struct Gui {
     /// Every test file of the workspace, for marking them in the tree.
     test_files: BTreeMap<String, Opened>,
     panels: Panels,
+    /// The graph, while it shows in place of the page.
+    graph: Option<GraphView>,
+    /// Where the search field is.
+    search_field: Rect,
     search: Option<Search>,
     /// What is typed in the search box, as egui edits it.
     query: String,
@@ -291,6 +338,8 @@ impl Gui {
             pages: History::default(),
             tree,
             test_files,
+            graph: None,
+            search_field: Rect::ZERO,
             panels: Panels {
                 tree: true,
                 tests: true,
@@ -340,6 +389,25 @@ impl Gui {
     #[must_use]
     pub fn copied(&self) -> Option<&str> {
         self.copied.as_deref()
+    }
+
+    /// Whether the files of the graph are still finding their places.
+    #[must_use]
+    pub fn graph_is_moving(&self) -> bool {
+        self.graph.as_ref().is_some_and(GraphView::is_moving)
+    }
+
+    /// The files the graph is drawing attention to.
+    #[must_use]
+    pub fn graph_lit_files(&self) -> Vec<String> {
+        let graph = self.graph.as_ref();
+        graph.map(GraphView::lit_files).unwrap_or_default()
+    }
+
+    /// How many arrowheads the graph shows.
+    #[must_use]
+    pub fn graph_arrowheads(&self) -> usize {
+        self.graph.as_ref().map_or(0, GraphView::arrowheads)
     }
 
     /// The text selected on the page.
@@ -407,12 +475,16 @@ impl Gui {
         if self.panels.tree {
             self.tree_panel(ui, palette);
         }
-        if self.panels.tests && self.opened().is_some_and(Opened::is_test_file) {
-            self.tests_panel(ui, palette);
+        if self.graph.is_some() {
+            self.graph_view(ui, palette);
+        } else {
+            if self.panels.tests && self.opened().is_some_and(Opened::is_test_file) {
+                self.tests_panel(ui, palette);
+            }
+            self.page(ui, palette);
         }
-        self.page(ui, palette);
         if self.search.is_some() {
-            self.search_box(&ctx);
+            self.search_results(&ctx, palette);
         }
         if self.panels.help {
             help(&ctx);
@@ -427,10 +499,91 @@ impl Gui {
         self.pages.current().map(|visit| &visit.opened)
     }
 
+    /// Carries out something asked of the graph.
+    fn apply_graph(&mut self, command: GraphCommand) -> Result<(), String> {
+        match command {
+            GraphCommand::Toggle if self.graph.is_some() => self.graph = None,
+            GraphCommand::Toggle | GraphCommand::Show => {
+                if self.graph.is_none() {
+                    let document = self.opened().map(Opened::file);
+                    let view = GraphView::open(self.session.workspace(), document);
+                    self.graph = Some(view);
+                }
+            }
+            GraphCommand::Close => self.graph = None,
+            GraphCommand::OpenSelected => {
+                let selected = self.graph.as_ref().and_then(GraphView::selected_file);
+                if let Some(file) = selected.cloned() {
+                    self.open_from_graph(&file)?;
+                }
+            }
+            GraphCommand::Select(heading) => {
+                if let Some(graph) = &mut self.graph {
+                    graph.select_towards(heading);
+                }
+            }
+            GraphCommand::SelectStart => {
+                if let Some(graph) = &mut self.graph {
+                    graph.select_start();
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Leaves the graph for a file, which may be the one already open.
+    fn open_from_graph(&mut self, file: &str) -> Result<(), String> {
+        self.graph = None;
+        if self.opened().is_some_and(|opened| opened.file() == file) {
+            return Ok(());
+        }
+        self.visit(file, None)
+    }
+
+    /// Draws the graph in place of the page, with its panel beside it.
+    fn graph_view(&mut self, ui: &mut Ui, palette: &Palette) {
+        let Some(mut graph) = self.graph.take() else {
+            return;
+        };
+        let looks: Vec<Look> = graph
+            .files()
+            .iter()
+            .map(|file| {
+                let opened = self.test_files.get(file);
+                let result = opened.and_then(|opened| self.session.file_result(opened));
+                Look {
+                    is_test: opened.is_some(),
+                    result: result.filter(|result| *result != NOT_RUN),
+                }
+            })
+            .collect();
+        let mut asked = None;
+        Panel::right("graph details")
+            .default_size(296.0)
+            .show(ui, |ui| {
+                ui.add_space(12.0);
+                asked = graph.details(ui, palette);
+            });
+        let frame = Frame::new().fill(palette.page);
+        CentralPanel::default().frame(frame).show(ui, |ui| {
+            asked = asked.take().or(graph.show(ui, looks, palette));
+        });
+        self.graph = Some(graph);
+        if let Some(Asked::Open(file)) = asked
+            && let Err(message) = self.open_from_graph(&file)
+        {
+            self.status = Some(message);
+        }
+    }
+
     /// Goes to a file of the workspace, and to a heading of it if there is one,
     /// leaving the current page behind.
     fn visit(&mut self, file: &str, anchor: Option<&str>) -> Result<(), String> {
         let opened = self.session.read(file)?;
+        self.graph = None;
+        let urls = opened.document().link_urls();
+        let missing = urls.filter(|url| self.session.link_is_missing(file, url));
+        let missing = missing.map(String::from).collect();
         let headings = opened.document().headings();
         let mut headings = headings.iter();
         let heading = anchor.and_then(|anchor| headings.find(|known| known.anchor == anchor));
@@ -445,6 +598,7 @@ impl Gui {
             reveal_link: false,
             scroll_to: None,
             nudge: None,
+            missing,
             view: View::default(),
         });
         self.tree.reveal(file);
@@ -497,7 +651,11 @@ impl Gui {
     /// Takes the keys meant for temoc-ui out of this frame's input.
     fn read_keys(&mut self, ctx: &Context) {
         let searching = self.search.is_some();
-        let help_open = self.panels.help;
+        let open = Open {
+            search: searching,
+            help: self.panels.help,
+            graph: self.graph.is_some(),
+        };
         let mut commands = Vec::new();
         ctx.input_mut(|input| {
             input.events.retain(|event| {
@@ -507,7 +665,7 @@ impl Gui {
                         pressed: true,
                         modifiers,
                         ..
-                    } => key_command(*key, *modifiers, searching, help_open),
+                    } => key_command(*key, *modifiers, open),
                     Event::PointerButton {
                         button,
                         pressed: true,
@@ -577,10 +735,12 @@ impl Gui {
                 }
             }
             Command::Back => {
+                self.graph = None;
                 self.pages.back();
                 self.reveal_document();
             }
             Command::Forward => {
+                self.graph = None;
                 self.pages.forward();
                 self.reveal_document();
             }
@@ -608,6 +768,7 @@ impl Gui {
             Command::ToggleTests => self.panels.tests = !self.panels.tests,
             Command::ToggleHelp => self.panels.help = !self.panels.help,
             Command::CloseHelp => self.panels.help = false,
+            Command::Graph(command) => self.apply_graph(command)?,
             Command::SwapMode => ctx.set_theme(match ctx.theme() {
                 Theme::Dark => Theme::Light,
                 Theme::Light => Theme::Dark,
@@ -670,10 +831,6 @@ impl Gui {
                     let response = ui.label(document);
                     tagged(&response, tags::DOCUMENT, document);
                 }
-                let search = ui.add(Button::new("Search files and headings"));
-                if search.clicked() {
-                    commands.push(Command::OpenSearch);
-                }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if test_page {
                         let run = ui.add_enabled_ui(!busy, |ui| {
@@ -683,12 +840,20 @@ impl Gui {
                             commands.push(Command::RunFile);
                         }
                     }
+                    let graph_shows = self.graph.is_some();
+                    if ui.add(Button::selectable(graph_shows, "Graph")).clicked() {
+                        commands.push(Command::Graph(GraphCommand::Show));
+                    }
+                    if ui.add(Button::selectable(!graph_shows, "Page")).clicked() {
+                        commands.push(Command::Graph(GraphCommand::Close));
+                    }
                     let tests = (Icon::RightPanel, "Show or hide the tests panel");
                     icon_button(ui, tests, Command::ToggleTests, &mut commands);
                     let help = (Icon::Help, "Show help");
                     icon_button(ui, help, Command::ToggleHelp, &mut commands);
                     let mode = (Icon::Contrast, "Swap between dark and light");
                     icon_button(ui, mode, Command::SwapMode, &mut commands);
+                    self.search_field(ui, palette, &mut commands);
                 });
             });
         });
@@ -859,6 +1024,7 @@ impl Gui {
                 document: opened.document(),
                 file: opened.file(),
                 workspace: self.session.workspace(),
+                missing: &visit.missing,
                 tests: markdown::Tests {
                     tables: opened.tables(),
                     results: self.session.results(opened.file()),
@@ -908,28 +1074,99 @@ impl Gui {
         self.failure.clone().or(cannot_run.flatten())
     }
 
-    fn search_box(&mut self, ctx: &Context) {
-        let mut commands = Vec::new();
-        let only_tests = self.only_tests;
-        let width = SEARCH_WIDTH.min(ctx.content_rect().width() - 32.0);
-        let left = (ctx.content_rect().width() - width) / 2.0;
-        let query = &mut self.query;
-        let Some(search) = &mut self.search else {
-            return;
-        };
-        Area::new(Id::unique("search"))
-            .order(Order::Foreground)
-            .fixed_pos(egui::pos2(left, 88.0))
-            .show(ctx, |ui| {
-                Frame::popup(ui.style()).show(ui, |ui| {
-                    ui.set_width(width);
-                    let edit = TextEdit::singleline(query).desired_width(f32::INFINITY);
+    /// The field in the toolbar, in the middle of the window if there is room.
+    /// It only takes the keyboard while a search is open.
+    fn search_field(&mut self, ui: &mut Ui, palette: &Palette, commands: &mut Vec<Command>) {
+        let room = ui.available_rect_before_wrap().shrink2(vec2(8.0, 0.0));
+        let width = FIELD_SIZE.x.min(room.width()).max(0.0);
+        let middle = ui.ctx().content_rect().center().x;
+        let left = (middle - width / 2.0)
+            .min(room.right() - width)
+            .max(room.left());
+        let top = room.center().y - FIELD_SIZE.y / 2.0;
+        let field = Rect::from_min_size(egui::pos2(left, top), vec2(width, FIELD_SIZE.y));
+        self.search_field = field;
+        let hint = RichText::new(FIELD_HINT).color(palette.quote);
+        let border = if let Some(search) = &mut self.search {
+            // Above what closes the search, so that clicks in it stay in it.
+            let inside = field.shrink2(vec2(10.0, 4.0));
+            let query = &mut self.query;
+            Area::new(Id::unique("search field"))
+                .order(Order::Foreground)
+                .fixed_pos(inside.min)
+                .show(ui.ctx(), |ui| {
+                    let edit = TextEdit::singleline(query)
+                        .hint_text(hint)
+                        .frame(Frame::NONE)
+                        .desired_width(inside.width());
                     let response = ui.add(edit);
                     response.request_focus();
                     tagged(&response, tags::SEARCH, "Search");
                     if response.changed() {
                         follow_query(search, query);
                     }
+                });
+            palette.bar
+        } else {
+            let id = ui.scope_id().with("search field");
+            let response = ui.interact(field, id, Sense::click());
+            named(&response, Role::Button, "Search files and headings");
+            if response.clicked() {
+                commands.push(Command::OpenSearch);
+            }
+            let text_spot = egui::pos2(field.left() + 10.0, field.center().y);
+            let font = FontId::proportional(13.0);
+            let painter = ui.painter();
+            painter.text(
+                text_spot,
+                Align2::LEFT_CENTER,
+                FIELD_HINT,
+                font,
+                palette.quote,
+            );
+            if response.hovered() {
+                ui.set_cursor_icon(CursorIcon::Text);
+                palette.line
+            } else {
+                palette.hair
+            }
+        };
+        ui.painter()
+            .rect_stroke(field, 6, Stroke::new(1.0, border), StrokeKind::Inside);
+    }
+
+    /// What a search found, right under the field.
+    fn search_results(&mut self, ctx: &Context, palette: &Palette) {
+        let mut commands = Vec::new();
+        let only_tests = self.only_tests;
+        let field = self.search_field;
+        let window = ctx.content_rect();
+        let width = field.width().max(RESULTS_WIDTH).min(window.width() - 32.0);
+        let left = (field.center().x - width / 2.0)
+            .min(window.right() - 16.0 - width)
+            .max(16.0);
+        let Some(search) = &mut self.search else {
+            return;
+        };
+        // Covers the window, so that a click outside only closes the search.
+        Area::new(Id::unique("search backdrop"))
+            .order(Order::Middle)
+            .fixed_pos(window.min)
+            .show(ctx, |ui| {
+                let response = ui.allocate_response(window.size(), Sense::click());
+                if response.clicked() {
+                    commands.push(Command::CloseSearch);
+                }
+            });
+        Area::new(Id::unique("search"))
+            .order(Order::Foreground)
+            .fixed_pos(egui::pos2(left, field.bottom() + 6.0))
+            .show(ctx, |ui| {
+                let frame = Frame::popup(ui.style());
+                // The width is of the whole panel, to line up with the field.
+                let inside = width - frame.total_margin().sum().x;
+                frame.show(ui, |ui| {
+                    ui.set_width(inside);
                     let filter = ui.selectable_label(only_tests, "Test files only");
                     if filter.clicked() {
                         commands.push(Command::OnlyTestFiles);
@@ -938,13 +1175,17 @@ impl Gui {
                         for (index, hit) in search.results().iter().enumerate() {
                             let text = hit.to_string();
                             let chosen = index == search.selected();
-                            let response = ui.add(Button::selectable(chosen, &text));
+                            let button = Button::selectable(chosen, &text)
+                                .min_size(vec2(ui.available_width(), 0.0));
+                            let response = ui.add(button);
                             tagged(&response, tags::SEARCH_RESULT, &text);
                             if response.clicked() {
                                 commands.push(Command::OpenResult(index));
                             }
                         }
                     });
+                    let hints = "Up and Down choose   Enter opens   Esc closes";
+                    ui.label(RichText::new(hints).size(12.0).color(palette.quote));
                 });
             });
         ctx.input_mut(|input| {
@@ -972,26 +1213,37 @@ fn follow_query(search: &mut Search, query: &str) {
 }
 
 /// What a key does, for the keys that are not text.
-fn key_command(
-    key: Key,
-    modifiers: Modifiers,
-    searching: bool,
-    help_open: bool,
-) -> Option<Command> {
+fn key_command(key: Key, modifiers: Modifiers, open: Open) -> Option<Command> {
     match key {
         Key::Q if modifiers.command => return Some(Command::Quit),
         Key::F1 => return Some(Command::ToggleHelp),
-        Key::Escape if searching => return Some(Command::CloseSearch),
-        Key::Escape if help_open => return Some(Command::CloseHelp),
-        _ if searching => return None,
+        Key::Escape if open.search => return Some(Command::CloseSearch),
+        Key::Escape if open.help => return Some(Command::CloseHelp),
+        _ if open.search => return None,
         _ => {}
     }
     if modifiers.command {
         command_key(key)
     } else if modifiers.alt {
         alt_key(key, modifiers.shift)
+    } else if open.graph {
+        graph_key(key).map(Command::Graph)
     } else {
         plain_key(key, modifiers.shift)
+    }
+}
+
+/// What a key does by itself while the graph shows.
+fn graph_key(key: Key) -> Option<GraphCommand> {
+    match key {
+        Key::Escape => Some(GraphCommand::Close),
+        Key::Enter => Some(GraphCommand::OpenSelected),
+        Key::Home => Some(GraphCommand::SelectStart),
+        Key::ArrowLeft => Some(GraphCommand::Select(Heading::Left)),
+        Key::ArrowRight => Some(GraphCommand::Select(Heading::Right)),
+        Key::ArrowUp => Some(GraphCommand::Select(Heading::Up)),
+        Key::ArrowDown => Some(GraphCommand::Select(Heading::Down)),
+        _ => None,
     }
 }
 
@@ -999,6 +1251,7 @@ fn key_command(
 fn command_key(key: Key) -> Option<Command> {
     match key {
         Key::B => Some(Command::ToggleTree),
+        Key::G => Some(Command::Graph(GraphCommand::Toggle)),
         Key::K => Some(Command::OpenSearch),
         Key::R => Some(Command::RunFile),
         Key::Enter => Some(Command::RunFocused),

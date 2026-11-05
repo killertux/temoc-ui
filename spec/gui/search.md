@@ -2,9 +2,11 @@
 
 Back to the [specification index](../README.md).
 
-`Ctrl-k`, `/` or the search field in the toolbar opens the search box over the page. Typing
-narrows [what can be found](../search.md). `Up` and `Down` choose a result, `Enter`
-opens it, and `Esc` closes search without moving.
+`Ctrl-k`, `/` or clicking the search field in the toolbar starts a search. Typing in the
+field narrows [what can be found](../search.md), and the results open under it, over the
+page. `Up` and `Down` choose a result, `Enter` opens it, and `Esc` or a click anywhere else
+closes search without moving. That click does nothing else, so a link it lands on is not
+followed.
 
 ![Search](design/images/search.png)
 
@@ -33,11 +35,13 @@ you were.
 | Choose a result       | docs      | `/ Down Enter`                 | guide/long-page.md | no           |
 | Click a result        | docs      | `/ Click "guide/long-page.md"` | guide/long-page.md | no           |
 | Enter with no results | docs      | `/ "zzz" Enter`                | README.md          | yes          |
+| A click elsewhere     | docs      | `/ Click "Reference"`          | README.md          | no           |
+| A click on the filter | docs      | `/ Click "Test files only"`    | README.md          | yes          |
 | Back to the start     | docs      | `/ "reference" Enter Alt-Left` | README.md          | no           |
 
 ## Typing stays typing
 
-While the search box has the keyboard, `/` and `?` are typed like any other character.
+While the search field has the keyboard, `/` and `?` are typed like any other character.
 
 [//]: # "decisionTable Gui"
 

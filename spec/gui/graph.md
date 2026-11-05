@@ -8,7 +8,7 @@ of the page. `Esc`, `Ctrl-g` or the `Page` button returns to the document.
 ![The graph of this folder](design/images/graph.png)
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation      | workspace | actions                      | graph open? |
 | ---------------- | --------- | ---------------------------- | ----------- |
@@ -28,7 +28,7 @@ file with no links floats free. A file with more links is drawn larger.
 The files move until they settle, and the layout starts from the same places every
 time, so that a workspace looks the same each time you open it.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation | workspace  | actions  | settled? | same layout? |
 | ----------- | ---------- | -------- | -------- | ------------ |
@@ -41,7 +41,7 @@ time, so that a workspace looks the same each time you open it.
 Dragging a file moves it, and only it. It stays there until the graph closes. Dragging
 the background moves the whole view, the wheel zooms, and `Fit` puts everything back.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation      | workspace | actions                                       | node moved? | others moved? |
 | ---------------- | --------- | --------------------------------------------- | ----------- | ------------- |
@@ -57,7 +57,7 @@ the previous document.
 The arrow keys select the nearest file in that direction, and `Home` selects the start
 page.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation       | workspace | arguments    | actions                                              | graph open? | selected file? | document?    |
 | ----------------- | --------- | ------------ | ---------------------------------------------------- | ----------- | -------------- | ------------ |
@@ -77,7 +77,7 @@ A panel beside the graph lists the selected file's links, including
 [broken ones](../viewer/graph.md#links), and its [distance](../viewer/graph.md#distance).
 Clicking a link selects that file.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation     | workspace | actions                                                             | selected file?           | distance?                         | links out?                                                                       | links in?                           |
 | --------------- | --------- | ------------------------------------------------------------------- | ------------------------ | --------------------------------- | -------------------------------------------------------------------------------- | ----------------------------------- |
@@ -91,7 +91,7 @@ That file is the one under the pointer, or else the selected file. Only its link
 arrowheads, which point at the target. A pair of files that link both ways shares one
 line with an arrowhead at each end.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation     | workspace | actions                                  | lit files?                                        | arrowheads? |
 | --------------- | --------- | ---------------------------------------- | ------------------------------------------------- | ----------- |
@@ -104,7 +104,7 @@ line with an arrowhead at each end.
 A file that has a result shows it. See how it looks
 [after a run](design/images/graph-results.png).
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation  | workspace  | arguments  | actions         | file       | node result? |
 | ------------ | ---------- | ---------- | --------------- | ---------- | ------------ |

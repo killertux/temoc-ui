@@ -229,6 +229,7 @@ pub struct Gui {
     actions: String,
     row: String,
     look_for: String,
+    file: String,
     system_mode: String,
     played: Option<GuiPlayed>,
 }
@@ -399,6 +400,83 @@ impl Gui {
     #[must_use]
     pub fn selection(&self) -> String {
         self.read(|scene| or_none(scene.window().selected().map(String::from)))
+    }
+
+    pub fn set_file(&mut self, file: String) {
+        self.file = file;
+    }
+
+    #[must_use]
+    pub fn graph_open(&self) -> String {
+        self.read(|scene| yes_no(scene.is_tagged(tags::GRAPH)))
+    }
+
+    #[must_use]
+    pub fn settled(&self) -> String {
+        self.read(|scene| {
+            let open = scene.is_tagged(tags::GRAPH);
+            yes_no(open && !scene.window().graph_is_moving())
+        })
+    }
+
+    /// Opens the graph again in a new window, and compares.
+    #[must_use]
+    pub fn same_layout(&self) -> String {
+        let again = GuiPlayed::of(
+            &self.workspace,
+            &self.arguments,
+            &self.actions,
+            &self.system_mode,
+        );
+        let GuiPlayed::Finished(again) = again else {
+            return "the graph did not open again".into();
+        };
+        self.read(|scene| yes_no(scene.graph_places() == again.graph_places()))
+    }
+
+    #[must_use]
+    pub fn node_moved(&self) -> String {
+        self.read(|scene| yes_no(scene.moved_by_dragging().0))
+    }
+
+    #[must_use]
+    pub fn others_moved(&self) -> String {
+        self.read(|scene| yes_no(scene.moved_by_dragging().1))
+    }
+
+    #[must_use]
+    pub fn selected_file(&self) -> String {
+        self.read(|scene| or_none(scene.selected_file()))
+    }
+
+    #[must_use]
+    pub fn distance(&self) -> String {
+        self.read(|scene| or_none(scene.first_tagged(tags::GRAPH_DISTANCE)))
+    }
+
+    #[must_use]
+    pub fn links_out(&self) -> String {
+        self.read(|scene| list(&scene.tagged(tags::GRAPH_LINK_OUT), ", "))
+    }
+
+    #[must_use]
+    pub fn links_in(&self) -> String {
+        self.read(|scene| list(&scene.tagged(tags::GRAPH_LINK_IN), ", "))
+    }
+
+    #[must_use]
+    pub fn lit_files(&self) -> String {
+        self.read(|scene| list(&scene.window().graph_lit_files(), ", "))
+    }
+
+    #[must_use]
+    pub fn arrowheads(&self) -> String {
+        self.read(|scene| scene.window().graph_arrowheads().to_string())
+    }
+
+    #[must_use]
+    pub fn node_result(&self) -> String {
+        self.read(|scene| or_none(scene.node_result(&self.file)))
     }
 
     #[must_use]

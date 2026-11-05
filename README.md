@@ -1,7 +1,10 @@
 # temoc-ui
 
-A terminal interface for [temoc](https://github.com/killertux/temoc), which runs
-acceptance tests written in markdown.
+A desktop window and a terminal interface for
+[temoc](https://github.com/killertux/temoc), which runs acceptance tests written in
+markdown.
+
+![The window after a run](spec/gui/design/images/main.png)
 
 temoc tests are ordinary markdown pages, so they sit next to the documentation they
 describe. A hidden line marks a table as a test, and each row of the table is one
@@ -22,6 +25,10 @@ a markdown viewer that makes it easy to jump between pages, follow links and fin
 what you are looking for. When a page contains tests, you can also run the whole
 file, a single table or a single row, and watch the results appear in place.
 
+There are two ways to use it, and they do the same job. The terminal interface works
+anywhere, including over SSH. The window, opened with `--gui`, adds things a terminal
+cannot draw, such as pictures, alerts and a graph of your pages that you can drag around.
+
 > [!NOTE]
 > temoc-ui is in early development. See [Project status](#project-status) for what
 > works today.
@@ -33,8 +40,10 @@ and [temoc](https://github.com/killertux/temoc/releases) 0.10 or later on your `
 to run tests. Install temoc-ui from this repository:
 
 ```sh
-cargo install --git https://github.com/killertux/temoc-ui temoc-ui
+cargo install --git https://github.com/killertux/temoc-ui temoc-ui --features gui
 ```
+
+Without `--features gui` you get a smaller build with only the terminal interface.
 
 Then open a folder, or a single markdown file:
 
@@ -42,8 +51,9 @@ Then open a folder, or a single markdown file:
 temoc-ui              # the current folder
 temoc-ui docs/        # another folder
 temoc-ui docs/api.md  # one page
+temoc-ui --gui docs/  # in a window
 temoc-ui --config ci/temoc.toml  # with a temoc configuration file
-temoc-ui --theme light           # with a theme
+temoc-ui --theme light           # with a terminal theme
 ```
 
 temoc-ui opens the folder's `README.md`. If there isn't one, search opens so that
@@ -57,10 +67,53 @@ To try it without any pages of your own, run it from a clone of this repository 
 one of the sample workspaces:
 
 ```sh
+cargo run --features gui -- --gui samples/docs
 cargo run -- samples/docs
 ```
 
-## Using it
+## Using the window
+
+| Key                                | What it does                                   |
+| ---------------------------------- | ---------------------------------------------- |
+| `Up`, `Down`                       | Scroll one line                                |
+| `Space`, `PageDown`, `PageUp`      | Scroll one page                                |
+| `Home`, `End`                      | Go to the top or bottom                        |
+| `Left`, `Right`                    | Scroll wide tables and code sideways           |
+| `Tab`, `Shift-Tab`                 | Focus the next or previous link                |
+| `Enter`                            | Follow the focused link                        |
+| `Alt-Left`, `Alt-Right`            | Go back or forward                             |
+| `Ctrl-[`, `Ctrl-]`                 | Go back or forward                             |
+| `Ctrl-k`, `/`                      | Search                                         |
+| `Alt-Down`, `Alt-Up`               | Focus the next or previous test table          |
+| `Alt-Shift-Down`, `Alt-Shift-Up`   | Focus the next or previous test row            |
+| `Ctrl-Enter`                       | Run the focused row, or else the focused table |
+| `Ctrl-r`                           | Run the whole file                             |
+| `Ctrl-b`                           | Show or hide the file tree                     |
+| `Ctrl-g`                           | Show or hide the graph                         |
+| `Ctrl-c`                           | Copy the selected text                         |
+| `F1`, `?`                          | Show or hide help                              |
+| `Ctrl-q`                           | Quit                                           |
+
+On macOS, `Ctrl` is `Cmd` in all of these.
+
+The mouse does what you would expect. Click a link to follow it, or a test table or row
+to focus it. The back and forward buttons of a mouse go through history. Drag over the page
+to select text. Moving over a test row shows a `▶` in its gutter that runs just that row,
+and each table has one in its header. The green `▶` in the toolbar runs the whole file.
+
+Type in the search field at the top of the window to look through file paths and
+headings. Results open under it, and `Test files only` narrows them to files with tests.
+
+`Ctrl-g` or the `Graph` button shows the graph. Files that link to each other pull
+together, and a file with more links is drawn larger. Drag a file to move it, drag the
+background to move the view, use the wheel to zoom, and `Fit` to put everything back.
+Clicking a file selects it and lists its links beside the graph, and clicking it again
+opens it. The arrow keys select the nearest file that way.
+
+A link to a website opens in your browser. The window follows the light or dark setting
+of your system, and the toolbar button swaps between them.
+
+## Using the terminal
 
 | Key                           | What it does                          |
 | ----------------------------- | ------------------------------------- |
@@ -124,18 +177,18 @@ between dark and light until you close temoc-ui.
 The terminal never opens a web browser. External links stay on the page and show their
 address in the status line.
 
-### Running tests
+## Running tests
 
 Running needs a temoc configuration file, which tells temoc how to start your Slim
 server. temoc-ui uses `temoc.toml` at the root of the workspace, or the file given
 with `--config`. Pages open without one, but nothing can run.
 
-The focused table has a reversed header row, and the focused row is reversed too. Each
-row that runs gets a mark two columns after its end and a colour, as soon as temoc
-finishes it: a green `✓` when it passed, a red `✗` for a wrong value, a red `!` for an
-error such as an exception, a yellow `~` when it is snoozed, and a plain `-` when it never
-ran. The row temoc is working on shows `⋯`. A row that did not pass has a note below it
-saying why.
+The focused table has a highlighted header row, and the focused row is highlighted too.
+Each row that runs gets a mark and a colour as soon as temoc finishes it: a green `✓` when
+it passed, a red `✗` for a wrong value, a red `!` for an error such as an exception, a
+yellow `~` when it is snoozed, and a plain `-` when it never ran. The row temoc is working
+on shows `⋯`. A row that did not pass has a note below it saying why. The window shows
+the marks in a gutter beside the table, and the terminal two columns after each row.
 
 Each table shows its result below it, and the result for the whole file is at the right
 of the status bar. A table takes the worst result of its rows, and a file the worst of
@@ -150,35 +203,33 @@ by other rows, which temoc reports as an error in the row.
 
 **Working today**
 
+- A desktop window and a terminal interface
 - Rendering GitHub Flavored Markdown, the format temoc reads
 - Scrolling, following links and going back and forward through history
 - Searching files and headings, with a filter for test files
 - Finding test tables and moving between them
 - Running a whole file, a single table or a single row, and showing each row's result
   in place as soon as it is known
-- A pop-up file tree
+- A file tree
 - Mouse support
 - Selecting and copying text
 - A graph of how the pages link together
 - A help screen listing the keys
-- Dark and light themes, in 24-bit and 256 colours
+- Dark and light themes, and 256-colour themes in the terminal
 
-**Further out**
-
-- A graphical interface built with [egui](https://github.com/emilk/egui), opened with
-  `--gui` in builds with the `gui` feature. Its [specification](spec/gui/writing-specs.md)
-  and [design](spec/gui/design/README.md) are written, and it is partly built: the window,
-  file tree, search, and running a file work, and the rest is on its way.
+The window is built with [egui](https://github.com/emilk/egui). Its
+[specification](spec/gui/writing-specs.md) and [pictures](spec/gui/design/README.md) are
+part of this repository.
 
 ## The specification
 
-The [specification](spec/README.md) describes how temoc-ui behaves, including the
-features that are not built yet. It is written in temoc format, so its tables are
+The [specification](spec/README.md) describes how temoc-ui behaves. It is written in temoc format, so its tables are
 executable tests: each page explains a feature and proves that it works. It is a
 good place to read about anything this page leaves out.
 
 A table that is specified but not built yet is marked as snoozed. Building a feature
-means removing the snooze from its tables, so this command lists what is left:
+means removing the snooze from its tables, so this command lists what is left, which is
+nothing right now:
 
 ```sh
 grep -rn 'snooze until 2099' spec
@@ -197,6 +248,8 @@ checks that CI runs on every push and pull request:
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
+cargo clippy -p temoc-ui --all-targets -- -D warnings
+cargo test -p temoc-ui
 temoc -c temoc.toml
 ```
 

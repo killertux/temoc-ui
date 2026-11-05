@@ -50,7 +50,7 @@ so `?` is typed there, and `Ctrl-q` still quits.
 | Hides again     | docs      | `F1 F1`             | no         |
 | Esc hides it    | docs      | `F1 Esc`            | no         |
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation    | workspace | actions     | help open? |
 | -------------- | --------- | ----------- | ---------- |
