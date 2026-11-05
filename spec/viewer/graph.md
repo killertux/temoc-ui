@@ -2,35 +2,23 @@
 
 Back to the [specification index](../README.md).
 
-The graph shows every markdown file in the workspace and the links between them. The
-[terminal](../tui/graph.md) draws it on a screen of its own.
+The graph shows every markdown file in the workspace and the links between them. How it
+is laid out is up to the interface: the [terminal](../tui/graph.md) draws it in columns
+on a screen of its own, and the [GUI](../gui/graph.md) lets the files find their own
+places.
 
-## Columns
+## Distance
 
-Files are arranged in columns by how many links away they are from the start page,
-which is the workspace's `README.md`, or else its first file alphabetically. Each
-column is in alphabetical order ignoring case. Files that cannot be reached from
-the start page are in a final column of their own.
-
-There are as many columns as the links need. A file sits at its shortest distance
-from the start page, so a longer route to it does not move it.
-
-In `columns?` below, columns are separated by semicolons.
-
-[//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Core"
-
-| # situation         | workspace  | path  | columns?                                                                                                            |
-| ------------------- | ---------- | ----- | ------------------------------------------------------------------------------------------------------------------- |
-| Unreachable last    | docs       |       | README.md; guide/getting-started.md, guide/long-page.md, reference.md; notes.MD                                     |
-| Test files included | calculator |       | README.md; failing.md, passing.md; broken.md, mixed.md, snoozed.md                                                  |
-| No README           | docs       | guide | getting-started.md; long-page.md                                                                                    |
-| Many hops           | link-chain |       | README.md; shortcut.md, stop-one.md; stop-two.md; stop-three.md; stop-four.md; stop-five.md; stop-six.md; island.md |
+Every file has a distance: how many links away it is from the start page, which is
+the workspace's `README.md`, or else its first file alphabetically. A file's distance
+is its shortest route, so a longer route to it does not change it. A file that cannot
+be reached from the start page has no distance.
 
 The [`link-chain`](../../samples/link-chain/README.md) sample is a chain of pages with
 a shortcut and an island. `distance?` is how many links the open document is from
 the start page.
 
+[//]: # "import Spec.Fixtures"
 [//]: # "decisionTable Core"
 
 | # situation               | workspace  | path          | distance?     |

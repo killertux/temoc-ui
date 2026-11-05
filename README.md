@@ -121,7 +121,7 @@ to tell whether it shows 24-bit colour and asking it for its background colour. 
 does not answer, you get a dark theme. `--theme NAME` picks one yourself, and `T` swaps
 between dark and light until you close temoc-ui.
 
-temoc-ui never opens a web browser. External links stay on the page and show their
+The terminal never opens a web browser. External links stay on the page and show their
 address in the status line.
 
 ### Running tests
@@ -165,7 +165,9 @@ by other rows, which temoc reports as an error in the row.
 
 **Further out**
 
-- A web interface, behind a compile-time feature flag
+- A graphical interface built with [egui](https://github.com/emilk/egui), opened with
+  `--gui` in builds with the `gui` feature. Its [specification](spec/gui/writing-specs.md)
+  and [design](spec/gui/design/README.md) are written, and it is not built yet.
 
 ## The specification
 

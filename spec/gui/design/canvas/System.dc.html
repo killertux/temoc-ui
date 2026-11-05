@@ -1,0 +1,280 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Tokens and components</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; box-sizing: border-box; padding: 48px 40px 72px; background: {{c.page}}; color: {{c.text}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 21px">
+  <div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px">
+
+    <h1 style="margin: 0; color: {{c.heading}}; font-size: 34px; line-height: 42px; font-weight: 600">Tokens and components</h1>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Colours</h2>
+      <div style="overflow-x: auto; border: 1px solid {{c.hair}}; border-radius: 6px">
+        <div style="min-width: 860px">
+          <div style="display: grid; grid-template-columns: 180px 170px 170px minmax(0, 1fr); background: {{c.raised}}; color: {{c.quote}}; font-size: 12px; font-weight: 600; line-height: 18px">
+            <span style="padding: 7px 12px">Token</span>
+            <span style="padding: 7px 12px">Dark</span>
+            <span style="padding: 7px 12px">Light</span>
+            <span style="padding: 7px 12px">Used for</span>
+          </div>
+          <sc-for list="{{tokens}}" as="t" hint-placeholder-count="8">
+            <sc-if value="{{t.isGroup}}" hint-placeholder-val="{{ false }}">
+              <div style="padding: 7px 12px; border-top: 1px solid {{t.c.hair}}; background: {{t.c.panel}}; font-size: 13px; font-weight: 600">{{t.name}}</div>
+            </sc-if>
+            <sc-if value="{{t.isToken}}" hint-placeholder-val="{{ true }}">
+              <div style="display: grid; grid-template-columns: 180px 170px 170px minmax(0, 1fr); align-items: center; border-top: 1px solid {{t.c.hair}}; font-size: 13px; line-height: 20px">
+                <code style="padding: 6px 12px; color: {{t.c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{t.name}}</code>
+                <div style="padding: 6px 12px; display: flex; align-items: center; gap: 8px">
+                  <span style="flex: 0 0 auto; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid {{t.c.line}}; border-radius: 4px; background: {{t.dark}}"></span>
+                  <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px">{{t.darkLabel}}</span>
+                </div>
+                <div style="padding: 6px 12px; display: flex; align-items: center; gap: 8px">
+                  <span style="flex: 0 0 auto; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid {{t.c.line}}; border-radius: 4px; background: {{t.light}}"></span>
+                  <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px">{{t.lightLabel}}</span>
+                </div>
+                <span style="padding: 6px 12px; color: {{t.c.quote}}">{{t.use}}</span>
+              </div>
+            </sc-if>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Type</h2>
+      <div style="display: flex; flex-direction: column; border: 1px solid {{c.hair}}; border-radius: 6px">
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px">
+          <span style="flex: 1 1 360px; color: {{c.heading}}; font-size: 30px; line-height: 38px; font-weight: 600">Heading 1</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 600, 30 on 38</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
+          <span style="flex: 1 1 360px; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Heading 2</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 600, 21 on 28</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
+          <span style="flex: 1 1 360px; color: {{c.heading}}; font-size: 17px; line-height: 24px; font-weight: 600">Heading 3 and below</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 600, 17 on 24</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
+          <span style="flex: 1 1 360px; font-size: 15px; line-height: 24px">Page text, with <strong style="font-weight: 600">bold</strong>, <em>italic</em>, <s>struck</s>, <code style="padding: 1px 5px; border-radius: 4px; background: {{c.chip}}; color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13.5px">inline code</code> and <a href="#type" style="color: {{c.link}}">a link</a></span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 400, 15 on 24</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
+          <span style="flex: 1 1 360px; font-size: 13px; line-height: 20px">Panels, toolbar, status bar</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 400 and 600, 13 on 20</span>
+        </div>
+        <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
+          <span style="flex: 1 1 360px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">Tables, code, paths: mul expected 5, got 4</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Mono 400 and 600, 13 on 20</span>
+        </div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Test table</h2>
+      <div style="max-width: 800px; border: 1px solid {{c.hair}}; border-radius: 6px; overflow: hidden; background: {{c.panel}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">
+        <div style="display: flex; align-items: center; background: {{c.bar}}; color: {{c.barText}}; font-weight: 600">
+          <span style="flex: 0 0 36px"></span>
+          <span style="flex: 0 0 220px; padding: 7px 12px">state</span>
+          <span style="flex: 1 1 auto; padding: 7px 12px">how it looks</span>
+        </div>
+        <sc-for list="{{states}}" as="s" hint-placeholder-count="7">
+          <div style="display: flex; align-items: center; min-height: 34px; border-top: 1px solid {{s.c.hair}}; background: {{s.bg}}; color: {{s.fg}}">
+            <span style="flex: 0 0 36px; color: {{s.markColor}}; font-size: 14px; font-weight: 600; text-align: center">{{s.mark}}</span>
+            <span style="flex: 0 0 220px; padding: 7px 12px">{{s.name}}</span>
+            <span style="flex: 1 1 auto; padding: 7px 12px">{{s.how}}</span>
+            <sc-if value="{{s.hasRun}}" hint-placeholder-val="{{ false }}">
+              <button style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-right: 6px; padding: 3px 8px; border: 0; border-radius: 4px; background: {{s.runBg}}; color: {{s.runFg}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 12px; font-weight: 600">
+                <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
+                <span>Run row</span>
+              </button>
+            </sc-if>
+          </div>
+          <sc-if value="{{s.hasNote}}" hint-placeholder-val="{{ false }}">
+            <div style="padding: 0 12px 8px 48px; background: {{s.bg}}; color: {{s.noteFg}}; font-size: 12.5px">{{s.note}}</div>
+          </sc-if>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Graph nodes</h2>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px 36px">
+        <sc-for list="{{nodes}}" as="n" hint-placeholder-count="7">
+          <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 20px">
+            <span style="flex: 0 0 auto; width: {{n.size}}px; height: {{n.size}}px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid {{n.stroke}}; border-radius: 50%; background: {{n.fill}}; box-shadow: 0 0 0 3px {{n.halo}}; color: {{n.c.page}}; opacity: {{n.opacity}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; line-height: 1">{{n.mark}}</span>
+            <span>{{n.name}}</span>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Controls and text</h2>
+      <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 12px">
+        <button style="height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 6px; background: {{c.bar}}; color: {{c.barText}}; font: inherit; font-size: 13px; font-weight: 600">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
+          <span>Run file</span>
+        </button>
+        <button disabled="{{ true }}" style="height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 10px; border: 0; border-radius: 6px; background: {{c.raised}}; color: {{c.quote}}; font: inherit; font-size: 13px; font-weight: 600">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
+          <span>Running</span>
+        </button>
+        <button style="height: 28px; padding: 0 10px; border: 1px solid {{c.hair}}; border-radius: 6px; background: transparent; color: {{c.text}}; font: inherit; font-size: 13px">Close</button>
+        <div style="display: flex; padding: 2px; border: 1px solid {{c.hair}}; border-radius: 7px">
+          <button style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: {{c.sel}}; color: {{c.text}}; font: inherit; font-size: 13px">Page</button>
+          <button style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: {{c.quote}}; font: inherit; font-size: 13px">Graph</button>
+        </div>
+        <span style="min-width: 20px; padding: 0 5px; border: 1px solid {{c.hair}}; border-radius: 4px; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; text-align: center">/</span>
+      </div>
+      <div style="max-width: 800px; display: flex; flex-direction: column; gap: 12px; font-size: 15px; line-height: 24px">
+        <div>Selected text: <span style="background: {{c.sel}}">Run the installer</span>.</div>
+        <div style="display: flex; align-items: center; gap: 16px; min-height: 26px; padding: 0 12px; border: 1px solid {{c.hair}}; background: {{c.panel}}; color: {{c.quote}}; font-size: 13px; line-height: 18px">
+          <span style="flex: 1 1 auto">Copied 17 characters</span>
+          <span style="color: {{c.failed}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 600">file: failed</span>
+        </div>
+      </div>
+    </section>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">The window in egui</h2>
+      <div style="overflow-x: auto; border: 1px solid {{c.hair}}; border-radius: 6px">
+        <div style="min-width: 860px">
+          <div style="display: grid; grid-template-columns: 170px 300px minmax(0, 1fr); background: {{c.raised}}; color: {{c.quote}}; font-size: 12px; font-weight: 600; line-height: 18px">
+            <span style="padding: 7px 12px">Part</span>
+            <span style="padding: 7px 12px">Size</span>
+            <span style="padding: 7px 12px">Built with</span>
+          </div>
+          <sc-for list="{{parts}}" as="p" hint-placeholder-count="8">
+            <div style="display: grid; grid-template-columns: 170px 300px minmax(0, 1fr); border-top: 1px solid {{p.c.hair}}; font-size: 13.5px; line-height: 20px">
+              <span style="padding: 8px 12px; font-weight: 600">{{p.part}}</span>
+              <span style="padding: 8px 12px; color: {{p.c.quote}}">{{p.size}}</span>
+              <span style="padding: 8px 12px">{{p.how}}</span>
+            </div>
+          </sc-for>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"$preview":{"width":1440,"height":3170}}'>
+const SHEETS = {
+  dark: {
+    page: '#14161A', panel: '#1A1D22', raised: '#22262C', hair: '#2D3239', chip: '#262A31', edge: '#3D444E', text: '#E4E6EA', heading: '#F4F5F7', code: '#D9B3FF', link: '#8AB4FF',
+    quote: '#A3ABB8', line: '#7F8896', passed: '#5FD38A', snoozed: '#EFC95E', failed: '#FF8A80', note: '#C79792', bar: '#8AB4FF', barText: '#10141A',
+    tintPassed: 'rgba(95, 211, 138, 0.08)', tintFailed: 'rgba(255, 138, 128, 0.14)', tintSnoozed: 'rgba(239, 201, 94, 0.11)',
+    sel: 'rgba(138, 180, 255, 0.16)', hover: 'rgba(255, 255, 255, 0.05)', scrim: 'rgba(8, 9, 12, 0.60)'
+  },
+  light: {
+    page: '#FFFFFF', panel: '#F6F7F9', raised: '#FFFFFF', hair: '#DFE3E8', chip: '#EEF0F3', edge: '#C6CCD4', text: '#1E2227', heading: '#11141A', code: '#7A3EC8', link: '#0B57D0',
+    quote: '#59626D', line: '#7A838E', passed: '#116329', snoozed: '#7D4E00', failed: '#B3261E', note: '#8C5A55', bar: '#0B57D0', barText: '#FFFFFF',
+    tintPassed: 'rgba(17, 99, 41, 0.07)', tintFailed: 'rgba(179, 38, 30, 0.09)', tintSnoozed: 'rgba(125, 78, 0, 0.09)',
+    sel: 'rgba(11, 87, 208, 0.10)', hover: 'rgba(0, 0, 0, 0.04)', scrim: 'rgba(30, 34, 39, 0.35)'
+  }
+};
+
+const TOKEN_ROWS = [
+  ['Surfaces'],
+  ['page', 'page', 'The page, and extreme_bg_color for inputs'],
+  ['panel', 'panel', 'Side and top panels, status bar, table bodies, panel_fill'],
+  ['raised', 'raised', 'Table headers, pop-ups, window_fill'],
+  ['chip', 'chip', 'Background of inline code'],
+  ['hairline', 'hair', 'Borders between things, noninteractive stroke'],
+  ['Text'],
+  ['text', 'text', 'Page text, override_text_color'],
+  ['heading', 'heading', 'Headings, a step brighter than text'],
+  ['secondary', 'quote', 'Quotes, labels, status bar text, snoozed notes'],
+  ['code', 'code', 'Inline code'],
+  ['link', 'link', 'Links, hyperlink_color'],
+  ['Accent'],
+  ['accent', 'bar', 'Focused header and row, Run buttons, lit graph lines, selected file'],
+  ['on_accent', 'barText', 'Text on accent'],
+  ['selection', 'sel', 'Selected text, open file, active toggle, running row, alert fill'],
+  ['hover', 'hover', 'A row or list item under the pointer'],
+  ['Results'],
+  ['passed', 'passed', 'Passed marks and graph nodes'],
+  ['snoozed', 'snoozed', 'Snoozed marks and graph nodes'],
+  ['failed', 'failed', 'Failed and error marks and graph nodes'],
+  ['note', 'note', 'The note under a row'],
+  ['tint_passed', 'tintPassed', 'Row background'],
+  ['tint_failed', 'tintFailed', 'Row background, failed and error'],
+  ['tint_snoozed', 'tintSnoozed', 'Row background'],
+  ['Graph and overlays'],
+  ['line', 'line', 'Node borders, plain page nodes'],
+  ['edge', 'edge', 'Graph lines that are not lit'],
+  ['scrim', 'scrim', 'Behind search and help']
+];
+
+const PART_ROWS = [
+  ['Top bar', '48 high, controls 32', 'A top panel with a horizontal layout'],
+  ['File tree', '248 wide, resizable, rows 30', 'A left side panel. Custom rows, FileTree underneath'],
+  ['Tests panel', '296 wide, resizable, test pages only', 'A right side panel, fed by Session::outcome'],
+  ['Page', 'Reading column up to 800, centred', 'The central panel with a vertical ScrollArea'],
+  ['Inline text', '', 'One LayoutJob per paragraph, so links, code and emphasis share a line. Link hit testing uses the Galley'],
+  ['Test table', 'Gutter 36, rows from 34, columns 88 to 170', 'Frame with a horizontal ScrollArea for the cells. The gutter is painted outside it, so marks stay in view'],
+  ['Run row', 'Pill at the row end, pinned', 'Shown when response.hovered() or the row is focused. Painted outside the ScrollArea, like the gutter'],
+  ['Graph', 'Nodes 16 to 44 across, by link count', 'egui::Scene for pan and zoom, with a force layout stepped each frame until it settles. Painter circles and lines, interact rects for dragging'],
+  ['Graph details', '296 wide', 'The right side panel, in place of the Tests panel, while the graph shows'],
+  ['Search', '640 wide, 88 from the top', 'egui::Modal or an Area at Order::Foreground, with a TextEdit'],
+  ['Help', '960 wide', 'egui::Modal with a Grid per topic'],
+  ['Status bar', '26 high', 'A bottom panel, with the file result in its colour'],
+  ['Icons', '16, stroke 1.5', 'Drawn with Painter, so no icon font is needed'],
+  ['Marks', '14 semibold', 'Text, the same characters as the terminal. Check that the embedded font has ✓ ✗ ⋯ or fall back to one that does'],
+  ['Shapes', 'Radius 6, pop-ups 8', 'CornerRadius and Stroke on Frame. One soft Shadow, on pop-ups only']
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const tone = this.props.tone ?? 'dark';
+    const c = SHEETS[tone] || SHEETS.dark;
+    const state = (mark, name, how, markColor, bg, note, noteFg) => ({
+      c, mark, name, how, markColor, bg, fg: c.text, note, noteFg, hasNote: Boolean(note)
+    });
+    return {
+      c,
+      tokens: TOKEN_ROWS.map(([name, key, use]) => ({
+        c, name, use,
+        isGroup: !key, isToken: Boolean(key),
+        dark: key ? SHEETS.dark[key] : '', light: key ? SHEETS.light[key] : '',
+        darkLabel: key ? SHEETS.dark[key].replace('rgba', '').replace(/ /g, '') : '',
+        lightLabel: key ? SHEETS.light[key].replace('rgba', '').replace(/ /g, '') : ''
+      })),
+      states: [
+        state('', 'no result', 'no mark, no tint', c.quote, 'transparent'),
+        state('✓', 'passed', 'green mark, faint green tint', c.passed, c.tintPassed),
+        state('✗', 'failed', 'red mark, red tint, note', c.failed, c.tintFailed, 'mul expected 5, got 4', c.note),
+        state('!', 'error', 'red mark, red tint, note', c.failed, c.tintFailed, 'div expected 0, got exception division by zero', c.note),
+        state('~', 'snoozed', 'yellow mark, yellow tint, quiet note', c.snoozed, c.tintSnoozed, 'mul expected 5, got 4 (snoozed until 2099-12-31)', c.quote),
+        state('-', 'skipped', 'plain mark, no tint', c.quote, 'transparent'),
+        state('⋯', 'running', 'plain mark, selection tint', c.quote, c.sel),
+        { ...state('', 'hovered', 'hover tint, Run row appears', c.quote, c.hover), hasRun: true, runBg: c.bar, runFg: c.barText },
+        { c, mark: '✗', name: 'focused', how: 'accent fill, over any result', markColor: c.barText, bg: c.bar, fg: c.barText, hasNote: false, hasRun: true, runBg: 'transparent', runFg: c.barText }
+      ],
+      nodes: [
+        { c, name: 'A page', size: 16, fill: c.line, stroke: c.line, halo: 'transparent', mark: '', opacity: 1 },
+        { c, name: 'A test file', size: 20, fill: c.raised, stroke: c.line, halo: 'transparent', mark: '', opacity: 1 },
+        { c, name: 'Passed', size: 24, fill: c.passed, stroke: c.passed, halo: 'transparent', mark: '✓', opacity: 1 },
+        { c, name: 'Failed', size: 24, fill: c.failed, stroke: c.failed, halo: 'transparent', mark: '✗', opacity: 1 },
+        { c, name: 'Selected', size: 24, fill: c.raised, stroke: c.line, halo: c.bar, mark: '', opacity: 1 },
+        { c, name: 'More links', size: 40, fill: c.line, stroke: c.line, halo: 'transparent', mark: '', opacity: 1 },
+        { c, name: 'Not linked to the focus', size: 20, fill: c.raised, stroke: c.line, halo: 'transparent', mark: '', opacity: 0.4 }
+      ],
+      parts: PART_ROWS.map(([part, size, how]) => ({ c, part, size, how }))
+    };
+  }
+}
+</script>
+</body>
+</html>

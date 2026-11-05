@@ -26,8 +26,10 @@ A link with a heading anchor opens the page at that heading.
 | Another page        | docs      | `follow guide/getting-started.md#install` | guide/getting-started.md | install |
 | No anchor           | docs      | `follow reference.md`               | reference.md             | none    |
 
-Links that cannot be opened leave you on the same page and explain why. temoc-ui
-does not launch a web browser.
+Links that cannot be opened as a page leave you on the same page and say why. For a
+website, what happens next is up to the interface: the
+[terminal](../tui/navigation.md#following-links) only shows its address, and the
+[GUI](../gui/navigation.md#following-links) opens it in the web browser.
 
 [//]: # "decisionTable Core"
 

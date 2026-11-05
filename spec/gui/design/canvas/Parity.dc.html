@@ -1,0 +1,227 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>TUI to GUI work list</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="min-height: 100vh; box-sizing: border-box; padding: 48px 40px 72px; background: {{c.page}}; color: {{c.text}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 21px">
+  <div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px">
+
+    <div style="display: flex; flex-direction: column; gap: 8px; max-width: 760px">
+      <h1 style="margin: 0; color: {{c.heading}}; font-size: 34px; line-height: 42px; font-weight: 600">What the GUI has to do</h1>
+      <p style="margin: 0; font-size: 16px; line-height: 25px">Every behaviour in <code style="color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px">spec/tui/</code> and the code behind it, with what happens to it in egui. Core behaviour in the rest of <code style="color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px">spec/</code> carries over unchanged.</p>
+    </div>
+
+    <div style="display: flex; flex-wrap: wrap; gap: 8px 20px">
+      <sc-for list="{{legend}}" as="l" hint-placeholder-count="6">
+        <div style="display: flex; align-items: baseline; gap: 8px">
+          <span style="padding: 0 7px; border: 1px solid {{l.color}}; border-radius: 4px; color: {{l.color}}; font-size: 12px; font-weight: 600; line-height: 20px">{{l.name}}</span>
+          <span style="color: {{l.c.quote}}; font-size: 13px">{{l.count}} {{l.meaning}}</span>
+        </div>
+      </sc-for>
+    </div>
+
+    <section style="display: flex; flex-direction: column; gap: 12px">
+      <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">The code today</h2>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap: 16px">
+        <sc-for list="{{lanes}}" as="lane" hint-placeholder-count="3">
+          <div style="display: flex; flex-direction: column; gap: 8px; padding: 16px 18px; border: 1px solid {{lane.c.hair}}; border-radius: 6px; background: {{lane.c.panel}}">
+            <h3 style="margin: 0; font-size: 15px; line-height: 22px; font-weight: 600">{{lane.title}}</h3>
+            <sc-for list="{{lane.items}}" as="m" hint-placeholder-count="5">
+              <div style="display: flex; flex-wrap: wrap; gap: 0 10px; font-size: 13px; line-height: 20px">
+                <code style="color: {{m.c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{m.file}}</code>
+                <span style="color: {{m.c.quote}}">{{m.why}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+    </section>
+
+    <sc-for list="{{groups}}" as="g" hint-placeholder-count="4">
+      <section style="display: flex; flex-direction: column; gap: 10px">
+        <h2 style="margin: 0; color: {{g.c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">{{g.title}}</h2>
+        <div style="overflow-x: auto; border: 1px solid {{g.c.hair}}; border-radius: 6px">
+          <div style="min-width: 1080px">
+            <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) minmax(0, 1fr) 150px 190px; background: {{g.c.raised}}; color: {{g.c.quote}}; font-size: 12px; font-weight: 600; line-height: 18px">
+              <span style="padding: 7px 12px">Feature</span>
+              <span style="padding: 7px 12px">In the terminal</span>
+              <span style="padding: 7px 12px">In the GUI</span>
+              <span style="padding: 7px 12px">Work</span>
+              <span style="padding: 7px 12px">Code</span>
+            </div>
+            <sc-for list="{{g.rows}}" as="r" hint-placeholder-count="3">
+              <div style="display: grid; grid-template-columns: 200px minmax(0, 1fr) minmax(0, 1fr) 150px 190px; border-top: 1px solid {{r.c.hair}}; font-size: 13.5px; line-height: 20px">
+                <span style="padding: 9px 12px; font-weight: 600">{{r.feature}}</span>
+                <span style="padding: 9px 12px; color: {{r.c.quote}}">{{r.today}}</span>
+                <span style="padding: 9px 12px">{{r.gui}}</span>
+                <div style="padding: 9px 12px; display: flex; flex-wrap: wrap; align-content: flex-start; gap: 4px">
+                  <span style="padding: 0 6px; border: 1px solid {{r.color}}; border-radius: 4px; color: {{r.color}}; font-size: 12px; font-weight: 600; line-height: 18px">{{r.work}}</span>
+                  <sc-if value="{{r.decide}}" hint-placeholder-val="{{ false }}">
+                    <span style="padding: 0 6px; border: 1px solid {{r.c.bar}}; border-radius: 4px; background: {{r.c.bar}}; color: {{r.c.barText}}; font-size: 12px; font-weight: 600; line-height: 18px">Spec edit</span>
+                  </sc-if>
+                </div>
+                <code style="padding: 9px 12px; color: {{r.c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 20px; overflow-wrap: anywhere">{{r.code}}</code>
+              </div>
+            </sc-for>
+          </div>
+        </div>
+      </section>
+    </sc-for>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"$preview":{"width":1440,"height":5000}}'>
+const PALETTES = {
+  dark: { page: '#14161A', panel: '#1A1D22', raised: '#22262C', hair: '#2D3239', text: '#E4E6EA', heading: '#F4F5F7', code: '#D9B3FF', link: '#8AB4FF', quote: '#A3ABB8', line: '#7F8896', teal: '#6FD3C7', bar: '#8AB4FF', barText: '#10141A' },
+  light: { page: '#FFFFFF', panel: '#F6F7F9', raised: '#EDEFF2', hair: '#DFE3E8', text: '#1E2227', heading: '#11141A', code: '#7A3EC8', link: '#0B57D0', quote: '#59626D', line: '#7A838E', teal: '#0A6C74', bar: '#0B57D0', barText: '#FFFFFF' }
+};
+
+const KINDS = [
+  ['Reuse', 'link', 'work unchanged'],
+  ['Split', 'teal', 'need pulling away from ratatui first'],
+  ['Rebuild', 'text', 'behave the same, drawn in egui'],
+  ['Rethink', 'code', 'get a native equivalent'],
+  ['New', 'bar', 'exist only in the GUI'],
+  ['Drop', 'quote', 'are not needed']
+];
+
+const LANES = [
+  { title: 'Works as it is', items: [
+    ['session.rs', 'workspace, runs, results'], ['run.rs', 'background temoc'], ['temoc.rs', 'output and detection'],
+    ['document.rs', 'markdown AST, headings'], ['workspace.rs', 'files, link targets'],
+    ['links.rs', 'files, links, distance from the start'],
+    ['search.rs', 'fuzzy search'], ['tree.rs', 'folder model'], ['history.rs', 'generic back and forward']
+  ] },
+  { title: 'Mixes logic with ratatui', items: [
+    ['page.rs', 'focus and scroll rules beside cell layout'],
+    ['app.rs', 'argument parsing beside event handling']
+  ] },
+  { title: 'Terminal only', items: [
+    ['render.rs', 'markdown to styled cells, 2,023 lines'], ['graph.rs', 'column selection and drawing'],
+    ['graph/drawing.rs', 'lines on a character grid, 615 lines'], ['theme.rs', 'the terminal themes'], ['help.rs', 'the terminal key list'],
+    ['terminal.rs', 'OSC 11 background query'], ['clipboard.rs', 'OSC 52'], ['main.rs', 'the draw and poll loop']
+  ] }
+];
+
+const GROUPS = [
+  { title: 'Starting up', rows: [
+    ['Command line', 'temoc-ui [PATH] [--config FILE] [--theme NAME]. Bad arguments print a message and exit.', 'temoc-ui --gui [PATH] [--config FILE], in builds with the gui feature. --theme does not apply. Messages print before any window opens.', 'Split', 'app.rs Arguments, main.rs'],
+    ['Workspace and first page', 'The path decides the workspace. README.md opens, or the file given.', 'Unchanged.', 'Reuse', 'session.rs, workspace.rs'],
+    ['Folder without a README', 'Nothing opens, so search opens.', 'Search opens over an empty window.', 'Rebuild', 'app.rs'],
+    ['Closing', 'Dropping the run stops temoc and its Slim server, waiting up to 3 seconds.', 'Same, on window close. The window should go away first so the wait does not look like a hang.', 'Rebuild', 'run.rs Drop']
+  ] },
+  { title: 'Reading', rows: [
+    ['Rendering markdown', 'GFM turned into rows of styled cells: headings, emphasis, code, lists, quotes, tables, footnotes.', 'A new renderer over the same Document AST. LayoutJob for inline runs, one widget per block. Every element is on the Markdown elements board.', 'Rebuild', 'render.rs'],
+    ['Richer elements', 'Images show their alt text, [!NOTE] shows as a quote, and task items as [x].', 'Real images, alert boxes, checkboxes, and a Copy button on code blocks.', 'New', 'new'],
+    ['Hidden directives', 'temoc directives and imports draw nothing.', 'The same rule in the new renderer.', 'Rebuild', 'render.rs is_comment'],
+    ['Wrapping', 'Its own wrapper breaks long words across rows.', 'egui wraps text itself.', 'Drop', 'render.rs Wrapper'],
+    ['Scrolling', 'j, k, Space, PageUp, PageDown, g, G, wheel.', 'A ScrollArea for the page, with the same keys moving it.', 'Rebuild', 'page.rs'],
+    ['Wide tables and code', 'Left and Right move every wide block together, 8 columns at a time, with ‹ and › markers.', 'Each wide block has its own horizontal ScrollArea and scrollbar, and only that block moves. Left and Right act on the block under the pointer, or the focused table.', 'Rethink', 'page.rs, render.rs'],
+    ['Heading anchors', 'Links and search results scroll to a heading.', 'Record each heading rect while drawing, then scroll_to_rect.', 'Rebuild', 'page.rs go_to_anchor'],
+    ['Restoring a page', 'Back restores scroll, sideways position and the focused link.', 'History is generic, so it holds the new page state.', 'Rebuild', 'history.rs, page.rs']
+  ] },
+  { title: 'Links and history', rows: [
+    ['Following links', 'Relative paths, anchors, links out of the workspace.', 'Unchanged.', 'Reuse', 'session.rs follow, workspace.rs'],
+    ['Focused link', 'Tab and Shift-Tab wrap around, Enter follows, the view follows the focus.', 'Same keys. egui has its own Tab focus, which must stay out of the page.', 'Rebuild', 'page.rs'],
+    ['Missing and external links', 'Both stay on the page and explain in the status bar. A browser is never launched.', 'Missing files still stay and explain. External links open in the browser with ctx.open_url.', 'Rethink', 'workspace.rs, spec/viewer/links.md'],
+    ['Back and forward', 'h, Backspace and l.', 'Same keys, plus toolbar buttons.', 'Rebuild', 'app.rs']
+  ] },
+  { title: 'Search', rows: [
+    ['Search model', 'Fuzzy match on paths and headings, files first, a test-file filter.', 'Unchanged.', 'Reuse', 'search.rs'],
+    ['Search box', '/ opens a pop-up. Up, Down, Enter, Esc. Ctrl-t is remembered until closing.', 'An overlay with a TextEdit, same keys, a toggle for the filter. The toolbar field opens it too.', 'Rebuild', 'app.rs draw_search']
+  ] },
+  { title: 'File tree', rows: [
+    ['Tree model', 'Folders first, reveals the open page, folders open and close.', 'Unchanged, apart from first_shown, which is only viewport arithmetic.', 'Reuse', 'tree.rs'],
+    ['Where it lives', 't opens a pop-up that closes when a file opens.', 'A docked, resizable side panel. t shows or hides it, and it stays open after opening a file.', 'Rethink', 'app.rs draw_tree'],
+    ['Results in the tree', 'Not shown.', 'An icon for test files, and the file result mark beside each file that has run.', 'New', 'new']
+  ] },
+  { title: 'Graph', rows: [
+    ['Graph data', 'Files, links in and out, broken links, distance from the start page.', 'Unchanged. LinkGraph already has all of it, and the columns are simply not used.', 'Reuse', 'links.rs'],
+    ['Layout', 'Fixed columns by distance, unreachable files last.', 'A force-directed layout: linked files pull together, all files push apart, and unreachable files float free. About 100 lines of our own, stepped each frame until it settles.', 'Rethink', 'new, replaces graph/drawing.rs'],
+    ['Drawing', 'Lines routed on a character grid, arrowheads, one line for links both ways, lit lines for the selection.', 'Circles sized by link count, straight lines, labels. Test files are rings and files with a result take its colour and mark. Arrowheads show only on lines touching the selected or hovered file, and everything else fades.', 'Rethink', 'graph/drawing.rs'],
+    ['Moving around', 'h, j, k, l, g, G within columns. The view follows. Click selects, a second click opens.', 'Drag a file to move it, drag the background to pan, wheel to zoom, Fit to reset, from egui::Scene. Arrow keys and h, j, k, l go to the nearest file that way, and g to the start page. Click selects, a second click opens.', 'Rethink', 'graph.rs'],
+    ['Links panel', 'A panel below lists links out and in, ending with "and N more".', 'A side panel, so the graph keeps its height. The lists scroll, so "and N more" goes. Each link selects its file, and the distance is shown as text.', 'Rethink', 'graph.rs draw_panel']
+  ] },
+  { title: 'Running tests', rows: [
+    ['Starting a run', 'R, r and Ctrl-r call the session.', 'The same session calls, from keys and buttons.', 'Reuse', 'session.rs'],
+    ['Live updates', 'A 100 ms poll picks up events and redraws.', 'Call Session::update each frame, and request_repaint_after while a run is going.', 'Rebuild', 'main.rs, app.rs update'],
+    ['Focused table and row', '] [ } { move focus, kept in Page. Headers and rows are reversed.', 'The same rules in the new page state, drawn in the bar colour. A click focuses.', 'Split', 'page.rs'],
+    ['Run buttons', 'Keys only.', 'Run file in the toolbar and Run table on each table header.', 'New', 'new'],
+    ['Run row on hover', 'Focus a row with } and {, then Ctrl-r.', 'Hovering a row shows a Run row button at its right end, so one click runs it without focusing first. The focused row shows it too. It is disabled during a run.', 'New', 'new'],
+    ['Row marks and colour', 'A mark two columns after the row, and the row coloured. A wide table can hide the mark.', 'The mark sits in a pinned left gutter that never scrolls away, and the row gets a tint.', 'Rethink', 'render.rs add_mark'],
+    ['Notes', 'A line below the row, first line of the message only. Quiet red, or the quote colour when snoozed.', 'Same content and colours, inside the row tint.', 'Rebuild', 'render.rs note_rows'],
+    ['Table results', 'A line below the table, then failures outside any row.', 'A footer inside the table.', 'Rebuild', 'render.rs result_rows'],
+    ['File result and status', 'Right of the status bar. Running hanging.md... and refusals on the left.', 'The same bar. Run buttons disable during a run, and keys still get temoc is already running.', 'Rebuild', 'app.rs draw_status'],
+    ['Tests panel', 'Not shown.', 'A side panel on test pages: file result, tables, what did not pass, last command. All of it comes from Outcome and temoc_arguments.', 'New', 'new'],
+    ['temoc could not finish', 'The message goes to the status bar.', 'The status bar and a banner above the page, because the status line is easy to miss in a large window.', 'Rethink', 'session.rs update'],
+    ['No configuration', 'Status bar message when you try to run.', 'The same message, plus a banner on test pages before you try.', 'Rethink', 'session.rs configuration']
+  ] },
+  { title: 'Selecting text', rows: [
+    ['Drag to select', 'Hand-written selection. Releasing copies and says Copied 17 characters.', 'egui label selection across blocks. Ctrl-c copies, and the status bar says so.', 'Rethink', 'page.rs, render.rs'],
+    ['Selecting with keys', 'v puts a cursor on the page, with vim motions, v and y.', 'Left out. There is no selection mode in the GUI.', 'Drop', 'page.rs, render.rs Motion'],
+    ['Clipboard', 'OSC 52, so it works over SSH.', 'ctx.copy_text.', 'Drop', 'clipboard.rs']
+  ] },
+  { title: 'Keys, mouse and help', rows: [
+    ['Key routing', 'Crossterm events by hand. Letters are typed in search, not acted on.', 'egui input, checking wants_keyboard_input first.', 'Rebuild', 'app.rs handle_event'],
+    ['Ctrl keys', 'Ctrl-c quits. Ctrl-r, Ctrl-g and Ctrl-t act.', 'Ctrl-c copies and Ctrl-q quits. Modifiers::command gives Cmd on macOS.', 'Rethink', 'spec/tui/keys.md'],
+    ['Mouse handling', 'Hit testing by hand for wheel, clicks and drags.', 'Comes with the widgets.', 'Drop', 'app.rs, page.rs click'],
+    ['Help', '? shows a scrolling list, tested against the spec.', 'A modal grouped by topic, with its own key list, tested against spec/gui/ the same way.', 'Rebuild', 'help.rs']
+  ] },
+  { title: 'Themes', rows: [
+    ['Dark and light', 'Four terminal themes held as ratatui Color.', 'A separate GUI palette with a dark and a light mode, set through egui Visuals. theme.rs stays with the terminal.', 'New', 'new'],
+    ['256-colour themes', 'dark-256 and light-256.', 'Not needed.', 'Drop', 'theme.rs'],
+    ['--theme', 'Picks any of the four themes.', 'Does not apply with --gui.', 'Drop', 'app.rs Arguments'],
+    ['Matching the system', 'COLORTERM and an OSC 11 query.', 'Follows the system setting through ctx.system_theme().', 'Rethink', 'terminal.rs'],
+    ['Swapping', 'T, until closing.', 'T and a toolbar button.', 'Rebuild', 'app.rs'],
+    ['Contrast rules', 'Tests hold text to 4.5 and lines to 3.', 'The same limits as tests on the GUI palette, including text over tints.', 'Rebuild', 'theme.rs tests']
+  ] },
+  { title: 'The project', rows: [
+    ['Build', 'ratatui and crossterm, always built.', 'A gui feature adds eframe 0.37, egui_extras for images and the embedded fonts. Without it, --gui says the feature is not built.', 'New', 'Cargo.toml'],
+    ['Specification', 'spec/tui/ and a Tui fixture driving a headless terminal.', 'spec/gui/ is written and snoozed. Still to build: a Gui fixture, with egui_kittest driving the UI headless.', 'New', 'spec/gui/, fixtures/'],
+    ['Core pages', 'spec/viewer/graph.md put columns in core, and spec/viewer/links.md said no browser is launched.', 'Done. Columns moved to spec/tui/graph.md, and the browser rule is now up to each interface. Distance stays in core.', 'Rethink', 'spec/viewer/'],
+    ['Web interface', 'Was listed as planned in the README and spec/README.md.', 'Done. Both pages now point at the GUI instead.', 'Drop', 'README.md, spec/README.md'],
+    ['CI', 'fmt, clippy, tests and temoc on every push.', 'Same checks with the GUI feature on, plus the Linux system libraries eframe needs.', 'New', '.github/workflows']
+  ] }
+];
+
+class Component extends DCLogic {
+  renderVals() {
+    const tone = this.props.tone ?? 'dark';
+    const c = PALETTES[tone] || PALETTES.dark;
+    const colour = {};
+    KINDS.forEach(([name, token]) => {
+      colour[name] = c[token];
+    });
+    const all = GROUPS.flatMap((group) => group.rows);
+    return {
+      c,
+      legend: KINDS.map(([name, token, meaning]) => ({
+        c, name, meaning, color: c[token],
+        count: all.filter((row) => row[3] === name).length
+      })),
+      lanes: LANES.map((lane) => ({
+        c, title: lane.title,
+        items: lane.items.map(([file, why]) => ({ c, file, why }))
+      })),
+      groups: GROUPS.map((group) => ({
+        c, title: group.title,
+        rows: group.rows.map(([feature, today, gui, work, code, decide]) => ({
+          c, feature, today, gui, work, code, decide: Boolean(decide), color: colour[work]
+        }))
+      }))
+    };
+  }
+}
+</script>
+</body>
+</html>

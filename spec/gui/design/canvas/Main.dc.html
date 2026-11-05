@@ -1,0 +1,1395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>temoc-ui window</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<style>
+body{margin:0}
+</style>
+</helmet>
+<div style="position: relative; height: 100vh; min-height: 640px; display: flex; flex-direction: column; overflow: hidden; background: {{c.page}}; color: {{c.text}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; line-height: 24px">
+
+<header style="flex: 0 0 auto; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; background: {{c.panel}}; border-bottom: 1px solid {{c.hair}}">
+  <div style="display: flex; align-items: center; gap: 2px">
+    <button aria-label="Show or hide the file tree" onClick="{{toggleTree}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: {{treeBtnBg}}; color: {{c.quote}}; cursor: pointer">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5"></rect><path d="M6 3v10"></path></svg>
+    </button>
+    <button aria-label="Go back" onClick="{{goBack}}" disabled="{{noBack}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{backFg}}; cursor: pointer">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="M10 3 5 8l5 5"></path></svg>
+    </button>
+    <button aria-label="Go forward" onClick="{{goForward}}" disabled="{{noForward}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{forwardFg}}; cursor: pointer">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><path d="m6 3 5 5-5 5"></path></svg>
+    </button>
+  </div>
+  <div style="display: flex; align-items: center; gap: 6px; padding: 0 6px; font-size: 13px; line-height: 20px; white-space: nowrap">
+    <span style="color: {{c.quote}}">{{wsName}}</span>
+    <span style="color: {{c.line}}">/</span>
+    <span style="font-weight: 500">{{file}}</span>
+  </div>
+  <button onClick="{{openSearch}}" style="flex: 1 1 220px; max-width: 420px; height: 32px; margin: 0 auto; display: flex; align-items: center; gap: 8px; padding: 0 8px 0 10px; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.page}}; color: {{c.quote}}; font: inherit; font-size: 13px; text-align: left; cursor: pointer">
+    <svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg>
+    <span style="flex: 1 1 auto">Search files and headings</span>
+    <span style="min-width: 20px; padding: 0 5px; border: 1px solid {{c.hair}}; border-radius: 4px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; text-align: center">/</span>
+  </button>
+  <div style="display: flex; align-items: center; gap: 8px">
+    <div style="display: flex; padding: 2px; border: 1px solid {{c.hair}}; border-radius: 7px">
+      <button onClick="{{showDoc}}" style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: {{docTabBg}}; color: {{docTabFg}}; font: inherit; font-size: 13px; cursor: pointer">Page</button>
+      <button onClick="{{showGraph}}" style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: {{graphTabBg}}; color: {{graphTabFg}}; font: inherit; font-size: 13px; cursor: pointer">Graph</button>
+    </div>
+    <button aria-label="Swap between dark and light" onClick="{{swapTone}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{c.quote}}; cursor: pointer">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><circle cx="8" cy="8" r="5.5"></circle><path d="M8 2.5v11a5.5 5.5 0 0 0 0-11Z" fill="currentColor" stroke="none"></path></svg>
+    </button>
+    <button aria-label="Show help" onClick="{{openHelp}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: transparent; color: {{c.quote}}; font: inherit; font-size: 15px; font-weight: 600; cursor: pointer">?</button>
+    <sc-if value="{{isTestPage}}" hint-placeholder-val="{{ true }}">
+      <button aria-label="Show or hide the tests panel" onClick="{{toggleTests}}" style="width: 32px; height: 32px; display: flex; align-items: center; justify-content: center; padding: 0; border: 0; border-radius: 6px; background: {{testsBtnBg}}; color: {{c.quote}}; cursor: pointer">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="1.75" y="2.75" width="12.5" height="10.5" rx="1.5"></rect><path d="M10 3v10"></path></svg>
+      </button>
+      <button onClick="{{runFile}}" disabled="{{isBusy}}" style="height: 32px; display: flex; align-items: center; gap: 6px; padding: 0 8px 0 10px; border: 0; border-radius: 6px; background: {{runBg}}; color: {{runFg}}; font: inherit; font-size: 13px; font-weight: 600; white-space: nowrap; cursor: pointer">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
+        <span>{{runLabel}}</span>
+        <span style="min-width: 18px; padding: 0 4px; border: 1px solid currentColor; border-radius: 4px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11px; font-weight: 500; line-height: 16px; text-align: center">R</span>
+      </button>
+    </sc-if>
+  </div>
+</header>
+
+<div style="flex: 1 1 auto; min-height: 0; display: flex; flex-wrap: wrap; overflow: auto">
+
+  <sc-if value="{{showTree}}" hint-placeholder-val="{{ true }}">
+    <nav aria-label="Files" style="flex: 0 1 248px; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 1px; padding: 12px 8px; overflow: auto; background: {{c.panel}}; border-right: 1px solid {{c.hair}}; font-size: 13px; line-height: 20px">
+      <div style="padding: 0 8px 8px; color: {{c.quote}}; font-size: 12px; font-weight: 600">Files</div>
+      <sc-for list="{{treeRows}}" as="row" hint-placeholder-count="6">
+        <button onClick="{{row.pick}}" style="min-height: 30px; display: flex; align-items: center; gap: 7px; padding: 0 8px 0 {{row.indent}}px; border: 0; border-radius: 5px; background: {{row.bg}}; color: {{row.c.text}}; font: inherit; text-align: left; cursor: pointer">
+          <sc-if value="{{row.isClosedFolder}}" hint-placeholder-val="{{ false }}">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="flex: 0 0 auto; color: {{row.c.quote}}"><path d="m4.5 2.5 3.5 3.5-3.5 3.5"></path></svg>
+          </sc-if>
+          <sc-if value="{{row.isOpenFolder}}" hint-placeholder-val="{{ false }}">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="flex: 0 0 auto; color: {{row.c.quote}}"><path d="m2.5 4.5 3.5 3.5 3.5-3.5"></path></svg>
+          </sc-if>
+          <sc-if value="{{row.isPlainFile}}" hint-placeholder-val="{{ true }}">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.25" aria-hidden="true" style="flex: 0 0 auto; color: {{row.c.line}}"><path d="M3 1.75h5.25L11 4.5v7.75H3Z"></path></svg>
+          </sc-if>
+          <sc-if value="{{row.isTestFile}}" hint-placeholder-val="{{ false }}">
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.25" aria-hidden="true" style="flex: 0 0 auto; color: {{row.c.line}}"><rect x="2" y="2.5" width="10" height="9" rx="1"></rect><path d="M2 5.75h10M5.5 5.75v5.75"></path></svg>
+          </sc-if>
+          <span style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: {{row.weight}}">{{row.label}}</span>
+          <span style="flex: 0 0 auto; color: {{row.markColor}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; font-weight: 600">{{row.mark}}</span>
+        </button>
+      </sc-for>
+    </nav>
+  </sc-if>
+
+  <sc-if value="{{isDocView}}" hint-placeholder-val="{{ true }}">
+    <main style="flex: 999 1 560px; min-width: 0; overflow: auto; background: {{c.page}}">
+      <div style="max-width: 800px; margin: 0 auto; box-sizing: border-box; padding: 36px 40px 72px; display: flex; flex-direction: column; gap: 14px">
+
+        <sc-if value="{{showNoConfig}}" hint-placeholder-val="{{ false }}">
+          <div style="display: flex; align-items: center; gap: 12px; padding: 10px 14px; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.raised}}; font-size: 13px; line-height: 20px">
+            <span style="flex: 1 1 auto">No temoc configuration found. Add <code style="color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace">temoc.toml</code> or use <code style="color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace">--config</code>. You can still read this page.</span>
+          </div>
+        </sc-if>
+
+        <sc-if value="{{hasFail}}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 10px 14px; border: 1px solid {{c.failed}}; border-radius: 6px; background: {{c.tintFailed}}; font-size: 13px; line-height: 20px">
+            <div style="color: {{c.failed}}; font-weight: 600">temoc could not finish</div>
+            <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{failMessage}}</div>
+          </div>
+        </sc-if>
+
+        <sc-for list="{{docBlocks}}" as="b" hint-placeholder-count="5">
+          <sc-if value="{{b.isH1}}" hint-placeholder-val="{{ false }}">
+            <h1 style="margin: 0 0 6px; color: {{b.c.heading}}; font-size: 30px; line-height: 38px; font-weight: 600">{{b.t}}</h1>
+          </sc-if>
+          <sc-if value="{{b.isH2}}" hint-placeholder-val="{{ false }}">
+            <h2 style="margin: 18px 0 0; color: {{b.c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">{{b.t}}</h2>
+          </sc-if>
+          <sc-if value="{{b.isH3}}" hint-placeholder-val="{{ false }}">
+            <h3 style="margin: 10px 0 0; color: {{b.c.heading}}; font-size: 17px; line-height: 24px; font-weight: 600">{{b.t}}</h3>
+          </sc-if>
+          <sc-if value="{{b.isAlert}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 2px; padding: 10px 14px; border-radius: 6px; background: {{b.c.sel}}">
+              <div style="color: {{b.c.link}}; font-size: 13px; line-height: 20px; font-weight: 600">{{b.title}}</div>
+              <div><sc-for list="{{b.spans}}" as="s" hint-placeholder-count="1"><sc-if value="{{s.isText}}" hint-placeholder-val="{{ true }}"><span>{{s.t}}</span></sc-if><sc-if value="{{s.isLink}}" hint-placeholder-val="{{ false }}"><button onClick="{{s.follow}}" style="padding: 0; border: 0; background: none; color: {{s.c.link}}; font: inherit; text-decoration: underline; cursor: pointer">{{s.t}}</button></sc-if></sc-for></div>
+            </div>
+          </sc-if>
+          <sc-if value="{{b.isP}}" hint-placeholder-val="{{ false }}">
+            <div style="max-width: 680px"><sc-for list="{{b.spans}}" as="s" hint-placeholder-count="1"><sc-if value="{{s.isText}}" hint-placeholder-val="{{ true }}"><span>{{s.t}}</span></sc-if><sc-if value="{{s.isBold}}" hint-placeholder-val="{{ false }}"><strong style="font-weight: 600">{{s.t}}</strong></sc-if><sc-if value="{{s.isCode}}" hint-placeholder-val="{{ false }}"><code style="padding: 1px 5px; border-radius: 4px; background: {{s.c.chip}}; color: {{s.c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13.5px">{{s.t}}</code></sc-if><sc-if value="{{s.isLink}}" hint-placeholder-val="{{ false }}"><button onClick="{{s.follow}}" style="padding: 0; border: 0; background: none; color: {{s.c.link}}; font: inherit; text-decoration: underline; cursor: pointer">{{s.t}}</button></sc-if></sc-for></div>
+          </sc-if>
+          <sc-if value="{{b.isList}}" hint-placeholder-val="{{ false }}">
+            <div style="display: flex; flex-direction: column; gap: 6px">
+              <sc-for list="{{b.items}}" as="li" hint-placeholder-count="3">
+                <div style="display: flex; gap: 10px">
+                  <span style="color: {{li.c.quote}}">•</span>
+                  <div><sc-for list="{{li.spans}}" as="s" hint-placeholder-count="1"><sc-if value="{{s.isText}}" hint-placeholder-val="{{ false }}"><span>{{s.t}}</span></sc-if><sc-if value="{{s.isLink}}" hint-placeholder-val="{{ true }}"><button onClick="{{s.follow}}" style="padding: 0; border: 0; background: none; color: {{s.c.link}}; font: inherit; text-decoration: underline; cursor: pointer">{{s.t}}</button></sc-if></sc-for></div>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{b.isCode}}" hint-placeholder-val="{{ false }}">
+            <div style="border: 1px solid {{b.c.hair}}; border-radius: 6px; overflow: hidden; background: {{b.c.panel}}">
+              <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; padding: 0 6px 0 14px; border-bottom: 1px solid {{b.c.hair}}; color: {{b.c.quote}}; font-size: 12px; line-height: 16px">
+                <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace">{{b.lang}}</span>
+                <button onClick="{{b.copy}}" style="padding: 2px 8px; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit; cursor: pointer">Copy</button>
+              </div>
+              <pre style="margin: 0; padding: 12px 14px; overflow-x: auto; color: {{b.c.text}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">{{b.t}}</pre>
+            </div>
+          </sc-if>
+          <sc-if value="{{b.isPlainTable}}" hint-placeholder-val="{{ false }}">
+            <div style="overflow-x: auto; border: 1px solid {{b.c.hair}}; border-radius: 6px; background: {{b.c.panel}}; font-size: 14px; line-height: 20px">
+              <div style="display: grid; grid-template-columns: {{b.cols}}; background: {{b.c.raised}}; font-weight: 600">
+                <sc-for list="{{b.head}}" as="h" hint-placeholder-count="2"><span style="padding: 7px 12px">{{h.t}}</span></sc-for>
+              </div>
+              <sc-for list="{{b.rows}}" as="r" hint-placeholder-count="1">
+                <div style="display: grid; grid-template-columns: {{r.cols}}; border-top: 1px solid {{r.c.hair}}">
+                  <sc-for list="{{r.cells}}" as="cell" hint-placeholder-count="2"><span style="padding: 7px 12px">{{cell.t}}</span></sc-for>
+                </div>
+              </sc-for>
+            </div>
+          </sc-if>
+          <sc-if value="{{b.isTest}}" hint-placeholder-val="{{ false }}">
+            <section aria-label="Test table {{b.name}}" style="border: 1px solid {{b.c.hair}}; border-radius: 6px; overflow: hidden; background: {{b.c.panel}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">
+              <div style="display: flex; align-items: center; background: {{b.headBg}}; color: {{b.headFg}}">
+                <span style="flex: 0 0 36px"></span>
+                <button aria-label="Focus table {{b.name}}" onClick="{{b.pick}}" style="flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: {{b.cols}}; padding: 7px 0; border: 0; background: transparent; color: inherit; font: inherit; font-weight: 600; text-align: left; cursor: pointer">
+                  <sc-for list="{{b.head}}" as="h" hint-placeholder-count="3"><span style="padding: 0 12px">{{h.t}}</span></sc-for>
+                </button>
+                <button onClick="{{b.run}}" style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-right: 6px; padding: 3px 8px; border: 0; border-radius: 4px; background: transparent; color: inherit; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 12px; font-weight: 500; cursor: pointer">
+                  <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
+                  <span>Run table</span>
+                </button>
+              </div>
+              <sc-for list="{{b.rows}}" as="r" hint-placeholder-count="2">
+                <div onMouseEnter="{{r.enter}}" onMouseLeave="{{r.leave}}" style="display: flex; align-items: center; min-height: 34px; border-top: 1px solid {{r.c.hair}}; background: {{r.bg}}; color: {{r.fg}}">
+                  <span title="{{r.result}}" style="flex: 0 0 36px; color: {{r.markColor}}; font-size: 14px; font-weight: 600; text-align: center">{{r.mark}}</span>
+                  <button aria-label="Focus row on line {{r.line}}" onClick="{{r.pick}}" style="flex: 1 1 auto; min-width: 0; display: grid; grid-template-columns: {{r.cols}}; padding: 7px 0; border: 0; background: transparent; color: inherit; font: inherit; text-align: left; cursor: pointer">
+                    <sc-for list="{{r.cells}}" as="cell" hint-placeholder-count="3"><span style="padding: 0 12px">{{cell.t}}</span></sc-for>
+                  </button>
+                  <sc-if value="{{r.showRun}}" hint-placeholder-val="{{ false }}">
+                    <button aria-label="Run row on line {{r.line}}" onClick="{{r.run}}" disabled="{{r.busy}}" style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-right: 6px; padding: 3px 8px; border: 0; border-radius: 4px; background: {{r.runBg}}; color: {{r.runFg}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 12px; font-weight: 600; cursor: pointer">
+                      <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
+                      <span>Run row</span>
+                    </button>
+                  </sc-if>
+                </div>
+                <sc-if value="{{r.hasNote}}" hint-placeholder-val="{{ false }}">
+                  <div style="padding: 0 12px 8px 48px; background: {{r.noteBg}}; color: {{r.noteFg}}; font-size: 12.5px">{{r.note}}</div>
+                </sc-if>
+              </sc-for>
+              <sc-if value="{{b.hasVerdict}}" hint-placeholder-val="{{ false }}">
+                <div style="display: flex; flex-direction: column; gap: 2px; padding: 8px 12px; border-top: 1px solid {{b.c.hair}}; font-size: 13px">
+                  <span style="color: {{b.verdictColor}}; font-weight: 600">{{b.verdict}}</span>
+                  <sc-if value="{{b.hasTableFail}}" hint-placeholder-val="{{ false }}">
+                    <span style="color: {{b.c.note}}; font-size: 12.5px">{{b.tableFail}}</span>
+                  </sc-if>
+                </div>
+              </sc-if>
+            </section>
+          </sc-if>
+        </sc-for>
+      </div>
+    </main>
+  </sc-if>
+
+  <sc-if value="{{isGraphView}}" hint-placeholder-val="{{ false }}">
+    <main onMouseDown="{{graph.down}}" onMouseMove="{{graph.move}}" onMouseUp="{{graph.up}}" onMouseLeave="{{graph.up}}" onWheel="{{graph.wheel}}" style="flex: 999 1 560px; min-width: 0; min-height: 480px; position: relative; overflow: hidden; background: {{c.page}}; cursor: grab">
+      <div style="position: absolute; left: 0; top: 0; width: {{graph.width}}px; height: {{graph.height}}px; transform: {{graph.transform}}; transform-origin: 0 0">
+        <svg aria-hidden="true" width="{{graph.width}}" height="{{graph.height}}" style="position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none">
+          <path d="{{graph.dim}}" fill="none" stroke="{{c.edge}}" stroke-width="1"></path>
+          <path d="{{graph.lit}}" fill="none" stroke="{{c.bar}}" stroke-width="1.75"></path>
+          <path d="{{graph.heads}}" fill="{{c.bar}}" stroke="none"></path>
+        </svg>
+        <sc-for list="{{graph.nodes}}" as="n" hint-placeholder-count="8">
+          <button aria-label="{{n.label}}" onClick="{{n.pick}}" onMouseDown="{{n.down}}" onMouseEnter="{{n.enter}}" onMouseLeave="{{n.leave}}" style="position: absolute; left: {{n.left}}px; top: {{n.top}}px; width: {{n.size}}px; height: {{n.size}}px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 0; border: 2px solid {{n.stroke}}; border-radius: 50%; background: {{n.fill}}; box-shadow: 0 0 0 3px {{n.halo}}; color: {{n.c.page}}; opacity: {{n.opacity}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; line-height: 1; cursor: pointer">{{n.mark}}</button>
+          <span style="position: absolute; left: {{n.labelX}}px; top: {{n.labelY}}px; transform: translateX(-50%); padding: 0 3px; border-radius: 3px; background: {{n.c.page}}; color: {{n.labelColor}}; opacity: {{n.opacity}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11.5px; line-height: 15px; font-weight: {{n.weight}}; white-space: nowrap; pointer-events: none">{{n.label}}</span>
+        </sc-for>
+      </div>
+      <div style="position: absolute; left: 12px; top: 12px; display: flex; gap: 2px; padding: 2px; border: 1px solid {{c.hair}}; border-radius: 7px; background: {{c.panel}}">
+        <button aria-label="Zoom out" onClick="{{graph.zoomOut}}" style="width: 28px; height: 26px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: {{c.text}}; font: inherit; font-size: 15px; cursor: pointer">−</button>
+        <button aria-label="Zoom in" onClick="{{graph.zoomIn}}" style="width: 28px; height: 26px; padding: 0; border: 0; border-radius: 5px; background: transparent; color: {{c.text}}; font: inherit; font-size: 15px; cursor: pointer">+</button>
+        <button onClick="{{graph.fit}}" style="height: 26px; padding: 0 8px; border: 0; border-radius: 5px; background: transparent; color: {{c.text}}; font: inherit; font-size: 13px; cursor: pointer">Fit</button>
+      </div>
+    </main>
+    <aside aria-label="Selected file" style="flex: 0 1 296px; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; padding: 16px 18px; overflow: auto; background: {{c.panel}}; border-left: 1px solid {{c.hair}}; font-size: 13px; line-height: 20px">
+      <div style="display: flex; flex-direction: column; align-items: flex-start; gap: 4px">
+        <div style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-weight: 600; overflow-wrap: anywhere">{{graph.selected}}</div>
+        <div style="color: {{c.quote}}">{{graph.distance}}</div>
+        <button onClick="{{graph.open}}" style="margin-top: 8px; height: 30px; padding: 0 12px; border: 0; border-radius: 6px; background: {{c.bar}}; color: {{c.barText}}; font: inherit; font-weight: 600; cursor: pointer">Open file</button>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <div style="padding-bottom: 3px; color: {{c.quote}}; font-size: 12px; font-weight: 600">Links out</div>
+        <sc-for list="{{graph.out}}" as="o" hint-placeholder-count="3">
+          <button onClick="{{o.pick}}" style="padding: 0; border: 0; background: none; color: {{o.fg}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; text-align: left; overflow-wrap: anywhere; cursor: pointer">{{o.t}}</button>
+        </sc-for>
+        <sc-if value="{{graph.noOut}}" hint-placeholder-val="{{ false }}"><span style="color: {{c.quote}}">None</span></sc-if>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 3px">
+        <div style="padding-bottom: 3px; color: {{c.quote}}; font-size: 12px; font-weight: 600">Links in</div>
+        <sc-for list="{{graph.in}}" as="o" hint-placeholder-count="2">
+          <button onClick="{{o.pick}}" style="padding: 0; border: 0; background: none; color: {{o.fg}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; text-align: left; overflow-wrap: anywhere; cursor: pointer">{{o.t}}</button>
+        </sc-for>
+        <sc-if value="{{graph.noIn}}" hint-placeholder-val="{{ false }}"><span style="color: {{c.quote}}">None</span></sc-if>
+      </div>
+    </aside>
+  </sc-if>
+
+  <sc-if value="{{showTests}}" hint-placeholder-val="{{ true }}">
+    <aside aria-label="Tests" style="flex: 0 1 296px; min-width: 0; box-sizing: border-box; display: flex; flex-direction: column; gap: 22px; padding: 16px 14px; overflow: auto; background: {{c.panel}}; border-left: 1px solid {{c.hair}}; font-size: 13px; line-height: 20px">
+      <div style="display: flex; flex-direction: column; gap: 2px; padding: 0 4px">
+        <div style="color: {{c.quote}}; font-size: 12px; font-weight: 600">This file</div>
+        <div style="color: {{fileColor}}; font-size: 20px; line-height: 28px; font-weight: 600">{{fileVerdict}}</div>
+      </div>
+      <sc-if value="{{hasTables}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 1px">
+          <div style="padding: 0 4px 6px; color: {{c.quote}}; font-size: 12px; font-weight: 600">Tables</div>
+          <sc-for list="{{tableList}}" as="t" hint-placeholder-count="2">
+            <button onClick="{{t.pick}}" style="min-height: 30px; display: flex; align-items: center; gap: 8px; padding: 0 6px; border: 0; border-radius: 5px; background: {{t.bg}}; color: {{t.c.text}}; font: inherit; text-align: left; cursor: pointer">
+              <span style="flex: 0 0 14px; color: {{t.color}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-weight: 600; text-align: center">{{t.mark}}</span>
+              <span style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{t.name}}</span>
+              <span style="flex: 0 0 auto; color: {{t.c.quote}}; font-size: 12px">{{t.result}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{hasFailures}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 8px; padding: 0 4px">
+          <div style="color: {{c.quote}}; font-size: 12px; font-weight: 600">What did not pass</div>
+          <sc-for list="{{failureList}}" as="f" hint-placeholder-count="1">
+            <button onClick="{{f.pick}}" style="display: flex; flex-direction: column; gap: 1px; padding: 0; border: 0; background: none; color: {{f.c.text}}; font: inherit; text-align: left; cursor: pointer">
+              <span>{{f.where}}</span>
+              <span style="color: {{f.color}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 18px">{{f.message}}</span>
+            </button>
+          </sc-for>
+        </div>
+      </sc-if>
+      <sc-if value="{{hasCommand}}" hint-placeholder-val="{{ true }}">
+        <div style="display: flex; flex-direction: column; gap: 4px; padding: 0 4px">
+          <div style="color: {{c.quote}}; font-size: 12px; font-weight: 600">Last command</div>
+          <code style="color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; overflow-wrap: anywhere">{{command}}</code>
+        </div>
+      </sc-if>
+    </aside>
+  </sc-if>
+</div>
+
+<footer style="flex: 0 0 auto; display: flex; align-items: center; gap: 16px; min-height: 26px; padding: 0 12px; background: {{c.panel}}; color: {{c.quote}}; border-top: 1px solid {{c.hair}}; font-size: 13px; line-height: 18px">
+  <span style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap">{{statusText}}</span>
+  <sc-if value="{{hasFileResult}}" hint-placeholder-val="{{ true }}">
+    <span style="flex: 0 0 auto; color: {{fileColor}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 600">{{fileStatus}}</span>
+  </sc-if>
+</footer>
+
+<sc-if value="{{isSearch}}" hint-placeholder-val="{{ false }}">
+  <div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-start; padding: 88px 16px 16px; background: {{c.scrim}}">
+    <div role="dialog" aria-label="Search" style="width: 100%; max-width: 640px; box-sizing: border-box; display: flex; flex-direction: column; border: 1px solid {{c.hair}}; border-radius: 8px; overflow: hidden; background: {{c.raised}}; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35)">
+      <div style="display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-bottom: 1px solid {{c.hair}}">
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true" style="flex: 0 0 auto; color: {{c.quote}}"><circle cx="7" cy="7" r="4.5"></circle><path d="m10.5 10.5 3 3"></path></svg>
+        <label style="flex: 1 1 auto; display: flex; min-width: 0">
+          <span style="position: absolute; width: 1px; height: 1px; overflow: hidden">Search files and headings</span>
+          <input value="{{query}}" onChange="{{onQuery}}" onKeyDown="{{onSearchKey}}" placeholder="Search files and headings" style="width: 100%; border: 0; outline: 0; padding: 0; background: transparent; color: {{c.text}}; font: inherit; font-size: 16px; line-height: 26px">
+        </label>
+        <button onClick="{{toggleOnlyTests}}" style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; height: 28px; padding: 0 8px; border: 1px solid {{onlyBorder}}; border-radius: 6px; background: {{onlyBg}}; color: {{onlyFg}}; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer">
+          <span>Test files only</span>
+          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 11px">Ctrl-t</span>
+        </button>
+      </div>
+      <div style="max-height: 400px; overflow: auto; padding: 6px; display: flex; flex-direction: column; gap: 1px; font-size: 14px; line-height: 20px">
+        <sc-for list="{{hits}}" as="h" hint-placeholder-count="5">
+          <button onClick="{{h.pick}}" style="min-height: 34px; display: flex; align-items: center; gap: 8px; padding: 0 10px; border: 0; border-radius: 5px; background: {{h.bg}}; color: {{h.fg}}; font: inherit; text-align: left; cursor: pointer">
+            <span style="flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">{{h.path}}</span>
+            <sc-if value="{{h.isHeading}}" hint-placeholder-val="{{ false }}">
+              <span style="flex: 0 0 auto; opacity: 0.75">&gt;</span>
+              <span style="flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 500">{{h.heading}}</span>
+            </sc-if>
+          </button>
+        </sc-for>
+        <sc-if value="{{noHits}}" hint-placeholder-val="{{ false }}">
+          <div style="padding: 12px 10px; color: {{c.quote}}">No matches</div>
+        </sc-if>
+      </div>
+      <div style="display: flex; flex-wrap: wrap; gap: 16px; padding: 7px 12px; border-top: 1px solid {{c.hair}}; color: {{c.quote}}; font-size: 12px; line-height: 16px">
+        <span>Up and Down choose</span>
+        <span>Enter opens</span>
+        <span>Esc closes</span>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{isHelp}}" hint-placeholder-val="{{ false }}">
+  <div style="position: absolute; left: 0; top: 0; right: 0; bottom: 0; display: flex; justify-content: center; align-items: flex-start; padding: 64px 16px 16px; overflow: auto; background: {{c.scrim}}">
+    <div role="dialog" aria-label="Keys" style="width: 100%; max-width: 960px; box-sizing: border-box; display: flex; flex-direction: column; gap: 16px; padding: 18px 22px 20px; border: 1px solid {{c.hair}}; border-radius: 8px; background: {{c.raised}}; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.35)">
+      <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px">
+        <h2 style="margin: 0; font-size: 18px; line-height: 24px; font-weight: 600">Keys</h2>
+        <button onClick="{{closeOverlay}}" style="height: 28px; padding: 0 10px; border: 1px solid {{c.hair}}; border-radius: 6px; background: transparent; color: {{c.text}}; font: inherit; font-size: 13px; cursor: pointer">Close</button>
+      </div>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(280px, 100%), 1fr)); gap: 20px 32px">
+        <sc-for list="{{helpGroups}}" as="g" hint-placeholder-count="4">
+          <div style="display: flex; flex-direction: column; gap: 5px; font-size: 13px; line-height: 20px">
+            <div style="color: {{g.c.quote}}; font-size: 12px; font-weight: 600">{{g.title}}</div>
+            <sc-for list="{{g.keys}}" as="k" hint-placeholder-count="4">
+              <div style="display: flex; align-items: baseline; gap: 12px">
+                <span style="flex: 0 0 116px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 600">{{k.key}}</span>
+                <span style="flex: 1 1 auto">{{k.action}}</span>
+              </div>
+            </sc-for>
+          </div>
+        </sc-for>
+      </div>
+      <div style="color: {{c.quote}}; font-size: 12px; line-height: 16px">On macOS, Ctrl here means Cmd.</div>
+    </div>
+  </div>
+</sc-if>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"ws":{"editor":null},"file":{"editor":null},"preset":{"editor":null},"view":{"editor":null},"overlay":{"editor":null},"query":{"editor":null},"status":{"editor":null},"focusTable":{"editor":null},"hoverRow":{"editor":null},"$preview":{"width":1440,"height":900}}'>
+const THEMES = {
+  dark: {
+    page: '#14161A', panel: '#1A1D22', raised: '#22262C', hair: '#2D3239', chip: '#262A31', edge: '#3D444E',
+    text: '#E4E6EA', heading: '#F4F5F7', code: '#D9B3FF', link: '#8AB4FF', quote: '#A3ABB8', line: '#7F8896',
+    passed: '#5FD38A', snoozed: '#EFC95E', failed: '#FF8A80', note: '#C79792', bar: '#8AB4FF', barText: '#10141A',
+    tintPassed: 'rgba(95, 211, 138, 0.08)', tintFailed: 'rgba(255, 138, 128, 0.14)', tintSnoozed: 'rgba(239, 201, 94, 0.11)',
+    sel: 'rgba(138, 180, 255, 0.16)', hover: 'rgba(255, 255, 255, 0.05)', scrim: 'rgba(8, 9, 12, 0.60)'
+  },
+  light: {
+    page: '#FFFFFF', panel: '#F6F7F9', raised: '#FFFFFF', hair: '#DFE3E8', chip: '#EEF0F3', edge: '#C6CCD4',
+    text: '#1E2227', heading: '#11141A', code: '#7A3EC8', link: '#0B57D0', quote: '#59626D', line: '#7A838E',
+    passed: '#116329', snoozed: '#7D4E00', failed: '#B3261E', note: '#8C5A55', bar: '#0B57D0', barText: '#FFFFFF',
+    tintPassed: 'rgba(17, 99, 41, 0.07)', tintFailed: 'rgba(179, 38, 30, 0.09)', tintSnoozed: 'rgba(125, 78, 0, 0.09)',
+    sel: 'rgba(11, 87, 208, 0.10)', hover: 'rgba(0, 0, 0, 0.04)', scrim: 'rgba(30, 34, 39, 0.35)'
+  }
+};
+
+const WORST = { passed: 1, skipped: 2, snoozed: 3, partial: 4, failed: 5, error: 6 };
+const MARKS = { passed: '✓', failed: '✗', error: '!', snoozed: '~', skipped: '-', running: '⋯', partial: '·' };
+
+const text = (t) => ({ t });
+const link = (t, href) => ({ t, href });
+const h1 = (t) => ({ k: 'h1', t });
+const h2 = (t) => ({ k: 'h2', t });
+const h3 = (t) => ({ k: 'h3', t });
+const mono = (t) => ({ t, code: true });
+const bold = (t) => ({ t, bold: true });
+const alert = (title, ...spans) => ({ k: 'alert', title, spans });
+const codeBlock = (lang, t) => ({ k: 'code', lang, t });
+const para = (...spans) => ({ k: 'p', spans });
+const list = (...items) => ({ k: 'list', items });
+const testTable = (name, line, head, rows, tableFail) => ({
+  k: 'test', name, line, head, tableFail,
+  rows: rows.map(([at, cells, out, note]) => ({ line: at, cells, out, note }))
+});
+
+const SNOOZE = 'mul expected 5, got 4 (snoozed until 2099-12-31)';
+
+const SPEC_LINKS = {
+  'README.md': 'glossary.md running/configuration.md running/finding-tests.md running/row-results.md running/running-a-file.md running/running-a-row.md running/running-a-table.md running/temoc-output.md search.md tui/file-tree.md tui/graph.md tui/keys.md tui/mouse.md tui/navigation.md tui/opening.md tui/rendering.md tui/row-results.md tui/running.md tui/search.md tui/selecting-text.md tui/themes.md tui/writing-specs.md viewer/file-tree.md viewer/graph.md viewer/links.md viewer/opening.md writing-specs.md',
+  'glossary.md': 'README.md running/finding-tests.md tui/selecting-text.md viewer/opening.md',
+  'running/configuration.md': 'README.md running/temoc-output.md viewer/opening.md',
+  'running/finding-tests.md': 'README.md running/running-a-file.md search.md',
+  'running/row-results.md': 'README.md',
+  'running/running-a-file.md': 'README.md running/row-results.md running/temoc-output.md',
+  'running/running-a-row.md': 'README.md running/running-a-table.md',
+  'running/running-a-table.md': 'README.md running/running-a-file.md',
+  'running/temoc-output.md': 'README.md running/row-results.md tui/row-results.md',
+  'search.md': 'README.md running/finding-tests.md tui/search.md viewer/links.md',
+  'tui/file-tree.md': 'README.md tui/mouse.md tui/navigation.md viewer/file-tree.md',
+  'tui/graph.md': 'README.md tui/mouse.md tui/navigation.md viewer/graph.md',
+  'tui/keys.md': 'README.md tui/file-tree.md tui/graph.md tui/navigation.md tui/running.md tui/search.md tui/selecting-text.md tui/themes.md',
+  'tui/mouse.md': 'README.md tui/file-tree.md tui/graph.md tui/navigation.md tui/running.md tui/selecting-text.md',
+  'tui/navigation.md': 'README.md glossary.md tui/mouse.md tui/running.md viewer/links.md',
+  'tui/opening.md': 'README.md running/configuration.md tui/themes.md viewer/opening.md',
+  'tui/rendering.md': 'README.md tui/navigation.md',
+  'tui/row-results.md': 'README.md running/row-results.md running/temoc-output.md tui/themes.md',
+  'tui/running.md': 'README.md running/running-a-file.md running/running-a-row.md running/running-a-table.md tui/mouse.md tui/navigation.md tui/row-results.md',
+  'tui/search.md': 'README.md search.md tui/navigation.md',
+  'tui/selecting-text.md': 'README.md',
+  'tui/themes.md': 'README.md tui/running.md',
+  'tui/writing-specs.md': 'README.md tui/rendering.md writing-specs.md',
+  'viewer/file-tree.md': 'README.md search.md tui/file-tree.md',
+  'viewer/graph.md': 'README.md tui/graph.md',
+  'viewer/links.md': 'README.md',
+  'viewer/opening.md': 'README.md running/configuration.md search.md tui/opening.md',
+  'writing-specs.md': 'README.md tui/writing-specs.md'
+};
+
+const WORKSPACES = {
+  spec: {
+    name: 'spec', config: true, first: 'README.md',
+    files: Object.keys(SPEC_LINKS),
+    links: Object.entries(SPEC_LINKS).flatMap(([from, targets]) => targets.split(' ').map((to) => [from, to])),
+    testFiles: Object.keys(SPEC_LINKS).filter((path) => !['README.md', 'glossary.md', 'tui/writing-specs.md', 'writing-specs.md'].includes(path)),
+    missing: {},
+    pages: {}
+  },
+  self: {
+    name: 'temoc-ui', config: true, first: 'README.md',
+    files: ['AGENTS.md', 'README.md'], links: [], missing: {},
+    pages: {
+      'README.md': { blocks: [
+        h1('temoc-ui'),
+        para(text('A terminal interface for '), link('temoc', 'https://github.com/killertux/temoc'), text(', which runs acceptance tests written in markdown.')),
+        para(text('temoc tests are ordinary markdown pages, so they sit next to the documentation they describe. A hidden line marks a table as a test, and each row of the table is one test case:')),
+        codeBlock('markdown', '## Addition\n\n[//]: # "decisionTable Calculator"\n\n| a | b | sum? |\n| - | - | ---- |\n| 1 | 2 | 3    |'),
+        alert('Note', text('temoc-ui is in early development. See '), link('Project status', '#project-status'), text(' for what works today.')),
+        h2('Getting started'),
+        para(text('You need a recent stable '), link('Rust', 'https://www.rust-lang.org/tools/install'), text(' toolchain, and '), link('temoc', 'https://github.com/killertux/temoc/releases'), text(' 0.10 or later on your '), mono('PATH'), text(' to run tests. Install temoc-ui from this repository:')),
+        codeBlock('sh', 'cargo install --git https://github.com/killertux/temoc-ui temoc-ui'),
+        h2('Using it'),
+        { k: 'table', head: ['Key', 'What it does'], rows: [['j, k, Down, Up', 'Scroll one line'], ['Space, PageDown, PageUp', 'Scroll one page'], ['/', 'Open search']] },
+        h3('Running tests'),
+        para(text('Running needs a temoc configuration file, which tells temoc how to start your '), bold('Slim'), text(' server.'))
+      ] }
+    }
+  },
+  calculator: {
+    name: 'calculator', config: true, first: 'failing.md',
+    files: ['broken.md', 'failing.md', 'mixed.md', 'passing.md', 'README.md', 'snoozed.md'],
+    links: [['README.md', 'passing.md'], ['README.md', 'failing.md']],
+    missing: {},
+    pages: {
+      'README.md': { blocks: [
+        h1('Calculator Sample'),
+        para(text('This page has no tests. The test files are:')),
+        list([link('Passing tests', 'passing.md')], [link('Failing tests', 'failing.md')])
+      ] },
+      'broken.md': {
+        parseFail: 'Expected a test table. Got `This paragraph should have been a table.` at broken.md:9:1',
+        blocks: [h1('Broken Tests'), h2('Addition'), para(text('This paragraph should have been a table.'))]
+      },
+      'failing.md': { blocks: [
+        h1('Failing Tests'),
+        h2('Addition'),
+        testTable('Addition', 7, ['a', 'b', 'sum?'], [[11, ['1', '2', '3'], 'passed']]),
+        h2('Multiplication'),
+        testTable('Multiplication', 15, ['a', 'b', 'mul?'], [
+          [19, ['2', '3', '6'], 'passed'],
+          [20, ['2', '2', '5'], 'failed', 'mul expected 5, got 4']
+        ])
+      ] },
+      'mixed.md': { blocks: [
+        h1('Mixed Failures'),
+        h2('Broken Now'),
+        testTable('Broken Now', 7, ['a', 'b', 'sum?'], [[11, ['1', '2', '9'], 'failed', 'sum expected 9, got 3']]),
+        h2('Not Ready'),
+        testTable('Not Ready', 15, ['a', 'b', 'mul?'], [
+          [19, ['2', '3', '6'], 'passed'],
+          [20, ['2', '2', '5'], 'snoozed', SNOOZE]
+        ])
+      ] },
+      'passing.md': { blocks: [
+        h1('Passing Tests'),
+        h2('Addition'),
+        testTable('Addition', 7, ['a', 'b', 'sum?'], [[11, ['1', '2', '3'], 'passed']]),
+        h2('Multiplication'),
+        testTable('Multiplication', 15, ['a', 'b', 'mul?'], [
+          [19, ['2', '3', '6'], 'passed'],
+          [20, ['2', '2', '4'], 'passed']
+        ])
+      ] },
+      'snoozed.md': { blocks: [
+        h1('Snoozed Tests'),
+        h2('Working'),
+        testTable('Working', 7, ['a', 'b', 'sum?'], [[11, ['1', '2', '3'], 'passed']]),
+        h2('Not Ready'),
+        testTable('Not Ready', 15, ['a', 'b', 'mul?'], [
+          [19, ['2', '3', '6'], 'passed'],
+          [20, ['2', '2', '5'], 'snoozed', SNOOZE]
+        ])
+      ] }
+    }
+  },
+  outcomes: {
+    name: 'outcomes', config: true, first: 'README.md',
+    files: ['dying.md', 'errors.md', 'hanging.md', 'README.md', 'symbols.md'],
+    links: [['README.md', 'errors.md'], ['README.md', 'symbols.md'], ['README.md', 'hanging.md'], ['README.md', 'dying.md']],
+    missing: {},
+    pages: {
+      'README.md': { blocks: [
+        h1('Outcomes Sample'),
+        para(text('This page has no tests. The test files show what else a run can do:')),
+        list([link('Errors', 'errors.md')], [link('Symbols', 'symbols.md')], [link('Hanging', 'hanging.md')], [link('Dying', 'dying.md')])
+      ] },
+      'errors.md': { blocks: [
+        h1('Errors'),
+        h2('Division'),
+        testTable('Division', 7, ['a', 'b', 'div?'], [
+          [11, ['6', '3', '2'], 'passed'],
+          [12, ['1', '0', '0'], 'error', 'div expected 0, got exception division by zero']
+        ]),
+        h2('Unknown Symbol'),
+        testTable('Unknown Symbol', 16, ['a', 'b', 'sum?'], [[20, ['$NOPE', '2', '3'], 'error', 'setA got unknown symbol $NOPE']]),
+        h2('No Such Fixture'),
+        testTable('No Such Fixture', 24, ['a', 'sum?'], [[28, ['1', '1'], 'skipped']], 'make got exception NO_CLASS Missing')
+      ] },
+      'symbols.md': { blocks: [
+        h1('Symbols'),
+        h2('Remember'),
+        testTable('Remember', 7, ['a', 'b', 'sum?'], [[11, ['1', '2', '$TOTAL='], 'passed']]),
+        h2('Recall'),
+        testTable('Recall', 15, ['a', 'b', 'sum?'], [[19, ['$TOTAL', '1', '4'], 'passed']])
+      ] },
+      'hanging.md': { blocks: [
+        h1('Hanging'),
+        h2('Stuck'),
+        testTable('Stuck', 7, ['a', 'b', 'hang on zero?'], [
+          [11, ['1', '2', '3'], 'passed'],
+          [12, ['2', '2', '5'], 'failed', 'hangOnZero expected 5, got 4'],
+          [13, ['0', '9', '9'], 'hang'],
+          [14, ['3', '3', '6'], 'passed']
+        ]),
+        h2('Waiting'),
+        testTable('Waiting', 18, ['a', 'b', 'sum?'], [[22, ['4', '4', '8'], 'passed']])
+      ] },
+      'dying.md': {
+        die: 'Missing message length terminator (server exit status: 3)',
+        blocks: [
+          h1('Dying'),
+          h2('Stopped'),
+          testTable('Stopped', 7, ['a', 'b', 'die on zero?'], [
+            [11, ['1', '2', '3'], 'passed'],
+            [12, ['0', '9', '9'], 'error', 'Missing message length terminator'],
+            [13, ['3', '3', '6'], 'skipped']
+          ]),
+          h2('Never Reached'),
+          testTable('Never Reached', 17, ['a', 'b', 'sum?'], [[21, ['4', '4', '8'], 'skipped']])
+        ]
+      }
+    }
+  },
+  docs: {
+    name: 'docs', config: false, first: 'README.md',
+    files: ['guide/getting-started.md', 'guide/long-page.md', 'notes.MD', 'README.md', 'reference.md'],
+    links: [
+      ['guide/getting-started.md', 'README.md'], ['guide/getting-started.md', 'reference.md'],
+      ['README.md', 'guide/getting-started.md'], ['README.md', 'guide/long-page.md'], ['README.md', 'reference.md'],
+      ['reference.md', 'guide/getting-started.md']
+    ],
+    missing: { 'README.md': ['missing.md'] },
+    pages: {
+      'README.md': { blocks: [
+        h1('Docs Sample'),
+        para(text('Welcome to the sample documentation.')),
+        list(
+          [link('Getting started', 'guide/getting-started.md')],
+          [link('Install steps', 'guide/getting-started.md#install')],
+          [link('Reference', 'reference.md')],
+          [link('Long page', 'guide/long-page.md')],
+          [link('Long page ending', 'guide/long-page.md#the-end')],
+          [link('Missing page', 'missing.md')],
+          [link('Temoc on GitHub', 'https://github.com/killertux/temoc')]
+        )
+      ] },
+      'guide/getting-started.md': { blocks: [
+        h1('Getting Started'),
+        para(text('Back to the '), link('sample home', '../README.md'), text('.')),
+        h2('Install'),
+        para(text('Run the installer.')),
+        h2('First Steps'),
+        para(text('Read the '), link('reference', '../reference.md'), text('.'))
+      ] },
+      'guide/long-page.md': { blocks: [
+        h1('Long Page'), para(text('Line 1')), para(text('Line 2')), para(text('Line 3')), para(text('Line 4')), para(text('Line 5'))
+      ] },
+      'notes.MD': { blocks: [h1('Notes'), para(text('This file has an uppercase extension.'))] },
+      'reference.md': { blocks: [
+        h1('Reference'),
+        para(text('See '), link('Getting started', 'guide/getting-started.md'), text('.')),
+        h2('Commands'),
+        { k: 'table', head: ['Command', 'Meaning'], rows: [['open', 'Opens a file']] },
+        { k: 'code', t: 'temoc-ui docs/' }
+      ] }
+    }
+  },
+  unconfigured: {
+    name: 'unconfigured', config: false, first: 'tests.md',
+    files: ['tests.md'], links: [], missing: {},
+    pages: {
+      'tests.md': { blocks: [
+        h1('Unconfigured Tests'),
+        testTable('Unconfigured Tests', 3, ['a', 'b', 'sum?'], [[7, ['1', '2', '3'], 'passed']])
+      ] }
+    }
+  }
+};
+
+const HELP = [
+  { title: 'Reading', keys: [
+    ['j, Down', 'Scroll down one line'], ['k, Up', 'Scroll up one line'], ['PageDown, Space', 'Scroll down one page'],
+    ['PageUp', 'Scroll up one page'], ['g, G', 'Go to the top or bottom'], ['Left, Right', 'Scroll wide tables and code sideways']
+  ] },
+  { title: 'Links and history', keys: [
+    ['Tab, Shift-Tab', 'Focus the next or previous link'], ['Enter', 'Follow the focused link'],
+    ['h, Backspace', 'Go back'], ['l', 'Go forward']
+  ] },
+  { title: 'Tests', keys: [
+    ['], [', 'Focus the next or previous test table'], ['}, {', 'Focus the next or previous test row'],
+    ['r', 'Run the focused table'], ['Ctrl-r', 'Run the focused row'], ['R', 'Run the whole file']
+  ] },
+  { title: 'Finding things', keys: [
+    ['/', 'Open search'], ['Ctrl-t', 'In search, show only test files'],
+    ['t', 'Show or hide the file tree'], ['Ctrl-g', 'Show the graph']
+  ] },
+  { title: 'Window', keys: [
+    ['T', 'Swap between dark and light'], ['Ctrl-c', 'Copy the selected text'], ['?', 'Show or hide help'], ['q, Ctrl-q', 'Quit']
+  ] }
+];
+
+const isTestPage = (page) => Boolean(page.parseFail) || page.blocks.some((block) => block.k === 'test');
+const tablesOf = (page) => page.blocks.filter((block) => block.k === 'test');
+
+function worstOf(results) {
+  return results.reduce((worst, result) => (WORST[result] > WORST[worst] ? result : worst), 'passed');
+}
+
+function tableResult(table, rows) {
+  const got = table.rows.map((row) => rows[row.line]).filter(Boolean);
+  if (got.length === 0) return null;
+  if (got.some((row) => row.r === 'running')) return 'running';
+  const results = table.rows.map((row) => (rows[row.line] ? rows[row.line].r : 'partial'));
+  return worstOf(table.tableFail ? results.concat('error') : results);
+}
+
+function fileResult(page, rows, failure) {
+  if (!isTestPage(page)) return null;
+  if (failure) return 'error';
+  const got = tablesOf(page).map((table) => tableResult(table, rows));
+  if (got.includes('running')) return 'running';
+  if (got.every((result) => result === null)) return 'not run';
+  return worstOf(got.map((result) => result || 'partial'));
+}
+
+function resolveLink(from, href) {
+  const parts = from.split('/').slice(0, -1);
+  href.split('#')[0].split('/').forEach((segment) => {
+    if (segment === '..') parts.pop();
+    else if (segment !== '.') parts.push(segment);
+  });
+  return parts.join('/');
+}
+
+function fuzzy(query, value) {
+  const wanted = query.toLowerCase();
+  let found = 0;
+  for (const letter of value.toLowerCase()) {
+    if (letter === wanted[found]) found += 1;
+  }
+  return found === wanted.length;
+}
+
+function layoutOf(ws) {
+  if (ws.layout) return ws.layout;
+  const w = 880;
+  const h = 760;
+  const files = ws.files;
+  const at = {};
+  files.forEach((path, index) => {
+    const angle = index * 2.4;
+    const radius = 40 * Math.sqrt(index + 1);
+    at[path] = { x: w / 2 + radius * Math.cos(angle), y: h / 2 + radius * Math.sin(angle) };
+  });
+  const seen = {};
+  ws.links.forEach(([from, to]) => {
+    seen[[from, to].sort().join('|')] = [from, to];
+  });
+  const edges = Object.values(seen);
+  const ideal = Math.sqrt((w * h) / Math.max(files.length, 1)) * 0.75;
+  let heat = 80;
+  for (let round = 0; round < 320; round += 1) {
+    const push = {};
+    files.forEach((path) => {
+      push[path] = { x: 0, y: 0 };
+    });
+    files.forEach((one, index) => {
+      files.slice(index + 1).forEach((two) => {
+        const dx = at[one].x - at[two].x;
+        const dy = at[one].y - at[two].y;
+        const distance = Math.max(Math.hypot(dx, dy), 1);
+        const force = (ideal * ideal) / distance;
+        push[one].x += (dx / distance) * force;
+        push[one].y += (dy / distance) * force;
+        push[two].x -= (dx / distance) * force;
+        push[two].y -= (dy / distance) * force;
+      });
+    });
+    edges.forEach(([one, two]) => {
+      const dx = at[one].x - at[two].x;
+      const dy = at[one].y - at[two].y;
+      const distance = Math.max(Math.hypot(dx, dy), 1);
+      const force = ((distance * distance) / ideal) * 0.6;
+      push[one].x -= (dx / distance) * force;
+      push[one].y -= (dy / distance) * force;
+      push[two].x += (dx / distance) * force;
+      push[two].y += (dy / distance) * force;
+    });
+    files.forEach((path) => {
+      push[path].x += (w / 2 - at[path].x) * 0.35;
+      push[path].y += (h / 2 - at[path].y) * 0.35;
+      const size = Math.max(Math.hypot(push[path].x, push[path].y), 0.01);
+      const step = Math.min(size, heat);
+      at[path].x += (push[path].x / size) * step;
+      at[path].y += (push[path].y / size) * step;
+    });
+    heat = Math.max(heat * 0.985, 1);
+  }
+  const xs = files.map((path) => at[path].x);
+  const ys = files.map((path) => at[path].y);
+  const left = Math.min(...xs);
+  const top = Math.min(...ys);
+  const spanX = Math.max(Math.max(...xs) - left, 1);
+  const spanY = Math.max(Math.max(...ys) - top, 1);
+  const scale = Math.min((w - 200) / spanX, (h - 130) / spanY, 1.1);
+  files.forEach((path) => {
+    at[path] = {
+      x: w / 2 + (at[path].x - left - spanX / 2) * scale,
+      y: h / 2 + (at[path].y - top - spanY / 2) * scale
+    };
+  });
+  // Labels are wide, so files need more room side by side than one above the other.
+  for (let round = 0; round < 80; round += 1) {
+    files.forEach((one, index) => {
+      files.slice(index + 1).forEach((two) => {
+        const dx = at[one].x - at[two].x;
+        const dy = at[one].y - at[two].y;
+        const distance = Math.max(Math.hypot(dx / 2.2, dy), 1);
+        if (distance < 50) {
+          const push = (50 - distance) / 2;
+          at[one].x += ((dx / 2.2) / distance) * push * 2.2;
+          at[one].y += (dy / distance) * push;
+          at[two].x -= ((dx / 2.2) / distance) * push * 2.2;
+          at[two].y -= (dy / distance) * push;
+        }
+      });
+    });
+  }
+  ws.layout = { at, w, h };
+  return ws.layout;
+}
+
+function columnsOf(ws) {
+  const start = ws.files.includes('README.md') ? 'README.md' : ws.files[0];
+  const distance = { [start]: 0 };
+  let edge = [start];
+  while (edge.length > 0) {
+    const next = [];
+    edge.forEach((file) => {
+      ws.links.filter((pair) => pair[0] === file).forEach((pair) => {
+        if (distance[pair[1]] === undefined) {
+          distance[pair[1]] = distance[file] + 1;
+          next.push(pair[1]);
+        }
+      });
+    });
+    edge = next;
+  }
+  const deepest = Math.max(...Object.values(distance));
+  const columns = [];
+  for (let at = 0; at <= deepest; at += 1) {
+    columns.push(ws.files.filter((file) => distance[file] === at));
+  }
+  const lost = ws.files.filter((file) => distance[file] === undefined);
+  return { columns, lost, distance };
+}
+
+class Component extends DCLogic {
+  componentWillUnmount() {
+    clearTimeout(this.timer);
+  }
+
+  val(key, fallback) {
+    const state = this.state || {};
+    if (state[key] !== undefined) return state[key];
+    const prop = this.props[key];
+    return prop !== undefined && prop !== null ? prop : fallback;
+  }
+
+  workspace() {
+    return WORKSPACES[this.val('ws', 'calculator')] || WORKSPACES.calculator;
+  }
+
+  file() {
+    return this.val('file', this.workspace().first);
+  }
+
+  page() {
+    return this.workspace().pages[this.file()] || { blocks: [h1(this.file())] };
+  }
+
+  isTestFile(ws, path) {
+    return ws.testFiles ? ws.testFiles.includes(path) : isTestPage(ws.pages[path] || { blocks: [] });
+  }
+
+  seed() {
+    if (this.seeded) return this.seeded;
+    const preset = this.val('preset', 'done');
+    const file = this.file();
+    const results = {};
+    const failures = {};
+    let busy = null;
+    const fill = (path, page) => {
+      const rows = {};
+      let stopped = false;
+      tablesOf(page).forEach((table) => table.rows.forEach((row) => {
+        if (stopped) return;
+        if (row.out === 'hang' && preset === 'mid') {
+          rows[row.line] = { r: 'running' };
+          stopped = true;
+          busy = path;
+        } else {
+          rows[row.line] = { r: row.out, note: row.note };
+        }
+      }));
+      results[path] = rows;
+      if (page.die) failures[path] = page.die;
+      if (page.parseFail) failures[path] = page.parseFail;
+    };
+    if (preset === 'all') {
+      Object.entries(this.workspace().pages).forEach(([path, page]) => fill(path, page));
+    } else if (preset === 'done' || preset === 'mid') {
+      fill(file, this.page());
+    }
+    this.seeded = { results, failures, busy };
+    return this.seeded;
+  }
+
+  results() {
+    return this.val('results', this.seed().results);
+  }
+
+  failures() {
+    return this.val('failures', this.seed().failures);
+  }
+
+  busy() {
+    return this.val('busy', this.seed().busy);
+  }
+
+  command() {
+    const seeded = Object.keys(this.results()[this.file()] || {}).length > 0 ? this.file() : null;
+    const target = this.val('target', seeded);
+    return target ? 'temoc -c temoc.toml --output jsonl ' + target : null;
+  }
+
+  open(file, remember) {
+    const history = this.val('history', [this.file()]);
+    const at = this.val('at', 0);
+    const change = { file, focusTable: 0, focusRow: null, status: null, view: 'doc', overlay: null, query: '', sel: 0 };
+    if (remember) {
+      change.history = history.slice(0, at + 1).concat(file);
+      change.at = at + 1;
+    }
+    this.setState(change);
+  }
+
+  move(step) {
+    const history = this.val('history', [this.file()]);
+    const at = this.val('at', 0) + step;
+    if (at < 0 || at >= history.length) return;
+    this.setState({ at, file: history[at], focusTable: 0, focusRow: null, status: null, view: 'doc' });
+  }
+
+  follow(href) {
+    const ws = this.workspace();
+    if (href.startsWith('http')) {
+      this.setState({ status: 'Opened in your browser: ' + href });
+      return;
+    }
+    if (href.startsWith('#')) return;
+    const target = resolveLink(this.file(), href);
+    if (!ws.files.includes(target)) {
+      this.setState({ status: 'Link target not found: ' + href });
+      return;
+    }
+    this.open(target, true);
+  }
+
+  run(lines, target) {
+    const ws = this.workspace();
+    const file = this.file();
+    const page = this.page();
+    if (this.busy()) {
+      this.setState({ status: 'temoc is already running' });
+      return;
+    }
+    if (!ws.config) {
+      this.setState({ status: 'No temoc configuration found. Add temoc.toml or use --config.' });
+      return;
+    }
+    const failures = { ...this.failures() };
+    delete failures[file];
+    if (page.parseFail) {
+      failures[file] = page.parseFail;
+      this.setState({ failures, target, status: 'temoc failed: ' + page.parseFail });
+      return;
+    }
+    const rows = { ...(this.results()[file] || {}) };
+    lines.forEach((line) => delete rows[line]);
+    this.setState({ results: { ...this.results(), [file]: rows }, failures, target, busy: file, status: null });
+    this.step(file, lines);
+  }
+
+  setRow(file, line, value) {
+    const results = this.results();
+    this.setState({ results: { ...results, [file]: { ...(results[file] || {}), [line]: value } } });
+  }
+
+  step(file, lines) {
+    const ws = this.workspace();
+    const page = ws.pages[file];
+    if (lines.length === 0) {
+      const change = { busy: null };
+      if (page.die) {
+        change.failures = { ...this.failures(), [file]: page.die };
+        change.status = 'temoc failed: ' + page.die;
+      }
+      this.setState(change);
+      return;
+    }
+    const line = lines[0];
+    const row = tablesOf(page).flatMap((table) => table.rows).find((candidate) => candidate.line === line);
+    this.timer = setTimeout(() => {
+      this.setRow(file, line, { r: 'running' });
+      if (row.out === 'hang') return;
+      this.timer = setTimeout(() => {
+        this.setRow(file, line, { r: row.out, note: row.note });
+        this.step(file, lines.slice(1));
+      }, 380);
+    }, 120);
+  }
+
+  colourOf(c, result) {
+    if (result === 'passed') return c.passed;
+    if (result === 'snoozed') return c.snoozed;
+    if (result === 'failed' || result === 'error') return c.failed;
+    return c.quote;
+  }
+
+  tintOf(c, result) {
+    if (result === 'passed') return c.tintPassed;
+    if (result === 'snoozed') return c.tintSnoozed;
+    if (result === 'failed' || result === 'error') return c.tintFailed;
+    if (result === 'running') return c.sel;
+    return 'transparent';
+  }
+
+  decorate(c, block, rows, tableIndex, focusTable, focusRow) {
+    const file = this.file();
+    const base = {
+      ...block, c,
+      isH1: block.k === 'h1', isH2: block.k === 'h2', isH3: block.k === 'h3', isP: block.k === 'p', isList: block.k === 'list',
+      isAlert: block.k === 'alert', isCode: block.k === 'code', isPlainTable: block.k === 'table', isTest: block.k === 'test'
+    };
+    const spans = (items) => items.map((span) => ({
+      ...span, c,
+      isText: !span.href && !span.code && !span.bold, isCode: Boolean(span.code), isLink: Boolean(span.href), isBold: Boolean(span.bold),
+      follow: () => this.follow(span.href)
+    }));
+    if (base.isP || base.isAlert) base.spans = spans(block.spans);
+    if (base.isCode) {
+      base.lang = block.lang || '';
+      base.copy = () => this.setState({ status: 'Copied ' + block.t.length + ' characters' });
+    }
+    if (base.isList) base.items = block.items.map((item) => ({ c, spans: spans(item) }));
+    if (base.isPlainTable) {
+      const cols = 'repeat(' + block.head.length + ', minmax(120px, 220px))';
+      base.cols = cols;
+      base.head = block.head.map((t) => ({ t }));
+      base.rows = block.rows.map((cells) => ({ c, cols, cells: cells.map((t) => ({ t })) }));
+    }
+    if (base.isTest) {
+      const focused = tableIndex === focusTable;
+      const cols = 'repeat(' + block.head.length + ', minmax(88px, 170px))';
+      const result = tableResult(block, rows);
+      const shown = block.tableFail && result && result !== 'running';
+      base.cols = cols;
+      base.head = block.head.map((t) => ({ t }));
+      base.headBg = focused ? c.bar : c.raised;
+      base.headFg = focused ? c.barText : c.text;
+      base.pick = () => this.setState({ focusTable: tableIndex, focusRow: null });
+      base.run = () => {
+        this.setState({ focusTable: tableIndex, focusRow: null });
+        this.run(block.rows.map((row) => row.line), file + ':' + block.line);
+      };
+      base.hasVerdict = Boolean(result);
+      base.verdict = result ? MARKS[result] + ' ' + result : '';
+      base.verdictColor = this.colourOf(c, result);
+      base.hasTableFail = Boolean(shown);
+      base.rows = block.rows.map((row) => {
+        const got = rows[row.line];
+        const isFocused = focused && focusRow === row.line;
+        const isHovered = Number(this.val('hoverRow', -1)) === row.line;
+        const busy = Boolean(this.busy());
+        const out = got ? got.r : null;
+        const snoozed = out === 'snoozed';
+        return {
+          c, cols, line: row.line,
+          cells: row.cells.map((t) => ({ t })),
+          result: out || 'no result',
+          mark: out ? MARKS[out] : '',
+          markColor: isFocused ? c.barText : this.colourOf(c, out),
+          bg: isFocused ? c.bar : isHovered && !out ? c.hover : this.tintOf(c, out),
+          fg: isFocused ? c.barText : c.text,
+          focused: isFocused,
+          showRun: isFocused || isHovered,
+          busy,
+          runBg: isFocused ? 'transparent' : busy ? c.raised : c.bar,
+          runFg: isFocused ? c.barText : busy ? c.quote : c.barText,
+          enter: () => this.setState({ hoverRow: row.line }),
+          leave: () => this.setState({ hoverRow: -1 }),
+          hasNote: Boolean(got && got.note),
+          note: got ? got.note : '',
+          noteBg: this.tintOf(c, out),
+          noteFg: snoozed ? c.quote : c.note,
+          pick: () => this.setState({ focusTable: tableIndex, focusRow: row.line }),
+          run: () => this.run([row.line], file + ':' + row.line)
+        };
+      });
+    }
+    return base;
+  }
+
+  treeRows(c, ws, file) {
+    const results = this.results();
+    const failures = this.failures();
+    const folders = this.val('folders', {});
+    const fileRow = (path, depth) => {
+      const page = ws.pages[path] || { blocks: [] };
+      const result = fileResult(page, results[path] || {}, failures[path]);
+      const shown = result && result !== 'not run';
+      const selected = path === file;
+      const isTest = this.isTestFile(ws, path);
+      return {
+        c, label: path.split('/').pop(), indent: 8 + depth * 18,
+        bg: selected ? c.sel : 'transparent', weight: selected ? 600 : 400,
+        isPlainFile: !isTest, isTestFile: isTest, isOpenFolder: false, isClosedFolder: false,
+        mark: shown ? MARKS[result] : '', markColor: this.colourOf(c, result),
+        pick: () => this.open(path, true)
+      };
+    };
+    const grouped = {};
+    const top = [];
+    ws.files.forEach((path) => {
+      const slash = path.indexOf('/');
+      if (slash > 0) {
+        const folder = path.slice(0, slash);
+        grouped[folder] = (grouped[folder] || []).concat(path);
+      } else {
+        top.push(path);
+      }
+    });
+    const rows = [];
+    Object.keys(grouped).sort().forEach((folder) => {
+      const toggled = folders[folder];
+      const isOpen = toggled !== undefined ? toggled : file.startsWith(folder + '/');
+      rows.push({
+        c, label: folder, indent: 8, bg: 'transparent', weight: 400,
+        isPlainFile: false, isTestFile: false, isOpenFolder: isOpen, isClosedFolder: !isOpen,
+        mark: '', markColor: c.quote,
+        pick: () => this.setState({ folders: { ...folders, [folder]: !isOpen } })
+      });
+      if (isOpen) grouped[folder].forEach((path) => rows.push(fileRow(path, 1)));
+    });
+    top.forEach((path) => rows.push(fileRow(path, 0)));
+    return rows;
+  }
+
+  searchHits(c, ws) {
+    const query = this.val('query', '');
+    const only = this.val('onlyTests', false);
+    const sel = this.val('sel', 0);
+    const files = ws.files.filter((path) => !only || isTestPage(ws.pages[path] || { blocks: [] }));
+    const found = files.filter((path) => fuzzy(query, path)).map((path) => ({ path, heading: null }));
+    if (query) {
+      files.forEach((path) => {
+        (ws.pages[path] || { blocks: [] }).blocks
+          .filter((block) => block.k === 'h1' || block.k === 'h2')
+          .filter((block) => fuzzy(query, block.t))
+          .forEach((block) => found.push({ path, heading: block.t }));
+      });
+    }
+    return found.slice(0, 9).map((hit, at) => ({
+      ...hit, c,
+      isHeading: Boolean(hit.heading),
+      bg: at === sel ? c.bar : 'transparent',
+      fg: at === sel ? c.barText : c.text,
+      pick: () => this.open(hit.path, true)
+    }));
+  }
+
+  graph(c, ws, file) {
+    const { distance } = columnsOf(ws);
+    const layout = layoutOf(ws);
+    const dragged = this.val('graphPos', {});
+    const spotOf = (path) => dragged[path] || layout.at[path];
+    const selected = this.val('graphSelected', ws.files.includes(file) ? file : ws.files[0]);
+    const focus = this.val('graphHover', null) || selected;
+    const pan = this.val('pan', { x: 0, y: 0 });
+    const zoom = this.val('zoom', 1);
+    const results = this.results();
+    const failures = this.failures();
+    const near = {};
+    ws.files.forEach((path) => {
+      near[path] = new Set();
+    });
+    ws.links.forEach(([from, to]) => {
+      near[from].add(to);
+      near[to].add(from);
+    });
+    const resultOf = (path) => {
+      const result = fileResult(ws.pages[path] || { blocks: [] }, results[path] || {}, failures[path]);
+      return result && result !== 'not run' ? result : null;
+    };
+    const sizeOf = (path) => {
+      const size = Math.min(44, 12 + 4 * Math.sqrt(near[path].size));
+      return resultOf(path) ? Math.max(size, 24) : Math.max(size, 16);
+    };
+    const nodes = ws.files.map((path) => {
+      const isSelected = path === selected;
+      const result = resultOf(path);
+      const isTest = this.isTestFile(ws, path);
+      const lit = path === focus || near[focus].has(path);
+      const size = sizeOf(path);
+      const spot = spotOf(path);
+      let fill = c.line;
+      if (isTest) fill = c.raised;
+      if (result) fill = this.colourOf(c, result);
+      return {
+        c, label: path.replace(/\.md$/i, ''),
+        left: spot.x - size / 2, top: spot.y - size / 2, size,
+        labelX: spot.x, labelY: spot.y + size / 2 + 5,
+        fill, stroke: result ? fill : c.line,
+        halo: isSelected ? c.bar : 'transparent',
+        mark: result ? MARKS[result] : '',
+        opacity: lit ? 1 : 0.55,
+        labelColor: lit ? c.text : c.quote,
+        weight: path === file ? 600 : 400,
+        enter: () => this.setState({ graphHover: path }),
+        leave: () => this.setState({ graphHover: null }),
+        down: (event) => {
+          event.stopPropagation();
+          this.moved = false;
+          this.drag = { kind: 'node', path, x: event.clientX, y: event.clientY, from: spot };
+        },
+        pick: () => {
+          if (this.moved) {
+            this.moved = false;
+          } else if (isSelected) {
+            this.open(path, true);
+          } else {
+            this.setState({ graphSelected: path });
+          }
+        }
+      };
+    });
+    const pairs = {};
+    ws.links.forEach(([from, to]) => {
+      const key = [from, to].sort().join('|');
+      if (!pairs[key]) pairs[key] = { from, to, both: false };
+      else if (pairs[key].from !== from) pairs[key].both = true;
+    });
+    const arrow = (from, to, gap) => {
+      const dx = to.x - from.x;
+      const dy = to.y - from.y;
+      const length = Math.max(Math.hypot(dx, dy), 1);
+      const ux = dx / length;
+      const uy = dy / length;
+      const tipX = to.x - ux * gap;
+      const tipY = to.y - uy * gap;
+      const baseX = tipX - ux * 9;
+      const baseY = tipY - uy * 9;
+      return 'M' + tipX + ' ' + tipY + ' L' + (baseX - uy * 4.5) + ' ' + (baseY + ux * 4.5) + ' L' + (baseX + uy * 4.5) + ' ' + (baseY - ux * 4.5) + ' Z ';
+    };
+    let dim = '';
+    let lit = '';
+    let heads = '';
+    Object.values(pairs).forEach((pair) => {
+      const one = spotOf(pair.from);
+      const two = spotOf(pair.to);
+      const line = 'M' + one.x + ' ' + one.y + ' L' + two.x + ' ' + two.y + ' ';
+      if (pair.from === focus || pair.to === focus) {
+        lit += line;
+        heads += arrow(one, two, sizeOf(pair.to) / 2 + 3);
+        if (pair.both) heads += arrow(two, one, sizeOf(pair.from) / 2 + 3);
+      } else {
+        dim += line;
+      }
+    });
+    const zoomTo = (next) => this.setState({ zoom: Math.min(2.5, Math.max(0.4, next)) });
+    const outFiles = ws.links.filter((pair) => pair[0] === selected).map((pair) => pair[1]).sort();
+    const inFiles = ws.links.filter((pair) => pair[1] === selected).map((pair) => pair[0]).sort();
+    const entry = (path) => ({ c, t: path, fg: c.link, pick: () => this.setState({ graphSelected: path }) });
+    const missing = (ws.missing[selected] || []).map((path) => ({ c, t: path + ' (missing)', fg: c.quote, pick: () => {} }));
+    const out = outFiles.map(entry).concat(missing);
+    const links = inFiles.map(entry);
+    const away = distance[selected];
+    return {
+      width: layout.w, height: layout.h,
+      transform: 'translate(' + pan.x + 'px, ' + pan.y + 'px) scale(' + zoom + ')',
+      nodes, dim, lit, heads, selected, out, in: links,
+      noOut: out.length === 0, noIn: links.length === 0,
+      distance: away === undefined ? 'Not reachable from the start page' : away === 0 ? 'The start page' : away === 1 ? '1 link from the start page' : away + ' links from the start page',
+      open: () => this.open(selected, true),
+      zoomIn: () => zoomTo(zoom * 1.2),
+      zoomOut: () => zoomTo(zoom / 1.2),
+      fit: () => this.setState({ zoom: 1, pan: { x: 0, y: 0 }, graphPos: {} }),
+      down: (event) => {
+        this.moved = false;
+        this.drag = { kind: 'pan', x: event.clientX, y: event.clientY, from: pan };
+      },
+      move: (event) => {
+        const drag = this.drag;
+        if (!drag) return;
+        const dx = event.clientX - drag.x;
+        const dy = event.clientY - drag.y;
+        if (Math.abs(dx) + Math.abs(dy) > 3) this.moved = true;
+        if (drag.kind === 'pan') {
+          this.setState({ pan: { x: drag.from.x + dx, y: drag.from.y + dy } });
+        } else {
+          this.setState({ graphPos: { ...dragged, [drag.path]: { x: drag.from.x + dx / zoom, y: drag.from.y + dy / zoom } } });
+        }
+      },
+      up: () => {
+        this.drag = null;
+      },
+      wheel: (event) => {
+        const box = event.currentTarget.getBoundingClientRect();
+        const next = Math.min(2.5, Math.max(0.4, zoom * (event.deltaY < 0 ? 1.12 : 0.89)));
+        const px = event.clientX - box.left;
+        const py = event.clientY - box.top;
+        const ratio = next / zoom;
+        this.setState({ zoom: next, pan: { x: px - (px - pan.x) * ratio, y: py - (py - pan.y) * ratio } });
+      }
+    };
+  }
+
+  renderVals() {
+    const tone = this.val('tone', 'dark');
+    const c = THEMES[tone] || THEMES.dark;
+    const ws = this.workspace();
+    const file = this.file();
+    const page = this.page();
+    const view = this.val('view', 'doc');
+    const overlay = this.val('overlay', null);
+    const busy = this.busy();
+    const rows = this.results()[file] || {};
+    const failure = this.failures()[file];
+    const tables = tablesOf(page);
+    const testPage = isTestPage(page);
+    const focusTable = Math.min(Number(this.val('focusTable', 1)), Math.max(tables.length - 1, 0));
+    const focusRowValue = this.val('focusRow', null);
+    const focusRow = focusRowValue === null ? null : Number(focusRowValue);
+    const treeOn = this.val('tree', true);
+    const testsOn = this.val('testsPanel', true);
+    const history = this.val('history', [file]);
+    const at = this.val('at', 0);
+    const onlyTests = this.val('onlyTests', false);
+
+    let tableIndex = -1;
+    const docBlocks = page.blocks.map((block) => {
+      if (block.k === 'test') tableIndex += 1;
+      return this.decorate(c, block, rows, tableIndex, focusTable, focusRow);
+    });
+
+    const result = fileResult(page, rows, failure);
+    const shownResult = result && result !== 'not run';
+    const tableList = tables.map((table, index) => {
+      const got = tableResult(table, rows);
+      return {
+        c, name: table.name, result: got || 'not run',
+        mark: got ? MARKS[got] : '', color: this.colourOf(c, got),
+        bg: index === focusTable ? c.sel : 'transparent',
+        pick: () => this.setState({ focusTable: index, focusRow: null })
+      };
+    });
+    const failureList = [];
+    tables.forEach((table, index) => {
+      table.rows.forEach((row) => {
+        const got = rows[row.line];
+        if (got && got.note) {
+          failureList.push({
+            c, where: table.name + ', line ' + row.line, message: got.note,
+            color: got.r === 'snoozed' ? c.quote : c.note,
+            pick: () => this.setState({ focusTable: index, focusRow: row.line })
+          });
+        }
+      });
+      if (table.tableFail && tableResult(table, rows)) {
+        failureList.push({
+          c, where: table.name + ', line ' + table.line, message: table.tableFail, color: c.note,
+          pick: () => this.setState({ focusTable: index, focusRow: null })
+        });
+      }
+    });
+
+    const seededStatus = failure ? 'temoc failed: ' + failure : null;
+    const status = this.val('status', seededStatus);
+    const statusText = status || (busy ? 'Running ' + busy + '...' : '');
+    const hits = overlay === 'search' ? this.searchHits(c, ws) : [];
+    const lines = tables.flatMap((table) => table.rows.map((row) => row.line));
+
+    return {
+      c, file, wsName: ws.name,
+      isDocView: view !== 'graph', isGraphView: view === 'graph',
+      isSearch: overlay === 'search', isHelp: overlay === 'help',
+      showTree: treeOn, showTests: testPage && testsOn && view !== 'graph',
+      isTestPage: testPage, isBusy: Boolean(busy),
+      showNoConfig: testPage && !ws.config, hasFail: Boolean(failure), failMessage: failure ? 'temoc failed: ' + failure : '',
+      treeRows: this.treeRows(c, ws, file),
+      docBlocks,
+      graph: view === 'graph' ? this.graph(c, ws, file) : { nodes: [], out: [], in: [] },
+      treeBtnBg: treeOn ? c.sel : 'transparent', testsBtnBg: testsOn ? c.sel : 'transparent',
+      noBack: at <= 0, noForward: at >= history.length - 1,
+      backFg: at <= 0 ? c.hair : c.quote, forwardFg: at >= history.length - 1 ? c.hair : c.quote,
+      docTabBg: view !== 'graph' ? c.sel : 'transparent', docTabFg: view !== 'graph' ? c.text : c.quote,
+      graphTabBg: view === 'graph' ? c.sel : 'transparent', graphTabFg: view === 'graph' ? c.text : c.quote,
+      runBg: busy ? c.raised : c.bar, runFg: busy ? c.quote : c.barText, runLabel: busy ? 'Running' : 'Run file',
+      fileVerdict: result === 'not run' ? 'not run' : result ? (MARKS[result] + ' ' + result) : '',
+      fileColor: this.colourOf(c, result),
+      fileStatus: shownResult ? 'file: ' + result : '', hasFileResult: Boolean(shownResult),
+      hasTables: tables.length > 0, tableList, hasFailures: failureList.length > 0, failureList,
+      hasCommand: Boolean(this.command()), command: this.command() || '',
+      statusText,
+      query: this.val('query', ''), hits, noHits: hits.length === 0,
+      onlyBg: onlyTests ? c.bar : 'transparent', onlyFg: onlyTests ? c.barText : c.quote, onlyBorder: onlyTests ? c.bar : c.hair,
+      helpGroups: HELP.map((group) => ({ c, title: group.title, keys: group.keys.map(([key, action]) => ({ key, action })) })),
+      toggleTree: () => this.setState({ tree: !treeOn }),
+      toggleTests: () => this.setState({ testsPanel: !testsOn }),
+      goBack: () => this.move(-1),
+      goForward: () => this.move(1),
+      openSearch: () => this.setState({ overlay: 'search', query: '', sel: 0 }),
+      openHelp: () => this.setState({ overlay: 'help' }),
+      closeOverlay: () => this.setState({ overlay: null }),
+      showDoc: () => this.setState({ view: 'doc' }),
+      showGraph: () => this.setState({ view: 'graph', graphSelected: file, graphHover: null }),
+      swapTone: () => this.setState({ tone: tone === 'dark' ? 'light' : 'dark' }),
+      runFile: () => this.run(lines, file),
+      toggleOnlyTests: () => this.setState({ onlyTests: !onlyTests, sel: 0 }),
+      onQuery: (event) => this.setState({ query: event.target.value, sel: 0 }),
+      onSearchKey: (event) => {
+        const sel = this.val('sel', 0);
+        if (event.key === 'ArrowDown') {
+          event.preventDefault();
+          this.setState({ sel: Math.min(sel + 1, hits.length - 1) });
+        } else if (event.key === 'ArrowUp') {
+          event.preventDefault();
+          this.setState({ sel: Math.max(sel - 1, 0) });
+        } else if (event.key === 'Enter' && hits[sel]) {
+          hits[sel].pick();
+        } else if (event.key === 'Escape') {
+          this.setState({ overlay: null });
+        } else if (event.key === 't' && event.ctrlKey) {
+          event.preventDefault();
+          this.setState({ onlyTests: !onlyTests, sel: 0 });
+        }
+      }
+    };
+  }
+}
+</script>
+</body>
+</html>

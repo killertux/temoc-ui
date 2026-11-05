@@ -29,6 +29,24 @@ file are highlighted.
 | Files are shown | docs      | `Ctrl-g` | notes.MD | yes      |
 | Links are drawn | docs      | `Ctrl-g` | ▶        | yes      |
 
+## Columns
+
+Files are arranged in columns by their [distance](../viewer/graph.md#distance) from the
+start page. Each column is in alphabetical order ignoring case. Files that cannot be
+reached from the start page are in a final column of their own, and there are as many
+columns as the links need.
+
+In `columns?` below, columns are separated by semicolons.
+
+[//]: # "decisionTable Tui"
+
+| # situation         | workspace  | arguments | keys         | columns?                                                                                                            |
+| ------------------- | ---------- | --------- | ------------ | ------------------------------------------------------------------------------------------------------------------- |
+| Unreachable last    | docs       |           | `Ctrl-g`     | README.md; guide/getting-started.md, guide/long-page.md, reference.md; notes.MD                                     |
+| Test files included | calculator |           | `Ctrl-g`     | README.md; failing.md, passing.md; broken.md, mixed.md, snoozed.md                                                  |
+| No README           | docs       | guide     | `Esc Ctrl-g` | getting-started.md; long-page.md                                                                                    |
+| Many hops           | link-chain |           | `Ctrl-g`     | README.md; shortcut.md, stop-one.md; stop-two.md; stop-three.md; stop-four.md; stop-five.md; stop-six.md; island.md |
+
 ## The panel
 
 A panel below the graph lists the links out of the selected file and into it. A list

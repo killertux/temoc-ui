@@ -53,13 +53,30 @@ What only the terminal does. Start with
 - [Themes](tui/themes.md): dark and light, and the colours of each.
 - [Keys](tui/keys.md): every key in one place.
 
+## Graphical interface
+
+What only the GUI does. None of it is built yet, so every table here is snoozed. Start
+with [how these pages work](gui/writing-specs.md). The pages describe behavior, and
+the [design](gui/design/README.md) shows how it should look.
+
+- [Opening the GUI](gui/opening.md): the `--gui` flag.
+- [The window](gui/window.md): the panels and what each one is for.
+- [Rendering](gui/rendering.md): what the GUI adds to how markdown is shown.
+- [Navigation](gui/navigation.md): scrolling, wide blocks, links, and history.
+- [Search](gui/search.md): the search box.
+- [File tree](gui/file-tree.md): browsing the workspace in a side panel.
+- [Graph view](gui/graph.md): a graph that lays itself out.
+- [Running tests](gui/running.md): buttons, keys, and the tests panel.
+- [Row results](gui/row-results.md): marks and notes.
+- [Selecting text](gui/selecting-text.md): selecting with the mouse and copying.
+- [Dark and light](gui/themes.md): the two modes.
+- [Keys](gui/keys.md): every key in one place.
+
 ## Scope
 
 These are planned for later, and none of them are specified yet:
 
 - **Symbols across rows and tables.** A table or row run alone cannot see `$V`
   symbols set by another one.
-- **Web interface.** It will sit behind a compile-time feature flag, follow the core
-  pages, and get a folder of its own next to `tui/`.
 - **Cancelling a run**, and **reloading a page** that changed on disk.
 - **Respecting `.gitignore`** when listing files.

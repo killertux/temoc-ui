@@ -1,0 +1,48 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-11-05T12:00:00Z" },
+  "title": "Temoc GUI Designs",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 1440, "h": 900, "title": "Prototype: click through it", "expand": "fill", "is_interactive": true },
+    "Running.dc.html": { "x": 1520, "y": 0, "w": 1440, "h": 900, "title": "A run in progress", "expand": "fill" },
+    "Results.dc.html": { "x": 3040, "y": 0, "w": 1440, "h": 900, "title": "Errors, skips, table failures", "expand": "fill" },
+    "RowHover.dc.html": { "x": 4560, "y": 0, "w": 1440, "h": 900, "title": "Hover a row to run it", "expand": "fill" },
+    "Reader.dc.html": { "x": 0, "y": 1360, "w": 1440, "h": 900, "title": "A page without tests", "expand": "fill" },
+    "Search.dc.html": { "x": 1520, "y": 1360, "w": 1440, "h": 900, "title": "Search", "expand": "fill" },
+    "Graph.dc.html": { "x": 3040, "y": 1360, "w": 1440, "h": 900, "title": "Graph of the spec folder", "expand": "fill" },
+    "GraphResults.dc.html": { "x": 4560, "y": 1360, "w": 1440, "h": 900, "title": "Graph after a run", "expand": "fill" },
+    "Light.dc.html": { "x": 0, "y": 2720, "w": 1440, "h": 900, "title": "Light theme", "expand": "fill" },
+    "Help.dc.html": { "x": 1520, "y": 2720, "w": 1440, "h": 900, "title": "Help", "expand": "fill" },
+    "NoConfig.dc.html": { "x": 3040, "y": 2720, "w": 1440, "h": 900, "title": "No temoc configuration", "expand": "fill" },
+    "Failed.dc.html": { "x": 4560, "y": 2720, "w": 1440, "h": 900, "title": "temoc could not finish", "expand": "fill" },
+    "Parity.dc.html": { "x": 0, "y": 4080, "w": 1440, "h": 5000, "title": "TUI to GUI work list", "expand": "fill" },
+    "Markdown.dc.html": { "x": 1520, "y": 4080, "w": 1440, "h": 3000, "title": "Markdown elements", "expand": "fill" },
+    "System.dc.html": { "x": 3040, "y": 4080, "w": 1440, "h": 3170, "title": "Tokens and components", "expand": "fill" }
+  },
+  "order": [
+    "Main.dc.html",
+    "Running.dc.html",
+    "Results.dc.html",
+    "RowHover.dc.html",
+    "Reader.dc.html",
+    "Search.dc.html",
+    "Graph.dc.html",
+    "GraphResults.dc.html",
+    "Light.dc.html",
+    "Help.dc.html",
+    "NoConfig.dc.html",
+    "Failed.dc.html",
+    "Parity.dc.html",
+    "Markdown.dc.html",
+    "System.dc.html"
+  ],
+  "notes": {
+    "rowRunning": { "x": 0, "y": -260, "text": "Running tests", "kind": "title1", "maxW": 6000 },
+    "rowReading": { "x": 0, "y": 1100, "text": "Reading and moving around", "kind": "title1", "maxW": 6000 },
+    "rowStates": { "x": 0, "y": 2460, "text": "Other states", "kind": "title1", "maxW": 6000 },
+    "rowBuild": { "x": 0, "y": 3820, "text": "What to build", "kind": "title1", "maxW": 4480 }
+  },
+  "designSystems": []
+}

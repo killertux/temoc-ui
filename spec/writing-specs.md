@@ -17,7 +17,8 @@ temoc -c temoc.toml
 The pages at this level describe what temoc-ui does whatever the interface is, and
 their tables never touch a screen, a key, or a colour. Each interface gets a folder
 of its own for what only it does, and for proof that it reaches the core behavior.
-The first is [`tui/`](tui/writing-specs.md), the terminal.
+There are two: [`tui/`](tui/writing-specs.md), the terminal, and
+[`gui/`](gui/writing-specs.md), the graphical interface.
 
 A behavior belongs in the core if another interface would have to do the same.
 How it looks and what you press to get it belong to the interface.
@@ -73,7 +74,6 @@ nothing to see of a run in progress. `wait for row` is for looking at one.
 | `results?`         | Search results in order, separated by commas, or `none`.                               |
 | `first result?`    | The top search result, or `none`.                                                      |
 | `tree?`            | The rows of the file tree in order. A folder ends with `/`.                            |
-| `columns?`         | The graph's columns, separated by semicolons.                                          |
 | `links?`           | Every link in the graph, written `from -> to`.                                         |
 | `distance?`        | Links from the start page to the open document, or `not reachable`.                    |
 | `links out?`       | The links out of the open document, or `none`.                                         |
@@ -103,6 +103,7 @@ running the specification does not run them as tests too.
 | [`link-chain`](../samples/link-chain/README.md) | A graph wider than the screen.  |
 | [`wide-blocks`](../samples/wide-blocks/README.md) | Content wider than the screen.  |
 | [`themes`](../samples/themes/README.md)       | One of each thing a theme colours. |
+| [`elements`](../samples/elements/README.md)   | Markdown only the GUI draws differently, and a wide test table. |
 
 The `calculator` and `outcomes` workspaces run real temoc against a small Slim server
 built by the spec harness.

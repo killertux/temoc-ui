@@ -27,11 +27,11 @@ are reported but do not fail the run.
 
 **Core.** What temoc-ui does whatever its interface is.
 
-**Interface.** A way of using temoc-ui, such as the terminal. Each one has its own
-folder in the specification.
+**Interface.** A way of using temoc-ui, such as the terminal or the GUI. Each one has
+its own folder in the specification.
 
-**Focused link**, **focused table** and **focused row.** In the terminal, the link,
-test table or row of that table that keys act on.
+**Focused link**, **focused table** and **focused row.** The link, test table or row of
+that table that keys act on.
 
 **Selection mode.** In the terminal, the state entered with `v`, where a cursor moves
 through the text. See [Selecting text](tui/selecting-text.md).

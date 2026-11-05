@@ -122,15 +122,6 @@ impl Core {
     }
 
     #[must_use]
-    pub fn columns(&self) -> String {
-        self.read(|scenario| {
-            let columns = scenario.graph().column_names();
-            let columns: Vec<String> = columns.iter().map(|column| column.join(", ")).collect();
-            list(&columns, "; ")
-        })
-    }
-
-    #[must_use]
     pub fn links(&self) -> String {
         self.read(|scenario| {
             let links = scenario.graph().link_names();
