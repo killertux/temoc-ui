@@ -3,11 +3,12 @@
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
+use std::fs;
 use std::path::Path;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use temoc_ui::app::Launch;
-use temoc_ui::gui::egui::{Key, Modifiers, Rect, Vec2};
+use temoc_ui::gui::egui::{Key, Modifiers, Pos2, Rect, Vec2};
 use temoc_ui::gui::{Gui, tags};
 
 const HEIGHT: f32 = 700.0;
@@ -72,5 +73,57 @@ fn focusing_a_table_brings_it_into_view() -> Result<(), String> {
     let after = ran("outcomes", "errors.md", 2)?;
     let after = last_tagged(&after, tags::VERDICT)?;
     assert!(after.bottom() <= HEIGHT);
+    Ok(())
+}
+
+#[test]
+fn the_run_table_button_stays_clear_of_the_columns() -> Result<(), String> {
+    let folder = std::env::temp_dir().join(format!("temoc-ui-wide-{}", std::process::id()));
+    fs::create_dir_all(&folder).map_err(|error| error.to_string())?;
+    let wide = "[//]: # \"decisionTable Wide\"\n\n\
+                | a first column | a second column | a third column | the last one? |\n\
+                | -------------- | --------------- | -------------- | ------------- |\n\
+                | 1              | 2               | 3              | 4             |\n";
+    fs::write(folder.join("README.md"), wide).map_err(|error| error.to_string())?;
+    let launch = Launch {
+        current_dir: folder.clone(),
+        ..Launch::default()
+    };
+    let window = Gui::start(&launch)?;
+    let mut harness = Harness::builder()
+        .with_size(Vec2::new(1440.0, HEIGHT))
+        .build_ui_state(|ui, window: &mut Gui| window.show(ui), window);
+    harness.run_ok();
+    let button = harness.get_by_label("Run table").rect();
+    for column in ["a first column", "the last one?"] {
+        let text = harness.get_by_label(column).rect();
+        assert!(!button.intersects(text), "over `{column}`");
+    }
+    fs::remove_dir_all(&folder).map_err(|error| error.to_string())
+}
+
+#[test]
+fn hovering_a_row_swaps_its_mark_for_the_button_that_runs_it() -> Result<(), String> {
+    let mut window = ran("calculator", "passing.md", 0)?;
+    let marks = |window: &Harness<'static, Gui>| {
+        let tag = Some(tags::MARK);
+        let found = window.query_all_by(move |node| node.description().as_deref() == tag);
+        found.count()
+    };
+    let before = marks(&window);
+    let tag = Some(tags::TEST_ROW);
+    let row = {
+        let mut rows = window.query_all_by(move |node| node.description().as_deref() == tag);
+        rows.next().ok_or("no test row")?.rect()
+    };
+    window.hover_at(row.center());
+    window.run_ok();
+    assert_eq!(marks(&window), before - 1);
+    let button = window.get_by_label("Run row").rect();
+    assert!(button.right() <= row.left(), "the button is in the gutter");
+    window.hover_at(Pos2::new(1.0, 1.0));
+    window.run_ok();
+    assert_eq!(marks(&window), before);
+    assert!(window.query_by_label("Run row").is_none());
     Ok(())
 }

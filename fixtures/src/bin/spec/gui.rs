@@ -35,6 +35,9 @@ enum Action {
     ClickIn(String, String),
     ClickRow(String),
     ClickTree(String),
+    /// Pressing on the first character of the one, and letting go on the last
+    /// character of the other.
+    Drag(String, String),
     Hover(String),
     HoverRow(String),
     /// Turning the wheel over text, which moves the page by this much.
@@ -66,6 +69,12 @@ impl Action {
                         }
                         Some(Token::Word(word)) if word == "row" => {
                             Self::ClickRow(line(tokens.next(), "Click row")?)
+                        }
+                        _ => return Err(NOT_IMPLEMENTED.into()),
+                    },
+                    "Drag" => match tokens.next() {
+                        Some(Token::Quoted(from)) => {
+                            Self::Drag(from, quoted(tokens.next(), "Drag")?)
                         }
                         _ => return Err(NOT_IMPLEMENTED.into()),
                     },
@@ -164,6 +173,13 @@ fn key(word: &str) -> Option<Action> {
     Some(Action::Press(key, modifiers))
 }
 
+/// Which end of some text.
+#[derive(Debug, Clone, Copy)]
+enum Edge {
+    Start,
+    End,
+}
+
 /// What happened when a scenario ran.
 pub enum Played {
     /// temoc-ui refused to open, with its message.
@@ -242,6 +258,8 @@ impl Scene {
 
     fn take(&mut self, action: &Action) -> Result<(), String> {
         match action {
+            // A window turns this one into an event of its own, and no key.
+            Action::Press(Key::C, Modifiers::COMMAND) => self.harness.event(Event::Copy),
             Action::Press(key, modifiers) => {
                 self.harness.key_press_modifiers(*modifiers, *key);
             }
@@ -265,6 +283,11 @@ impl Scene {
                     label == *name || label == folder
                 });
                 row.ok_or(format!("no `{name}` in the tree"))?.click();
+            }
+            Action::Drag(from, to) => {
+                let start = self.character(from, Edge::Start)?;
+                let end = self.character(to, Edge::End)?;
+                self.drag(start, end);
             }
             Action::Hover(text) => self.named(text)?.hover(),
             Action::HoverRow(line) => self.row(line)?.hover(),
@@ -404,6 +427,49 @@ impl Scene {
             says(node.label()) || says(node.value())
         });
         nodes.map(|node| node.rect()).collect()
+    }
+
+    /// Where one end of this text is on the page. Every face of the font is
+    /// as wide, so the place of a character says how far along it is.
+    fn character(&self, text: &str, edge: Edge) -> Result<Pos2, String> {
+        let page = self.window().page_rect().ok_or("no page shows")?;
+        let mut texts = self.harness.query_all_by(|node| {
+            let said = node.value().or_else(|| node.label()).unwrap_or_default();
+            said.contains(text)
+        });
+        let found = texts.find(|node| page.contains_rect(node.rect()));
+        let node = found.ok_or(format!("`{text}` is not on the page"))?;
+        let said = label_of(&node);
+        let before = said.find(text).unwrap_or_default();
+        let characters = |text: &str| text.chars().map(|_| 1.0_f32).sum::<f32>();
+        let width = node.rect().width() / characters(&said);
+        let along = match edge {
+            Edge::Start => characters(said.get(..before).unwrap_or_default()) + 0.25,
+            Edge::End => {
+                characters(said.get(..before).unwrap_or_default()) + characters(text) - 0.25
+            }
+        };
+        Ok(Pos2::new(
+            node.rect().left() + along * width,
+            node.rect().center().y,
+        ))
+    }
+
+    /// Drags the pointer with its button down, one step at a time.
+    fn drag(&mut self, from: Pos2, to: Pos2) {
+        let button = |pos, pressed| Event::PointerButton {
+            pos,
+            button: PointerButton::Primary,
+            pressed,
+            modifiers: Modifiers::NONE,
+        };
+        self.harness.hover_at(from);
+        self.harness.run_ok();
+        self.harness.event(button(from, true));
+        self.harness.run_ok();
+        self.harness.hover_at(to);
+        self.harness.run_ok();
+        self.harness.event(button(to, false));
     }
 
     /// Whether this text is on screen.

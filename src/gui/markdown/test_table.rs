@@ -3,22 +3,21 @@
 //!
 //! The cells scroll sideways. Everything else is placed afterwards around that
 //! scroll area, from the rows it reports: the tints behind the rows, the marks
-//! in the gutter and the run buttons at the row ends. That keeps them in view
-//! however far the cells are scrolled.
+//! and the run buttons in the gutter. That keeps them in view however far the
+//! cells are scrolled.
 
 use super::extras::top_corners;
 use super::{BODY, Drawing, STRONG, Style};
 use crate::document::{children, line_of};
-use crate::gui::icons::{self, RunLook};
+use crate::gui::icons;
 use crate::gui::look::Palette;
 use crate::gui::{Command, result_colour, tagged, tags};
 use crate::run::{RowResult, TableResult};
 use crate::temoc::{Failure, RunResult, TestTable};
 use eframe::egui::accesskit::Role;
 use eframe::egui::{
-    Align, Color32, CornerRadius, FontFamily, FontId, Label, Layout, Pos2, Rect, Response,
-    RichText, Sense, Shape, Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2, WidgetInfo,
-    pos2, vec2,
+    Align, Color32, CornerRadius, FontFamily, FontId, Label, Layout, Rect, Response, RichText,
+    Sense, Shape, Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2, WidgetInfo, pos2, vec2,
 };
 use markdown::mdast::{AlignKind, Node, Table};
 
@@ -37,10 +36,8 @@ const NOTE: f32 = 12.5;
 /// How big a mark is.
 const MARK: f32 = 14.0;
 const CORNER: u8 = 6;
-const RUN_TABLE: (&str, Vec2) = ("Run table", vec2(100.0, 26.0));
-const RUN_ROW: (&str, Vec2) = ("Run row", vec2(86.0, 26.0));
-/// How far a run button sits from the end of its row.
-const RUN_MARGIN: f32 = 6.0;
+const RUN_TABLE: &str = "Run table";
+const RUN_ROW: &str = "Run row";
 
 /// A row of the table, once the cells are drawn.
 struct Placed<'table> {
@@ -64,7 +61,6 @@ impl Drawing<'_> {
         let spot = ui.scope(|ui| {
             ui.spacing_mut().item_spacing = Vec2::ZERO;
             ui.style_mut().wrap_mode = Some(TextWrapMode::Extend);
-            ui.style_mut().interaction.selectable_labels = false;
             let tints = ui.painter().add(Shape::Noop);
             let left = ui.cursor().left();
             let width = ui.available_width();
@@ -154,10 +150,13 @@ impl Drawing<'_> {
         let builder = UiBuilder::new()
             .id_salt(("row", line_of(row)))
             .sense(Sense::click());
+        self.clicked_text = false;
         let drawn = ui.scope_builder(builder, |ui| {
             ui.set_min_width(cells.width);
             if focused {
                 ui.visuals_mut().override_text_color = Some(self.palette.bar_text);
+                // The pale tint would hide the pale text of the row.
+                ui.visuals_mut().selection.bg_fill = self.palette.bar_text.gamma_multiply(0.3);
             }
             ui.horizontal(|ui| {
                 let columns = children(row).iter().zip(cells.widths);
@@ -176,7 +175,8 @@ impl Drawing<'_> {
         });
         let response = drawn.response;
         describe_row(&response, line, cells.test, result, focused);
-        if response.clicked() {
+        // Text can be selected, so it hears the clicks on it instead of the row.
+        if response.clicked() || self.clicked_text {
             let table = cells.index;
             self.happened.commands.push(Command::Focus { table, line });
         }
@@ -200,14 +200,12 @@ impl Drawing<'_> {
         ui.allocate_ui_with_layout(size, layout, |ui| {
             ui.set_min_size(size);
             ui.add_space(CELL_PADDING + lead);
-            for node in children(cell) {
-                self.inline(ui, node, style);
-            }
+            self.inline(ui, children(cell), style, None);
         });
     }
 
     /// One line below a row for each check that did not pass.
-    fn notes(&self, ui: &mut Ui, line: usize, failures: &[Failure], focused: bool) {
+    fn notes(&mut self, ui: &mut Ui, line: usize, failures: &[Failure], focused: bool) {
         for failure in failures {
             let colour = if focused {
                 self.palette.bar_text
@@ -219,6 +217,7 @@ impl Drawing<'_> {
                 ui.add_space(CELL_PADDING);
                 let note = RichText::new(&text).size(NOTE).color(colour);
                 let response = ui.add(Label::new(note));
+                self.clicked_text |= response.clicked();
                 tagged(&response, tags::NOTE, &format!("{line}: {text}"));
             });
             ui.add_space(8.0);
@@ -254,21 +253,18 @@ impl Drawing<'_> {
         Some(Shape::rect_filled(band, corners, fill))
     }
 
-    /// What sits at either end of a row, whichever way the cells are scrolled.
+    /// What sits in the gutter of a row, whichever way the cells are scrolled:
+    /// its mark, or the button that runs it while the pointer is over it.
     fn row_ends(&mut self, ui: &mut Ui, row: &Placed<'_>, band: Rect, cells: &Cells<'_, '_>) {
-        let top = band.top() + (ROW - RUN_TABLE.1.y) / 2.0;
-        let right = band.right() - RUN_MARGIN;
         let Some(line) = row.line else {
-            self.run_table(ui, pos2(right, top), cells);
+            self.run_table(ui, band, cells);
             return;
         };
-        if let Some(row) = row.result {
-            let focused = self.is_focused(Some(line), cells.index);
-            self.mark(ui, band, (line, row.result), focused);
-        }
         let focused = self.is_focused(Some(line), cells.index);
-        if focused || ui.rect_contains_pointer(band) {
-            self.run_row(ui, pos2(right, top), line, focused);
+        if ui.rect_contains_pointer(band) {
+            self.run_row(ui, band, line, focused);
+        } else if let Some(row) = row.result {
+            self.mark(ui, band, (line, row.result), focused);
         }
     }
 
@@ -282,23 +278,14 @@ impl Drawing<'_> {
         let text = RichText::new(result.mark())
             .font(FontId::new(MARK, FontFamily::Name(STRONG.into())))
             .color(colour);
-        let response = ui.put(gutter, Label::new(text));
+        let response = ui.put(gutter, Label::new(text).selectable(false));
         tagged(&response, tags::MARK, &format!("{line}: {}", result.mark()));
     }
 
-    fn run_table(&mut self, ui: &mut Ui, top_right: Pos2, cells: &Cells<'_, '_>) {
-        let (name, size) = RUN_TABLE;
-        let ink = if self.is_focused(None, cells.index) {
-            self.palette.bar_text
-        } else {
-            self.palette.text
-        };
-        let look = RunLook {
-            fill: Color32::TRANSPARENT,
-            ink,
-        };
-        let spot = Rect::from_min_size(top_right - vec2(size.x, 0.0), size);
-        let response = self.run_button(ui, spot, name, look);
+    /// The button of a table, above the marks of what it runs.
+    fn run_table(&mut self, ui: &mut Ui, band: Rect, cells: &Cells<'_, '_>) {
+        let focused = self.is_focused(None, cells.index);
+        let response = self.run_button(ui, band, RUN_TABLE, focused);
         describe_button(&response, &cells.test.name);
         if response.clicked() {
             let table = cells.index;
@@ -308,32 +295,26 @@ impl Drawing<'_> {
         }
     }
 
-    fn run_row(&mut self, ui: &mut Ui, top_right: Pos2, line: usize, focused: bool) {
-        let (name, size) = RUN_ROW;
-        let look = if focused {
-            RunLook {
-                fill: Color32::TRANSPARENT,
-                ink: self.palette.bar_text,
-            }
-        } else {
-            RunLook {
-                fill: self.palette.bar,
-                ink: self.palette.bar_text,
-            }
-        };
-        let spot = Rect::from_min_size(top_right - vec2(size.x, 0.0), size);
-        let response = self.run_button(ui, spot, name, look);
+    fn run_row(&mut self, ui: &mut Ui, band: Rect, line: usize, focused: bool) {
+        let response = self.run_button(ui, band, RUN_ROW, focused);
         describe_button(&response, &line.to_string());
         if response.clicked() {
             self.happened.commands.push(Command::RunRow(line));
         }
     }
 
-    fn run_button(&self, ui: &mut Ui, spot: Rect, name: &str, look: RunLook) -> Response {
+    /// A button in the gutter. The end of a row belongs to the last column.
+    fn run_button(&self, ui: &mut Ui, band: Rect, name: &str, focused: bool) -> Response {
+        let ink = if focused {
+            self.palette.bar_text
+        } else {
+            self.palette.text
+        };
+        let gutter = Rect::from_min_size(band.left_top(), vec2(GUTTER, ROW));
         let enabled = !self.tests.busy;
         ui.add_enabled_ui(enabled, |ui| {
-            ui.put(spot, |ui: &mut Ui| {
-                icons::run_button(ui, spot.size(), name, look)
+            ui.put(gutter, |ui: &mut Ui| {
+                icons::run_icon(ui, name, ink, icons::SMALL_RUN)
             })
         })
         .inner

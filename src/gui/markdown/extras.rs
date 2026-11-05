@@ -8,13 +8,25 @@ use crate::gui::look::Palette;
 use crate::workspace;
 use eframe::egui::accesskit::{Role, Toggled};
 use eframe::egui::{
-    Color32, CornerRadius, FontFamily, FontId, Frame, Image, Margin, Rect, RichText, Sense, Shape,
-    Stroke, StrokeKind, Ui, Vec2, WidgetInfo, pos2, vec2,
+    Button, Color32, CornerRadius, FontFamily, FontId, Frame, Image, Margin, Rect, RichText, Sense,
+    Shape, Stroke, StrokeKind, Ui, Vec2, WidgetInfo, pos2, vec2,
 };
-use markdown::mdast::{FootnoteReference, Node};
+use markdown::mdast::Node;
+use std::time::Duration;
 
 /// How wide and tall a task box is.
 const TASK_BOX: f32 = 14.0;
+/// How many seconds a code block says that it was copied.
+const COPIED_FOR: f64 = 1.5;
+/// How many seconds it takes to change what it says.
+const COPIED_FADE: f32 = 0.2;
+
+/// Where the definition of a footnote is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Footnote {
+    At(usize),
+    Missing,
+}
 
 /// The kinds of alert a quote can be.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -179,23 +191,38 @@ impl Drawing<'_> {
         ui.painter().extend(dashes);
     }
 
-    /// A number that goes to the definition of its footnote.
-    pub(super) fn footnote_reference(&mut self, ui: &mut Ui, footnote: &FootnoteReference) {
+    /// The button that copies a code block, which says so for a moment.
+    pub(super) fn copy_button(&mut self, ui: &mut Ui, text: &str, line: usize) {
+        let id = ui.scope_id().with(("copied", self.wanted.visit, line));
+        let now = ui.input(|input| input.time);
+        let copied_at = ui.data(|data| data.get_temp::<f64>(id));
+        let left = copied_at.map_or(0.0, |copied_at| copied_at + COPIED_FOR - now);
+        let fade = ui.ctx().animate_bool_with_time(id, left > 0.0, COPIED_FADE);
+        // One word fades out, and then the other fades in.
+        let (word, ink) = if fade > 0.5 {
+            ("✓ Copied", self.palette.passed)
+        } else {
+            ("Copy", self.palette.quote)
+        };
+        let ink = ink.gamma_multiply((2.0 * fade - 1.0).abs());
+        let word = RichText::new(word).size(12.0).color(ink);
+        if ui.add(Button::new(word).frame(false)).clicked() {
+            ui.data_mut(|data| data.insert_temp(id, now));
+            self.happened.commands.push(Command::Copy(text.to_owned()));
+        }
+        if let Ok(wait) = Duration::try_from_secs_f64(left) {
+            ui.ctx().request_repaint_after(wait);
+        }
+    }
+
+    /// Where the definition of a footnote is.
+    pub(super) fn footnote_line(&self, identifier: &str) -> Footnote {
         let definitions = children(self.document.root()).iter();
         let definition = definitions.into_iter().find(|node| {
             matches!(node, Node::FootnoteDefinition(definition)
-                if definition.identifier == footnote.identifier)
+                if definition.identifier == identifier)
         });
-        let text = RichText::new(&footnote.identifier).size(10.0).raised();
-        match definition {
-            Some(definition) => {
-                let go_to = Command::GoToLine(line_of(definition));
-                self.link_to(ui, text.color(self.palette.link), go_to);
-            }
-            None => {
-                ui.label(text);
-            }
-        }
+        definition.map_or(Footnote::Missing, |node| Footnote::At(line_of(node)))
     }
 
     /// The text of a footnote, after its number.

@@ -68,9 +68,9 @@ table.
 
 ## Running a row
 
-Moving the pointer over a test row shows a `Run row` button on that row, so that one
-click runs it, with no need to focus it first. The button goes when the pointer leaves.
-The focused row always shows the button. Rows of other tables have none.
+Moving the pointer over a test row shows a `Run row` button in its gutter, in place of
+its mark, so that one click runs it, with no need to focus it first. The button goes when
+the pointer leaves, and the mark comes back. Rows of other tables have none.
 
 ![Hovering a row](design/images/row-hover.png)
 
@@ -82,8 +82,8 @@ The focused row always shows the button. Rows of other tables have none.
 | Hovering         | calculator | passing.md   | `Hover row 20`              | 20: enabled              | none         |
 | Another row      | calculator | passing.md   | `Hover row 20 Hover row 19` | 19: enabled              | none         |
 | Leaving          | calculator | passing.md   | `Hover row 20 Leave`        | none                     | none         |
-| The focused row  | calculator | passing.md   | `Click row 20 Leave`        | 20: enabled              | 20           |
-| Focus and hover  | calculator | passing.md   | `Click row 20 Hover row 19` | 19: enabled, 20: enabled | 20           |
+| The focused row  | calculator | passing.md   | `Click row 20 Leave`        | none                     | 20           |
+| Focus and hover  | calculator | passing.md   | `Click row 20 Hover row 19` | 19: enabled              | 20           |
 | Not a test table | docs       | reference.md | `Hover "Opens a file"`      | none                     | none         |
 
 [//]: # "decisionTable Gui"

@@ -397,6 +397,11 @@ impl Gui {
     }
 
     #[must_use]
+    pub fn selection(&self) -> String {
+        self.read(|scene| or_none(scene.window().selected().map(String::from)))
+    }
+
+    #[must_use]
     pub fn page_scroll(&self) -> String {
         self.read(|scene| match scene.window().page_position() {
             Some(Position::Start) => "top".into(),

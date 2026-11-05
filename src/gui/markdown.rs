@@ -1,31 +1,32 @@
 //! Drawing a document on the page.
 
 mod extras;
+mod inline;
 mod test_table;
 
-use super::look::{ITALIC, Palette, STRONG, STRONG_ITALIC};
+use super::Command;
+use super::look::{Palette, STRONG};
 use super::pictures::Pictures;
 use super::view::{Block, Reach};
-use super::{Command, is_website, tags};
-use crate::document::{Document, children, line_of, link_id};
+use crate::document::{Document, children, line_of};
 use crate::focus::Focus;
 use crate::run::FileResults;
 use crate::temoc::TestTable;
 use eframe::egui::{
-    self, Align, FontFamily, FontId, Frame, Margin, Rect, Response, RichText, ScrollArea, Sense,
-    Shape, Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2, vec2,
+    self, Align, FontFamily, FontId, Frame, Margin, Rect, RichText, ScrollArea, Sense, Shape,
+    Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2, vec2,
 };
 use markdown::mdast::{AlignKind, List, Node, Table};
 use std::path::Path;
 
 const BODY: f32 = 14.0;
 const CODE: f32 = 13.0;
+/// How tall a line of a paragraph is.
+const LINE: f32 = 23.0;
 /// The widest the text of a page gets.
 const COLUMN: f32 = 720.0;
 /// How far each level of a list moves in.
 const LIST_INDENT: f32 = 24.0;
-/// How tall a line of a list is.
-const LIST_LINE: f32 = 20.0;
 /// How tall a row of a table is.
 const TABLE_ROW: f32 = 30.0;
 /// The size of each level of heading.
@@ -108,6 +109,7 @@ pub(super) fn show(
         palette,
         column,
         list_depth: 0,
+        clicked_text: false,
         happened: Happened::default(),
     };
     ui.scope_builder(UiBuilder::new().max_rect(rect), |ui| {
@@ -131,6 +133,9 @@ struct Drawing<'page> {
     column: f32,
     /// How many lists the list being drawn is inside of.
     list_depth: usize,
+    /// Whether a click landed on text with nothing to follow in it, which a
+    /// row of a test table takes as its own.
+    clicked_text: bool,
     happened: Happened,
 }
 
@@ -214,119 +219,8 @@ impl Drawing<'_> {
     fn paragraph(&mut self, ui: &mut Ui, nodes: &[Node]) {
         ui.horizontal_wrapped(|ui| {
             ui.spacing_mut().item_spacing.x = 0.0;
-            for node in nodes {
-                self.inline(ui, node, Style::default());
-            }
+            self.inline(ui, nodes, Style::default(), Some(LINE));
         });
-    }
-
-    fn inline(&mut self, ui: &mut Ui, node: &Node, style: Style) {
-        match node {
-            Node::Text(text) => {
-                // A line break in the markdown is only a space on the page.
-                ui.label(styled(&text.value.replace('\n', " "), style));
-            }
-            Node::InlineCode(code) => {
-                let text = RichText::new(&code.value)
-                    .font(FontId::monospace(CODE))
-                    .color(self.palette.code)
-                    .background_color(self.palette.chip);
-                ui.label(text);
-            }
-            Node::Strong(_) => self.inline_all(
-                ui,
-                node,
-                Style {
-                    strong: true,
-                    ..style
-                },
-            ),
-            Node::Emphasis(_) => self.inline_all(
-                ui,
-                node,
-                Style {
-                    emphasis: true,
-                    ..style
-                },
-            ),
-            Node::Delete(_) => self.inline_all(
-                ui,
-                node,
-                Style {
-                    deleted: true,
-                    ..style
-                },
-            ),
-            Node::Link(link) => self.link(ui, node, link.position.as_ref()),
-            Node::LinkReference(link) => self.link(ui, node, link.position.as_ref()),
-            Node::Image(image) => self.picture(ui, &image.url, &image.alt),
-            Node::ImageReference(image) => {
-                let url = self.document.definition(&image.identifier);
-                self.picture(ui, url.unwrap_or_default(), &image.alt);
-            }
-            Node::FootnoteReference(footnote) => self.footnote_reference(ui, footnote),
-            Node::Html(html) if !is_comment(&html.value) => {
-                ui.label(RichText::new(&html.value).color(self.palette.quote));
-            }
-            Node::Break(_) => {
-                ui.end_row();
-            }
-            _ => self.inline_all(ui, node, style),
-        }
-    }
-
-    fn inline_all(&mut self, ui: &mut Ui, node: &Node, style: Style) {
-        for child in children(node) {
-            self.inline(ui, child, style);
-        }
-    }
-
-    fn link(&mut self, ui: &mut Ui, node: &Node, position: Option<&markdown::unist::Position>) {
-        let target = self.document.targets().get(&link_id(position));
-        let Some(target) = target else {
-            // A reference to nothing is only text.
-            ui.label(styled(&node.to_string(), Style::default()));
-            return;
-        };
-        // The text colour of the look would win, and a focused row sets its own.
-        let on_focused_row = ui.visuals().override_text_color == Some(self.palette.bar_text);
-        let colour = if on_focused_row {
-            self.palette.bar_text
-        } else {
-            self.palette.link
-        };
-        let url = &target.url;
-        let text = RichText::new(node.to_string()).size(BODY).underline();
-        let response = self.link_to(ui, text.color(colour), Command::Follow(url.clone()));
-        if response.hovered() {
-            self.happened.hovered_link = Some(url.clone());
-        }
-        if is_website(url) {
-            // Says that the link leaves the app.
-            ui.label(RichText::new(" ↗").size(BODY).color(colour));
-        }
-    }
-
-    /// Something that can be focused and followed.
-    fn link_to(&mut self, ui: &mut Ui, text: RichText, follow: Command) -> Response {
-        let response = ui.link(text);
-        let focused = self.wanted.focused_link == Some(self.happened.links.len());
-        self.happened.links.push(follow.clone());
-        if focused {
-            let ring = Stroke::new(1.5, self.palette.bar);
-            let rect = response.rect.expand(1.0);
-            ui.painter().rect_stroke(rect, 2, ring, StrokeKind::Outside);
-            ui.ctx().accesskit_node_builder(response.id, |node| {
-                node.set_description(tags::FOCUSED_LINK);
-            });
-            if self.wanted.reveal_link {
-                response.scroll_to_me(None);
-            }
-        }
-        if response.clicked() {
-            self.happened.commands.push(follow);
-        }
-        response
     }
 
     fn list(&mut self, ui: &mut Ui, list: &List) {
@@ -335,7 +229,7 @@ impl Drawing<'_> {
         for (item, number) in list.children.iter().zip(start..) {
             ui.horizontal_top(|ui| {
                 ui.spacing_mut().item_spacing.x = 0.0;
-                let marker = vec2(LIST_INDENT, LIST_LINE);
+                let marker = vec2(LIST_INDENT, LINE);
                 match item {
                     Node::ListItem(task) if task.checked.is_some() => {
                         let checked = task.checked == Some(true);
@@ -421,11 +315,7 @@ impl Drawing<'_> {
                         ui.label(name.color(quiet));
                     }
                     ui.with_layout(egui::Layout::right_to_left(Align::Center), |ui| {
-                        let copy = RichText::new("Copy").size(12.0).color(quiet);
-                        if ui.add(egui::Button::new(copy).frame(false)).clicked() {
-                            let copy = Command::Copy(text.to_owned());
-                            self.happened.commands.push(copy);
-                        }
+                        self.copy_button(ui, text, line);
                     });
                 });
             });
@@ -526,21 +416,4 @@ impl Drawing<'_> {
 
 fn is_comment(html: &str) -> bool {
     html.trim_start().starts_with("<!--")
-}
-
-fn styled(text: &str, style: Style) -> RichText {
-    let mut text = RichText::new(text).size(BODY);
-    let face = match (style.strong, style.emphasis) {
-        (false, false) => None,
-        (true, false) => Some(STRONG),
-        (false, true) => Some(ITALIC),
-        (true, true) => Some(STRONG_ITALIC),
-    };
-    if let Some(face) = face {
-        text = text.family(FontFamily::Name(face.into()));
-    }
-    if style.deleted {
-        text = text.strikethrough();
-    }
-    text
 }

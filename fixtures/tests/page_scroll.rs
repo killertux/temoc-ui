@@ -4,6 +4,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use std::path::Path;
 use temoc_ui::app::Launch;
+use temoc_ui::gui::egui::accesskit::Role;
 use temoc_ui::gui::egui::{Key, Modifiers, Vec2};
 use temoc_ui::gui::{Gui, Position};
 
@@ -26,7 +27,9 @@ fn left_the_end_of_a_long_page() -> Result<Harness<'static, Gui>, String> {
 }
 
 fn click_long_page(harness: &mut Harness<'static, Gui>) {
-    harness.get_by_label("Long page").click();
+    harness
+        .get_by_role_and_label(Role::Link, "Long page")
+        .click();
     harness.run_ok();
 }
 

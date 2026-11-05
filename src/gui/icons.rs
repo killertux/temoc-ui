@@ -3,8 +3,8 @@
 
 use eframe::egui::accesskit::Role;
 use eframe::egui::{
-    Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
-    StrokeKind, Ui, Vec2, WidgetInfo, pos2, vec2,
+    Color32, CornerRadius, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui,
+    Vec2, WidgetInfo, pos2, vec2,
 };
 
 /// How wide and tall an icon is.
@@ -13,6 +13,10 @@ const SIZE: f32 = 16.0;
 const BUTTON: f32 = 28.0;
 /// How thick the lines of an icon are.
 const LINE: f32 = 1.5;
+/// How far the triangle of a run button in a table reaches from its middle.
+pub(super) const SMALL_RUN: f32 = 4.5;
+/// How far the triangle of a run button in the toolbar reaches from its middle.
+pub(super) const LARGE_RUN: f32 = 7.0;
 
 /// One of the icons.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -22,6 +26,7 @@ pub(super) enum Icon {
     Back,
     Forward,
     Contrast,
+    Help,
 }
 
 /// A button showing an icon, which goes by `name` everywhere else.
@@ -38,43 +43,28 @@ pub(super) fn button(ui: &mut Ui, icon: Icon, name: &str) -> Response {
     response.on_hover_text(name)
 }
 
-/// How a button that runs something looks.
-#[derive(Debug, Clone, Copy)]
-pub(super) struct RunLook {
-    pub fill: Color32,
-    pub ink: Color32,
-}
-
-/// A button with a triangle and its name, which runs something. It fills the
-/// size it is given.
-pub(super) fn run_button(ui: &mut Ui, size: Vec2, name: &str, look: RunLook) -> Response {
+/// A button with a triangle of this size, which goes by `name` everywhere else.
+pub(super) fn run_icon(ui: &mut Ui, name: &str, ink: Color32, size: f32) -> Response {
     let enabled = ui.is_enabled();
-    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    let (rect, response) = ui.allocate_exact_size(Vec2::splat(BUTTON), Sense::click());
     response.widget_info(|| WidgetInfo::labeled(Role::Button, enabled, name));
-    let ink = if enabled {
-        look.ink
-    } else {
-        look.ink.gamma_multiply(0.5)
-    };
     let painter = ui.painter();
-    painter.rect_filled(rect, CornerRadius::same(4), look.fill);
-    let left = rect.left() + 9.0;
-    let middle = rect.center().y;
-    let triangle = vec![
-        pos2(left, middle - 4.0),
-        pos2(left + 6.0, middle),
-        pos2(left, middle + 4.0),
+    if enabled && response.hovered() {
+        painter.rect_filled(rect, CornerRadius::same(6), ink.gamma_multiply(0.15));
+    }
+    let shown = if enabled {
+        ink
+    } else {
+        ink.gamma_multiply(0.5)
+    };
+    let center = rect.center();
+    let corners = vec![
+        center + size * vec2(-0.75, -1.0),
+        center + size * vec2(0.75, 0.0),
+        center + size * vec2(-0.75, 1.0),
     ];
-    painter.add(Shape::convex_polygon(triangle, ink, Stroke::NONE));
-    let font = FontId::monospace(12.0);
-    painter.text(
-        pos2(left + 11.0, middle),
-        Align2::LEFT_CENTER,
-        name,
-        font,
-        ink,
-    );
-    response
+    painter.add(Shape::convex_polygon(corners, shown, Stroke::NONE));
+    response.on_hover_text(name)
 }
 
 fn draw(painter: &Painter, icon: Icon, center: Pos2, stroke: Stroke) {
@@ -104,6 +94,20 @@ fn draw(painter: &Painter, icon: Icon, center: Pos2, stroke: Stroke) {
                 stroke.color,
                 Stroke::NONE,
             ));
+        }
+        Icon::Help => {
+            painter.circle_stroke(center, SIZE / 2.0 - 1.0, stroke);
+            // The hook of the question mark goes around from the left, and
+            // then straight down.
+            let hook_center = center - vec2(0.0, 1.5);
+            let hook = (0_i16..=10).map(|step| {
+                let angle = std::f32::consts::PI * (f32::from(step) / 8.0 - 1.0);
+                hook_center + 2.5 * vec2(angle.cos(), angle.sin())
+            });
+            let mut mark: Vec<Pos2> = hook.collect();
+            mark.push(center + vec2(0.0, 1.5));
+            painter.add(Shape::line(mark, stroke));
+            painter.circle_filled(center + vec2(0.0, 4.0), 0.9, stroke.color);
         }
     }
 }

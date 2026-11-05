@@ -31,3 +31,30 @@ fn copy_puts_the_whole_block_on_the_clipboard() -> Result<(), String> {
     assert!(status.next().is_some(), "the status bar says so");
     Ok(())
 }
+
+#[test]
+fn the_button_says_copied_for_a_moment() -> Result<(), String> {
+    let samples = Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples");
+    let launch = Launch {
+        current_dir: samples.join("elements"),
+        ..Launch::default()
+    };
+    let window = Gui::start(&launch)?;
+    let mut harness = Harness::builder()
+        .with_size(Vec2::new(1000.0, 700.0))
+        .build_ui_state(|ui, window: &mut Gui| window.show(ui), window);
+    harness.run_ok();
+    harness.key_press(Key::End);
+    harness.run_ok();
+    harness.get_by_label("Copy").click();
+    harness.run_ok();
+    assert!(harness.query_by_label("✓ Copied").is_some());
+    assert!(harness.query_by_label("Copy").is_none());
+    // Each step is a quarter of a second.
+    for _ in 0..12 {
+        harness.step();
+    }
+    assert!(harness.query_by_label("Copy").is_some());
+    assert!(harness.query_by_label("✓ Copied").is_none());
+    Ok(())
+}

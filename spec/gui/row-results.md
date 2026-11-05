@@ -29,9 +29,9 @@ Marks stay in view when a wide table scrolls sideways.
 
 [//]: # "decisionTable Gui"
 
-| # situation       | workspace | arguments    | actions                                  | look for       | mark shown? | sideways? |
-| ----------------- | --------- | ------------ | ---------------------------------------- | -------------- | ----------- | --------- |
-| Scrolled sideways | elements  | wide-test.md | `Ctrl-r Wheel sideways "a long comment"` | a long comment | yes         | middle    |
+| # situation       | workspace | arguments    | actions                                        | look for       | mark shown? | sideways? |
+| ----------------- | --------- | ------------ | ---------------------------------------------- | -------------- | ----------- | --------- |
+| Scrolled sideways | elements  | wide-test.md | `Ctrl-r Wheel sideways "a long comment" Leave` | a long comment | yes         | middle    |
 
 ## Notes
 

@@ -4,6 +4,7 @@ mod icons;
 mod look;
 mod markdown;
 mod pictures;
+mod selection;
 mod view;
 
 use crate::app::{Arguments, Launch};
@@ -222,6 +223,7 @@ pub struct Gui {
     opened_url: Option<String>,
     /// The text last put on the clipboard.
     copied: Option<String>,
+    selected: Option<String>,
     pictures: Pictures,
     /// How many visits there have been.
     visits: u64,
@@ -302,6 +304,7 @@ impl Gui {
             hovered_link: None,
             opened_url: None,
             copied: None,
+            selected: None,
             pictures: Pictures::default(),
             visits: 0,
             commands: Vec::new(),
@@ -337,6 +340,12 @@ impl Gui {
     #[must_use]
     pub fn copied(&self) -> Option<&str> {
         self.copied.as_deref()
+    }
+
+    /// The text selected on the page.
+    #[must_use]
+    pub fn selected(&self) -> Option<&str> {
+        self.selected.as_deref()
     }
 
     /// Where the page is scrolled to.
@@ -385,9 +394,15 @@ impl Gui {
             self.status = Some(failure.clone());
             self.failure = Some(failure);
         }
+        let (selected, copied) = selection::read(&ctx);
+        self.selected = selected;
+        if let Some(copied) = copied {
+            self.status = Some(clipboard::copied(&copied));
+            self.copied = Some(copied);
+        }
         self.read_keys(&ctx);
         let palette = look::palette(ctx.theme());
-        self.toolbar(ui);
+        self.toolbar(ui, palette);
         self.status_bar(ui, palette);
         if self.panels.tree {
             self.tree_panel(ui, palette);
@@ -533,11 +548,7 @@ impl Gui {
                 }
             }
             Command::GoToLine(line) => self.in_visit(|visit| visit.go_to = Some(line)),
-            Command::Copy(text) => {
-                ctx.copy_text(text.clone());
-                self.status = Some(clipboard::copied(&text));
-                self.copied = Some(text);
-            }
+            Command::Copy(text) => ctx.copy_text(text),
             Command::NextLink => self.in_visit(|visit| {
                 visit.move_link(|focused, count| match focused {
                     Some(index) => index.saturating_add(1) % count,
@@ -643,7 +654,7 @@ impl Gui {
         self.visit(&hit.file, anchor.as_deref())
     }
 
-    fn toolbar(&mut self, ui: &mut Ui) {
+    fn toolbar(&mut self, ui: &mut Ui, palette: &Palette) {
         let document = self.opened().map(|opened| opened.file().to_owned());
         let test_page = self.opened().is_some_and(Opened::is_test_file);
         let busy = self.session.is_busy();
@@ -665,18 +676,17 @@ impl Gui {
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if test_page {
-                        let run = ui.add_enabled(!busy, Button::new("Run file"));
-                        if run.clicked() {
+                        let run = ui.add_enabled_ui(!busy, |ui| {
+                            icons::run_icon(ui, "Run file", palette.passed, icons::LARGE_RUN)
+                        });
+                        if run.inner.clicked() {
                             commands.push(Command::RunFile);
                         }
                     }
                     let tests = (Icon::RightPanel, "Show or hide the tests panel");
                     icon_button(ui, tests, Command::ToggleTests, &mut commands);
-                    let help = ui.add(Button::new("?")).on_hover_text("Show help");
-                    named(&help, Role::Button, "Show help");
-                    if help.clicked() {
-                        commands.push(Command::ToggleHelp);
-                    }
+                    let help = (Icon::Help, "Show help");
+                    icon_button(ui, help, Command::ToggleHelp, &mut commands);
                     let mode = (Icon::Contrast, "Swap between dark and light");
                     icon_button(ui, mode, Command::SwapMode, &mut commands);
                 });

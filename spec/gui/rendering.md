@@ -20,7 +20,7 @@ none of it is interpreted.
 | --------------- | ---------- | ---------- | ------- | ----------------------------- | -------- |
 | Table directive | calculator | passing.md |         | decisionTable                 | no       |
 | Import          | calculator | passing.md |         | Sample.Fixtures               | no       |
-| Comment         | elements   |            |         | A hidden comment              | no       |
+| Comment         | elements   |            | `End`   | A hidden comment              | no       |
 | Other HTML      | elements   |            | `End`   | `<details>raw html</details>` | yes      |
 
 ## Alerts
@@ -70,7 +70,7 @@ Anything that cannot be drawn shows its alt text and its path instead.
 ## Code blocks
 
 Code keeps its text exactly as written, without syntax colours, and shows its language
-if it has one. `Copy` copies the whole block.
+if it has one. `Copy` copies the whole block, and says `✓ Copied` for a moment.
 
 [//]: # "decisionTable Gui"
 
@@ -79,6 +79,7 @@ if it has one. `Copy` copies the whole block.
 | Its text     | elements  | `End`              | echo copied | yes      | none        | none                 |
 | Its language | elements  | `End`              | sh          | yes      | none        | none                 |
 | Copying      | elements  | `End Click "Copy"` | echo copied | yes      | echo copied | Copied 11 characters |
+| Saying so    | elements  | `End Click "Copy"` | ✓ Copied    | yes      | echo copied | Copied 11 characters |
 
 ## Footnotes
 

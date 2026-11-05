@@ -7,7 +7,7 @@ status bar says how much. What is copied is the text as shown, not the markdown 
 A click clears the selection.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # action        | workspace | arguments                | actions                                  | selection?        | clipboard?        | status?              |
 | --------------- | --------- | ------------------------ | ---------------------------------------- | ----------------- | ----------------- | -------------------- |
@@ -19,7 +19,7 @@ A click clears the selection.
 Text in a table can be selected too, and dragging from a link selects text without
 following it.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # action    | workspace | arguments    | actions                    | document?    | selection?      |
 | ----------- | --------- | ------------ | -------------------------- | ------------ | --------------- |
