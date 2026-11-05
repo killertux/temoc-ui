@@ -1,4 +1,4 @@
-//! The colours of the screen. See `spec/viewer/themes.md`.
+//! The colours of the screen. See `spec/tui/themes.md`.
 
 use crate::temoc::RunResult;
 use ratatui::style::{Color, Modifier, Style};

@@ -1,7 +1,8 @@
 //! A document on screen: how far it is scrolled and what is focused.
 
-use crate::render::{Document, Link, Marks, Motion, Rendered, Spot};
+use crate::render::{Link, Marks, Motion, Rendered, Spot};
 use crate::run::FileResults;
+use crate::session::Opened;
 use crate::temoc::TestTable;
 use crate::theme::Theme;
 use ratatui::layout::Size;
@@ -25,11 +26,8 @@ struct Selection {
 /// A document on screen. Going back to a page finds it as it was left.
 #[derive(Debug, Clone)]
 pub struct Page {
-    file: String,
-    document: Document,
+    opened: Opened,
     rendered: Rendered,
-    is_test_file: bool,
-    tables: Vec<TestTable>,
     /// The results shown on the page.
     results: Option<FileResults>,
     size: Size,
@@ -46,16 +44,11 @@ pub struct Page {
 impl Page {
     /// Shows a document from the top, with its first test table focused.
     #[must_use]
-    pub fn new(file: String, document: Document, size: Size) -> Self {
-        let tests = document.tests();
-        let tables = tests.tables;
+    pub fn new(opened: Opened, size: Size) -> Self {
         Self {
-            file,
-            rendered: document.render(size.width, &HashMap::new()),
-            document,
-            is_test_file: tests.is_test_file,
-            focused_table: (!tables.is_empty()).then_some(0),
-            tables,
+            rendered: opened.document().render(size.width, &HashMap::new()),
+            focused_table: (!opened.tables().is_empty()).then_some(0),
+            opened,
             results: None,
             size,
             scroll: 0,
@@ -66,22 +59,22 @@ impl Page {
         }
     }
 
+    /// The file behind this page.
+    #[must_use]
+    pub fn opened(&self) -> &Opened {
+        &self.opened
+    }
+
     /// The file on screen, relative to the workspace.
     #[must_use]
     pub fn file(&self) -> &str {
-        &self.file
-    }
-
-    /// Whether temoc would treat this file as a test file.
-    #[must_use]
-    pub fn is_test_file(&self) -> bool {
-        self.is_test_file
+        self.opened.file()
     }
 
     /// The tables that can run, in document order.
     #[must_use]
     pub fn tables(&self) -> &[TestTable] {
-        &self.tables
+        self.opened.tables()
     }
 
     /// Adapts to the size of the screen.
@@ -105,12 +98,12 @@ impl Page {
 
     fn lay_out(&mut self) {
         let results = self.results.as_ref().map_or_else(HashMap::new, |results| {
-            self.tables
+            self.tables()
                 .iter()
                 .filter_map(|table| Some((table.line, results.table(table)?)))
                 .collect()
         });
-        self.rendered = self.document.render(self.size.width, &results);
+        self.rendered = self.opened.document().render(self.size.width, &results);
         // What was selected may no longer be in the same place.
         self.selection = None;
     }
@@ -201,7 +194,7 @@ impl Page {
 
     /// Scrolls to a heading. An anchor that matches no heading changes nothing.
     pub fn go_to_anchor(&mut self, anchor: &str) {
-        let headings = self.document.headings();
+        let headings = self.opened.document().headings();
         let heading = headings.iter().find(|heading| heading.anchor == anchor);
         if let Some(rows) = heading.and_then(|heading| self.rendered.rows_of_line(heading.line)) {
             self.scroll = rows.start.min(self.last_scroll());
@@ -300,7 +293,7 @@ impl Page {
             let rows = self.rendered.rows_of_line(table.line);
             rows.is_some_and(|rows| rows.contains(&row))
         };
-        if let Some(index) = self.tables.iter().position(holds_row) {
+        if let Some(index) = self.tables().iter().position(holds_row) {
             self.focused_table = Some(index);
         }
         let clicked = self.rendered.table_line_at(row);
@@ -349,7 +342,7 @@ impl Page {
     /// The focused test table.
     #[must_use]
     pub fn focused_table(&self) -> Option<&TestTable> {
-        self.tables.get(self.focused_table?)
+        self.tables().get(self.focused_table?)
     }
 
     /// The row holding the header of the focused test table.
@@ -360,7 +353,7 @@ impl Page {
 
     /// Focuses the next test table, stopping at the last one.
     pub fn next_table(&mut self) {
-        let last = self.tables.len().saturating_sub(1);
+        let last = self.tables().len().saturating_sub(1);
         if let Some(index) = self.focused_table {
             self.focus_table(index.saturating_add(1).min(last));
         }
@@ -379,7 +372,7 @@ impl Page {
         }
         self.focused_table = Some(index);
         if let Some(rows) = self
-            .tables
+            .tables()
             .get(index)
             .and_then(|table| self.table_rows(table))
         {
@@ -440,10 +433,12 @@ impl Page {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::document::Document;
 
     fn page(markdown: &str, width: u16, height: u16) -> Page {
         let document = Document::parse(markdown).unwrap();
-        Page::new("a.md".into(), document, Size::new(width, height))
+        let opened = Opened::new("a.md".into(), document);
+        Page::new(opened, Size::new(width, height))
     }
 
     fn shown(page: &Page) -> Vec<String> {

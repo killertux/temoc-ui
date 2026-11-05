@@ -142,7 +142,7 @@ uses a quieter, greyer red, so that it explains the row without competing with i
 The note under a snoozed row uses the quote colour. Bold, italic and struck text add
 their emphasis to the plain text colour, and the same goes for bold text in a pop-up.
 
-Focus and selection stay [reversed](../running/running-a-table.md), swapping the
+Focus and selection stay [reversed](running.md#choosing-a-table), swapping the
 foreground and background of what they cover. That keeps its contrast, and also works
 on a failing row.
 

@@ -1,6 +1,6 @@
 //! Finding files and headings in the workspace.
 
-use crate::render::{Document, Heading};
+use crate::document::{Document, Heading};
 use crate::workspace;
 use std::fmt::{self, Display, Formatter};
 use std::fs;

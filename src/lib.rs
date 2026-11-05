@@ -6,12 +6,16 @@
 
 pub mod app;
 pub mod clipboard;
+pub mod document;
 pub mod graph;
 pub mod help;
+pub mod history;
+pub mod links;
 pub mod page;
 pub mod render;
 pub mod run;
 pub mod search;
+pub mod session;
 pub mod temoc;
 pub mod terminal;
 pub mod theme;

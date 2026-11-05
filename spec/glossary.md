@@ -4,9 +4,9 @@ Back to the [specification index](README.md).
 
 **Workspace.** The folder temoc-ui is working in. Search lists the markdown files
 inside it, and `temoc.toml` is looked up at its root. See
-[Opening temoc-ui](viewer/opening.md).
+[Opening a workspace](viewer/opening.md).
 
-**Document.** The markdown file currently on screen.
+**Document.** The markdown file currently open.
 
 **Directive.** A hidden markdown line that gives temoc an instruction, such as
 `[//]: # "decisionTable Calculator"`.
@@ -25,8 +25,13 @@ using the Slim protocol.
 **Snoozed.** A table marked `-- snooze until <date>`. Until that date, its failures
 are reported but do not fail the run.
 
-**Focused link**, **focused table** and **focused row.** The link, test table or row
-of that table that keys act on.
+**Core.** What temoc-ui does whatever its interface is.
 
-**Selection mode.** The state entered with `v`, where a cursor moves through the
-text. See [Selecting text](viewer/selecting-text.md).
+**Interface.** A way of using temoc-ui, such as the terminal. Each one has its own
+folder in the specification.
+
+**Focused link**, **focused table** and **focused row.** In the terminal, the link,
+test table or row of that table that keys act on.
+
+**Selection mode.** In the terminal, the state entered with `v`, where a cursor moves
+through the text. See [Selecting text](tui/selecting-text.md).

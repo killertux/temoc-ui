@@ -120,42 +120,40 @@ focused link is highlighted and scrolled into view.
 ## Following links
 
 `Enter` opens the focused link, and [clicking](mouse.md#following-links) a link does
-the same. Relative paths are resolved from the current document.
+the same. See [how links resolve](../viewer/links.md).
 
 [//]: # "decisionTable Tui"
 
-| # action                  | workspace | keys                  | document?                |
-| ------------------------- | --------- | --------------------- | ------------------------ |
-| Enter with nothing focused | docs     | `Enter`               | README.md                |
-| Link into a subfolder     | docs      | `Tab Enter`           | guide/getting-started.md |
-| Link in the same folder   | docs      | `Tab Tab Tab Enter`   | reference.md             |
-| Link to a parent folder   | docs      | `Tab Enter Tab Enter` | README.md                |
+| # action                   | workspace | keys                  | document?                |
+| -------------------------- | --------- | --------------------- | ------------------------ |
+| Enter with nothing focused | docs      | `Enter`               | README.md                |
+| Link into a subfolder      | docs      | `Tab Enter`           | guide/getting-started.md |
+| Link to a parent folder    | docs      | `Tab Enter Tab Enter` | README.md                |
 
-A link with a heading anchor opens the page and scrolls to that heading.
-
-[//]: # "decisionTable Tui"
-
-| # action                | workspace | keys                      | document?          | look for | visible? |
-| ----------------------- | --------- | ------------------------- | ------------------ | -------- | -------- |
-| Scrolls to the heading  | docs      | `Tab Tab Tab Tab Tab Enter` | guide/long-page.md | The End  | yes      |
-| Leaves the top behind   | docs      | `Tab Tab Tab Tab Tab Enter` | guide/long-page.md | Long Page | no      |
-
-Links that cannot be opened leave you on the same page and explain why. temoc-ui
-does not launch a web browser.
+A link with a heading anchor scrolls to that heading.
 
 [//]: # "decisionTable Tui"
 
-| # action      | workspace | keys                                | document? | status?                                             |
-| ------------- | --------- | ----------------------------------- | --------- | --------------------------------------------------- |
-| Missing file  | docs      | `Tab Tab Tab Tab Tab Tab Enter`     | README.md | Link target not found: missing.md                   |
-| External link | docs      | `Tab Tab Tab Tab Tab Tab Tab Enter` | README.md | External link: https://github.com/killertux/temoc   |
+| # action               | workspace | keys                        | document?          | look for  | visible? |
+| ---------------------- | --------- | --------------------------- | ------------------ | --------- | -------- |
+| Scrolls to the heading | docs      | `Tab Tab Tab Tab Tab Enter` | guide/long-page.md | The End   | yes      |
+| Leaves the top behind  | docs      | `Tab Tab Tab Tab Tab Enter` | guide/long-page.md | Long Page | no       |
+
+The status bar explains why a link cannot be opened.
+
+[//]: # "decisionTable Tui"
+
+| # action      | workspace | keys                                | document? | status?                                           |
+| ------------- | --------- | ----------------------------------- | --------- | ------------------------------------------------- |
+| Missing file  | docs      | `Tab Tab Tab Tab Tab Tab Enter`     | README.md | Link target not found: missing.md                 |
+| External link | docs      | `Tab Tab Tab Tab Tab Tab Tab Enter` | README.md | External link: https://github.com/killertux/temoc |
 
 ## Moving between tables
 
 `]` moves to the next [test table](../glossary.md) and `[` to the previous one,
 scrolling it into view. The first table is focused when a test file opens. Focus
 stops at the first and last tables and does not wrap around. `}` and `{` do the same
-for the [rows of the focused table](../running/running-a-row.md#choosing-a-row).
+for the [rows of the focused table](running.md#choosing-a-row).
 
 [//]: # "decisionTable Tui"
 
@@ -178,19 +176,17 @@ for the [rows of the focused table](../running/running-a-row.md#choosing-a-row).
 
 ## History
 
-`h` or `Backspace` goes back and `l` goes forward, like a web browser. Following a
-new link clears the forward history.
+`h` or `Backspace` goes back and `l` goes forward. See
+[how history works](../viewer/links.md#history).
 
 [//]: # "decisionTable Tui"
 
-| # action                 | workspace | keys                    | document?                |
-| ------------------------ | --------- | ----------------------- | ------------------------ |
-| Back                     | docs      | `Tab Enter h`           | README.md                |
-| Backspace goes back      | docs      | `Tab Enter Backspace`   | README.md                |
-| Forward                  | docs      | `Tab Enter h l`         | guide/getting-started.md |
-| Nothing to go back to    | docs      | `h`                     | README.md                |
-| Nothing to go forward to | docs      | `l`                     | README.md                |
-| New link clears forward  | docs      | `Tab Enter h Tab Tab Enter l` | reference.md       |
+| # action              | workspace | keys                  | document?                |
+| --------------------- | --------- | --------------------- | ------------------------ |
+| Back                  | docs      | `Tab Enter h`         | README.md                |
+| Backspace goes back   | docs      | `Tab Enter Backspace` | README.md                |
+| Forward               | docs      | `Tab Enter h l`       | guide/getting-started.md |
+| Nothing to go back to | docs      | `h`                   | README.md                |
 
 Going back restores the scroll position and the focused link.
 

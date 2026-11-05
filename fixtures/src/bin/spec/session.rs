@@ -71,12 +71,12 @@ impl Outcome {
     }
 }
 
-fn samples() -> PathBuf {
+pub fn samples() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../samples")
 }
 
 /// The folder holding this binary, and so `calculator-server` too.
-fn example_binaries() -> Option<PathBuf> {
+pub fn example_binaries() -> Option<PathBuf> {
     env::current_exe().ok()?.parent().map(Path::to_path_buf)
 }
 

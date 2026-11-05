@@ -2,9 +2,8 @@
 
 mod drawing;
 
-use crate::render::Document;
+use crate::links::LinkGraph;
 use crate::theme::Theme;
-use crate::workspace;
 use drawing::{Drawing, ROW_STEP};
 use ratatui::Frame;
 use ratatui::buffer::Buffer;
@@ -12,12 +11,9 @@ use ratatui::layout::{Constraint, Layout, Position, Rect};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::Paragraph;
-use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
-use std::fs;
+use std::collections::HashSet;
 use std::path::Path;
 
-/// The file a workspace starts from, if it has one.
-const START_PAGE: &str = "README.md";
 /// How tall the panel below the graph is, border included.
 const PANEL_HEIGHT: u16 = 8;
 /// What the panel lists when there is nothing to list.
@@ -42,104 +38,6 @@ pub struct GraphState {
     pub area: Rect,
 }
 
-/// What the files of a workspace link to, by their position among the files.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-struct Links {
-    /// Links between files, as `(from, to)`.
-    between: BTreeSet<(usize, usize)>,
-    /// The links of each file to files that do not exist.
-    missing: HashMap<usize, BTreeSet<String>>,
-}
-
-impl Links {
-    fn read(workspace: &Path, files: &[String]) -> Self {
-        let positions: HashMap<&str, usize> = files
-            .iter()
-            .enumerate()
-            .map(|(position, file)| (file.as_str(), position))
-            .collect();
-        let mut links = Self::default();
-        for (from, file) in files.iter().enumerate() {
-            for path in linked_paths(workspace, file) {
-                if path == *file || is_outside(&path) {
-                    continue;
-                }
-                if let Some(to) = positions.get(path.as_str()) {
-                    links.between.insert((from, *to));
-                } else if !workspace.join(&path).is_file() {
-                    links.missing.entry(from).or_default().insert(path);
-                }
-            }
-        }
-        links
-    }
-}
-
-/// Where the links of a file lead. A file that cannot be read or parsed still
-/// has its place in the graph, and opening it says what is wrong.
-fn linked_paths(workspace: &Path, file: &str) -> Vec<String> {
-    let parsed = fs::read_to_string(workspace.join(file))
-        .map_err(|error| error.to_string())
-        .and_then(|text| Document::parse(&text));
-    match parsed {
-        Ok(document) => document
-            .link_urls()
-            .filter_map(|url| workspace::link_path(file, url))
-            .collect(),
-        Err(_) => Vec::new(),
-    }
-}
-
-/// Whether a path from a link leads out of the workspace, or to the workspace
-/// folder itself.
-fn is_outside(path: &str) -> bool {
-    path.is_empty() || path == ".." || path.starts_with("../")
-}
-
-/// How many links away from the start each file is, if it can be reached.
-fn distances_from(
-    start: Option<usize>,
-    count: usize,
-    links: &BTreeSet<(usize, usize)>,
-) -> Vec<Option<usize>> {
-    let mut distances = vec![None; count];
-    let mut waiting = VecDeque::new();
-    if let Some(start) = start {
-        waiting.push_back((start, 0));
-    }
-    while let Some((file, distance)) = waiting.pop_front() {
-        match distances.get_mut(file) {
-            Some(found @ None) => *found = Some(distance),
-            _ => continue,
-        }
-        for (_, to) in links.range((file, 0)..=(file, usize::MAX)) {
-            waiting.push_back((*to, distance + 1));
-        }
-    }
-    distances
-}
-
-/// Puts each file in the column of its distance, and the rest in a last one.
-fn columns_by(distances: &[Option<usize>]) -> Vec<Vec<usize>> {
-    let deepest = distances.iter().flatten().max();
-    let mut columns = vec![Vec::new(); deepest.map_or(0, |deepest| deepest + 1)];
-    let mut unreachable = Vec::new();
-    for (file, distance) in distances.iter().enumerate() {
-        let column = distance.and_then(|distance| columns.get_mut(distance));
-        column.unwrap_or(&mut unreachable).push(file);
-    }
-    if !unreachable.is_empty() {
-        columns.push(unreachable);
-    }
-    columns
-}
-
-/// Sorts the way files are sorted everywhere else.
-fn sorted(mut names: Vec<String>) -> Vec<String> {
-    names.sort_by_key(|name| name.to_lowercase());
-    names
-}
-
 /// A list for the panel, cut down to fit in `room` rows.
 fn fitted(items: &[String], room: usize) -> Vec<String> {
     if items.is_empty() {
@@ -158,10 +56,7 @@ fn fitted(items: &[String], room: usize) -> Vec<String> {
 /// The graph view.
 #[derive(Debug, Clone)]
 pub struct Graph {
-    files: Vec<String>,
-    links: Links,
-    distances: Vec<Option<usize>>,
-    columns: Vec<Vec<usize>>,
+    links: LinkGraph,
     drawing: Drawing,
     /// The column of the selected file, and its position there.
     selected: Option<(usize, usize)>,
@@ -180,28 +75,22 @@ impl Graph {
     /// Reads the links of a workspace, with `document` selected.
     #[must_use]
     pub fn open(workspace: &Path, document: Option<&str>) -> Self {
-        let files = workspace::markdown_files(workspace);
-        let links = Links::read(workspace, &files);
-        Self::over(files, links, document)
+        Self::over(LinkGraph::read(workspace), document)
     }
 
-    fn over(files: Vec<String>, links: Links, document: Option<&str>) -> Self {
-        let position = |wanted: &str| files.iter().position(|file| file == wanted);
-        let start = position(START_PAGE).or((!files.is_empty()).then_some(0));
-        let distances = distances_from(start, files.len(), &links.between);
-        let columns = columns_by(&distances);
-        let widths: Vec<usize> = files
+    fn over(links: LinkGraph, document: Option<&str>) -> Self {
+        let widths: Vec<usize> = links
+            .files()
             .iter()
             .map(|file| Line::from(file.as_str()).width())
             .collect();
-        let drawing = Drawing::lay_out(&columns, &widths, &links.between);
-        let chosen = document.and_then(position).or(start);
-        let selected = chosen.and_then(|chosen| spot_of(&columns, chosen));
+        let drawing = Drawing::lay_out(links.columns(), &widths, links.between());
+        let chosen = document
+            .and_then(|document| links.position(document))
+            .or(links.start());
+        let selected = chosen.and_then(|chosen| spot_of(links.columns(), chosen));
         Self {
-            files,
             links,
-            distances,
-            columns,
             drawing,
             selected,
             top: 0,
@@ -212,12 +101,12 @@ impl Graph {
     }
 
     fn name(&self, file: usize) -> Option<&String> {
-        self.files.get(file)
+        self.links.name(file)
     }
 
     fn selected_position(&self) -> Option<usize> {
         let (column, index) = self.selected?;
-        self.columns.get(column)?.get(index).copied()
+        self.links.columns().get(column)?.get(index).copied()
     }
 
     /// The selected file, relative to the workspace.
@@ -226,46 +115,17 @@ impl Graph {
         self.name(self.selected_position()?).map(String::as_str)
     }
 
-    fn links_out(&self, file: usize) -> Vec<String> {
-        let links = self.links.between.range((file, 0)..=(file, usize::MAX));
-        let found = links.filter_map(|(_, to)| self.name(*to).cloned());
-        let missing = self.links.missing.get(&file).into_iter().flatten();
-        sorted(
-            found
-                .chain(missing.map(|path| format!("{path} (missing)")))
-                .collect(),
-        )
-    }
-
-    fn links_in(&self, file: usize) -> Vec<String> {
-        let links = self.links.between.iter().filter(|(_, to)| *to == file);
-        sorted(
-            links
-                .filter_map(|(from, _)| self.name(*from).cloned())
-                .collect(),
-        )
-    }
-
     /// A snapshot of the graph.
     #[must_use]
     pub fn state(&self) -> GraphState {
-        let names = |files: &Vec<usize>| {
-            let found = files.iter().filter_map(|file| self.name(*file));
-            found.cloned().collect()
-        };
         let file = self.selected_position();
         GraphState {
-            columns: self.columns.iter().map(names).collect(),
-            links: self
-                .links
-                .between
-                .iter()
-                .filter_map(|(from, to)| Some((self.name(*from)?.clone(), self.name(*to)?.clone())))
-                .collect(),
+            columns: self.links.column_names(),
+            links: self.links.link_names(),
             selected: self.chosen_file().map(String::from),
-            distance: file.and_then(|file| self.distances.get(file).copied().flatten()),
-            links_out: file.map_or_else(Vec::new, |file| self.links_out(file)),
-            links_in: file.map_or_else(Vec::new, |file| self.links_in(file)),
+            distance: file.and_then(|file| self.links.distance(file)),
+            links_out: file.map_or_else(Vec::new, |file| self.links.links_out(file)),
+            links_in: file.map_or_else(Vec::new, |file| self.links.links_in(file)),
             area: self.area,
         }
     }
@@ -276,7 +136,7 @@ impl Graph {
     }
 
     fn column_length(&self, column: usize) -> usize {
-        self.columns.get(column).map_or(0, Vec::len)
+        self.links.columns().get(column).map_or(0, Vec::len)
     }
 
     /// Selects the next file of the column, stopping at the last one.
@@ -356,7 +216,7 @@ impl Graph {
 
     /// The first column that shows everything to its right.
     fn last_left(&self) -> usize {
-        let last = self.columns.len().saturating_sub(1);
+        let last = self.links.columns().len().saturating_sub(1);
         let room = usize::from(self.area.width);
         let fits = |column: &usize| {
             let start = self.drawing.column_start(*column);
@@ -450,7 +310,7 @@ impl Graph {
     fn draw_names(&self, buffer: &mut Buffer) {
         let left = self.drawing.column_start(self.left);
         let area = self.area;
-        for (column, files) in self.columns.iter().enumerate().skip(self.left) {
+        for (column, files) in self.links.columns().iter().enumerate().skip(self.left) {
             let x = self.drawing.column_start(column).saturating_sub(left);
             let Some(x) = u16::try_from(x).ok().filter(|x| *x < area.width) else {
                 break;
@@ -488,7 +348,7 @@ impl Graph {
             Paragraph::new(std::iter::once(title).chain(links).collect::<Vec<_>>())
         };
         let (out, into) = file.map_or_else(Default::default, |file| {
-            (self.links_out(file), self.links_in(file))
+            (self.links.links_out(file), self.links.links_in(file))
         });
         frame.render_widget(list("Links out", out, links_out), links_out);
         frame.render_widget(list("Links in", into, links_in), links_in);
@@ -505,10 +365,12 @@ fn spot_of(columns: &[Vec<usize>], file: usize) -> Option<(usize, usize)> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::links::Links;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Cell;
-    use std::{env, process};
+    use std::collections::HashMap;
+    use std::{env, fs, process};
 
     /// A graph of files named by their position, linked as `(from, to)`.
     fn graph(names: &[&str], links: &[(usize, usize)], document: Option<&str>) -> Graph {
@@ -517,7 +379,7 @@ mod tests {
             between: links.iter().copied().collect(),
             missing: HashMap::new(),
         };
-        Graph::over(files, links, document)
+        Graph::over(LinkGraph::over(files, links), document)
     }
 
     /// README.md links to `count` pages, and those to nothing.
@@ -550,12 +412,6 @@ mod tests {
 
     fn chosen(graph: &Graph) -> Option<&str> {
         graph.chosen_file()
-    }
-
-    #[test]
-    fn links_in_a_circle_end() {
-        let found = graph(&["a.md", "b.md"], &[(0, 1), (1, 0), (0, 0)], None);
-        assert_eq!(found.distances, [Some(0), Some(1)]);
     }
 
     #[test]

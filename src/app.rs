@@ -1,16 +1,17 @@
-//! The application itself, independent of any real terminal.
+//! The terminal interface, independent of any real terminal.
 
+use crate::NotImplemented;
 use crate::clipboard;
 use crate::graph::{Graph, GraphState};
 use crate::help::Help;
+use crate::history::History;
 use crate::page::Page;
-use crate::render::{Document, Motion};
-use crate::run::{FileResults, NOT_RUN, Progress, Request, Run};
+use crate::render::Motion;
+use crate::run::NOT_RUN;
 use crate::search::Search;
-use crate::temoc::{RunReport, TestTable};
+use crate::session::{Outcome, Session, Start};
 use crate::theme::{Rgb, Theme};
 use crate::tree::{FileTree, Row};
-use crate::{NotImplemented, workspace};
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -19,13 +20,9 @@ use ratatui::layout::{Constraint, Layout, Margin, Position, Rect, Size};
 use ratatui::style::{Modifier, Style};
 use ratatui::text::Line;
 use ratatui::widgets::{Block, Clear, Paragraph};
-use std::collections::HashMap;
-use std::fmt::Display;
+use std::mem;
 use std::path::PathBuf;
-use std::{fs, mem};
 
-/// The configuration file temoc-ui looks for in the workspace.
-const CONFIGURATION: &str = "temoc.toml";
 /// How many lines one step of the mouse wheel scrolls.
 const WHEEL_STEP: usize = 3;
 
@@ -116,12 +113,8 @@ pub struct AppState {
 #[derive(Debug)]
 pub struct App {
     running: bool,
-    workspace: PathBuf,
-    page: Option<Page>,
-    /// The pages behind the current one, the most recent last.
-    back: Vec<Page>,
-    /// The pages left by going back, the most recent last.
-    forward: Vec<Page>,
+    session: Session,
+    pages: History<Page>,
     search: Option<Search>,
     tree: Option<FileTree>,
     graph: Option<Graph>,
@@ -140,18 +133,6 @@ pub struct App {
     dragged: bool,
     /// The bytes waiting to be written to the terminal.
     output: Vec<u8>,
-    /// The folder temoc-ui was started from.
-    start_folder: PathBuf,
-    /// The configuration file given with `--config`, as written.
-    config: Option<String>,
-    /// Folders to search ahead of `PATH` when starting temoc.
-    extra_path: Vec<PathBuf>,
-    /// The temoc process at work.
-    run: Option<Run>,
-    /// What each file's runs have reported. Outlives the pages.
-    results: HashMap<String, FileResults>,
-    /// The arguments of the last temoc command.
-    temoc_arguments: Option<Vec<String>>,
 }
 
 impl App {
@@ -167,13 +148,17 @@ impl App {
             Some(name) => Theme::named(name).ok_or(format!("Unknown theme: {name}"))?,
             None => Theme::matching(launch.color_term.as_deref(), launch.background),
         };
-        let opening = workspace::locate(&launch.current_dir, arguments.path)?;
+        let session = Session::start(&Start {
+            current_dir: launch.current_dir.clone(),
+            path: arguments.path.map(String::from),
+            config: arguments.config.map(String::from),
+            extra_path: launch.extra_path.clone(),
+        })?;
+        let first_file = session.first_file().map(String::from);
         let mut app = Self {
             running: true,
-            workspace: opening.workspace,
-            page: None,
-            back: Vec::new(),
-            forward: Vec::new(),
+            session,
+            pages: History::default(),
             search: None,
             tree: None,
             graph: None,
@@ -186,14 +171,8 @@ impl App {
             pressed: None,
             dragged: false,
             output: Vec::new(),
-            start_folder: launch.current_dir.clone(),
-            config: arguments.config.map(String::from),
-            extra_path: launch.extra_path.clone(),
-            run: None,
-            results: HashMap::new(),
-            temoc_arguments: None,
         };
-        match opening.file {
+        match first_file {
             Some(file) => app.visit(&file, None)?,
             None => app.open_search(),
         }
@@ -202,49 +181,28 @@ impl App {
 
     /// Goes to a file of the workspace, leaving the current page behind.
     fn visit(&mut self, file: &str, anchor: Option<&str>) -> Result<(), String> {
-        let mut page = self.load(file)?;
+        let mut page = Page::new(self.session.read(file)?, self.page_size);
+        page.show_results(self.session.results(file));
         if let Some(anchor) = anchor {
             page.go_to_anchor(anchor);
         }
-        self.back.extend(self.page.replace(page));
-        self.forward.clear();
+        self.pages.visit(page);
         Ok(())
     }
 
-    fn load(&self, file: &str) -> Result<Page, String> {
-        let refuse = |error: &dyn Display| format!("Cannot read {file}: {error}");
-        let text = fs::read_to_string(self.workspace.join(file)).map_err(|e| refuse(&e))?;
-        let document = Document::parse(&text).map_err(|e| refuse(&e))?;
-        let mut page = Page::new(file.to_owned(), document, self.page_size);
-        page.show_results(self.results.get(file));
-        Ok(page)
-    }
-
-    fn go_back(&mut self) {
-        if let Some(page) = self.back.pop() {
-            self.forward.extend(self.page.replace(page));
-        }
-    }
-
-    fn go_forward(&mut self) {
-        if let Some(page) = self.forward.pop() {
-            self.back.extend(self.page.replace(page));
-        }
-    }
-
     fn follow_focused_link(&mut self) -> Result<(), String> {
-        let Some(page) = &self.page else {
+        let Some(page) = self.pages.current() else {
             return Ok(());
         };
         let Some(link) = page.focused_link() else {
             return Ok(());
         };
-        let place = workspace::follow_link(&self.workspace, page.file(), &link.target)?;
+        let place = self.session.follow(page.file(), &link.target)?;
         self.visit(&place.file, place.anchor.as_deref())
     }
 
     fn open_search(&mut self) {
-        self.search = Some(Search::open(&self.workspace, self.only_tests));
+        self.search = Some(Search::open(self.session.workspace(), self.only_tests));
     }
 
     /// Opens the chosen result, if there is one.
@@ -258,8 +216,8 @@ impl App {
     }
 
     fn open_tree(&mut self) {
-        let document = self.page.as_ref().map(Page::file);
-        self.tree = Some(FileTree::open(&self.workspace, document));
+        let document = self.pages.current().map(Page::file);
+        self.tree = Some(FileTree::open(self.session.workspace(), document));
     }
 
     /// Opens the selected file, or else the selected folder.
@@ -276,8 +234,8 @@ impl App {
     }
 
     fn open_graph(&mut self) {
-        let document = self.page.as_ref().map(Page::file);
-        self.graph = Some(Graph::open(&self.workspace, document));
+        let document = self.pages.current().map(Page::file);
+        self.graph = Some(Graph::open(self.session.workspace(), document));
     }
 
     /// Opens the selected file, if there is one, and leaves the graph.
@@ -292,99 +250,24 @@ impl App {
 
     /// Runs every table of the open file.
     fn run_file(&mut self) -> Result<(), String> {
-        let page = self.page.as_ref().filter(|page| page.is_test_file());
-        let page = page.ok_or("This file has no temoc tests")?;
-        let (file, tables) = (page.file().to_owned(), page.tables().to_vec());
-        self.start_run(&file, file.clone(), &tables, None)
+        self.session
+            .run_file(self.pages.current().map(Page::opened))
     }
 
     /// Runs the focused table.
     fn run_table(&mut self) -> Result<(), String> {
-        let page = self.page.as_ref();
-        let found = page.and_then(|page| Some((page.file(), page.focused_table()?)));
-        let (file, table) = found.ok_or("No test table to run")?;
-        let target = format!("{file}:{}", table.directive_line);
-        let (file, table) = (file.to_owned(), table.clone());
-        self.start_run(&file, target, &[table], None)
+        let page = self.pages.current();
+        self.session.run_table(page.and_then(|page| {
+            let table = page.focused_table()?;
+            Some((page.opened(), table.directive_line))
+        }))
     }
 
     /// Runs the focused row.
     fn run_row(&mut self) -> Result<(), String> {
-        let page = self.page.as_ref();
-        let found = page.and_then(|page| {
-            let table = page.focused_table()?;
-            Some((page.file(), table, page.focused_row()?))
-        });
-        let (file, table, row) = found.ok_or("No test row to run")?;
-        let target = format!("{file}:{row}");
-        let (file, table) = (file.to_owned(), table.clone());
-        self.start_run(&file, target, &[table], Some(row))
-    }
-
-    /// Starts temoc on `target`, which is these tables or one `row` of them.
-    fn start_run(
-        &mut self,
-        file: &str,
-        target: String,
-        tables: &[TestTable],
-        row: Option<usize>,
-    ) -> Result<(), String> {
-        if self.run.is_some() {
-            return Err("temoc is already running".into());
-        }
-        let arguments = vec![
-            "-c".into(),
-            self.configuration()?,
-            "--output".into(),
-            "jsonl".into(),
-            target,
-        ];
-        self.temoc_arguments = Some(arguments.clone());
-        let results = self.results.entry(file.to_owned()).or_default();
-        results.begin(tables, row);
-        let request = Request {
-            folder: self.workspace.clone(),
-            extra_path: self.extra_path.clone(),
-            arguments,
-            file: file.to_owned(),
-            tables: tables.to_vec(),
-        };
-        match Run::start(request) {
-            Ok(run) => {
-                self.run = Some(run);
-                Ok(())
-            }
-            Err(message) => {
-                results.finish(&RunReport::stopped(message.clone()));
-                Err(failed_run(&message))
-            }
-        }
-    }
-
-    /// The configuration file to give temoc, which runs in the workspace.
-    fn configuration(&self) -> Result<String, String> {
-        let Some(written) = &self.config else {
-            return if self.workspace.join(CONFIGURATION).is_file() {
-                Ok(CONFIGURATION.into())
-            } else {
-                Err(format!(
-                    "No temoc configuration found. Add {CONFIGURATION} or use --config."
-                ))
-            };
-        };
-        let missing = || format!("Configuration file not found: {written}");
-        let path = self.start_folder.join(written);
-        let path = path.canonicalize().map_err(|_| missing())?;
-        if !path.is_file() {
-            return Err(missing());
-        }
-        let workspace = self.workspace.canonicalize();
-        let inside = workspace.map(|workspace| path.strip_prefix(workspace).map(PathBuf::from));
-        let path = match inside {
-            Ok(Ok(inside)) => inside,
-            _ => path,
-        };
-        Ok(path.to_string_lossy().into_owned())
+        let page = self.pages.current();
+        self.session
+            .run_row(page.and_then(|page| Some((page.opened(), page.focused_row()?))))
     }
 
     /// Shows what went wrong, if anything did.
@@ -441,7 +324,7 @@ impl App {
         };
         self.dragged = true;
         if self.page_is_showing()
-            && let Some(page) = &mut self.page
+            && let Some(page) = self.pages.current_mut()
         {
             page.drag((start.x, start.y), (spot.x, spot.y));
         }
@@ -461,7 +344,7 @@ impl App {
 
     /// Puts the selection on the clipboard. Says whether there was any.
     fn copy_selection(&mut self) -> bool {
-        let text = self.page.as_ref().and_then(Page::selected_text);
+        let text = self.pages.current().and_then(Page::selected_text);
         let Some(text) = text.filter(|text| !text.is_empty()) else {
             self.status = Some("Nothing selected".into());
             return false;
@@ -492,7 +375,7 @@ impl App {
             }
             return;
         }
-        let Some(page) = &mut self.page else {
+        let Some(page) = self.pages.current_mut() else {
             return;
         };
         page.clear_selection();
@@ -552,7 +435,7 @@ impl App {
                 }
                 _ => {}
             }
-        } else if let Some(page) = &mut self.page {
+        } else if let Some(page) = self.pages.current_mut() {
             match (kind, shift) {
                 (MouseEventKind::ScrollDown, false) => page.scroll_down(WHEEL_STEP),
                 (MouseEventKind::ScrollUp, false) => page.scroll_up(WHEEL_STEP),
@@ -602,7 +485,7 @@ impl App {
             self.handle_graph_key(key.code, control);
             return Ok(());
         }
-        if self.page.as_ref().is_some_and(Page::is_selecting) {
+        if self.pages.current().is_some_and(Page::is_selecting) {
             if !control {
                 self.handle_selection_key(key.code);
             }
@@ -715,13 +598,13 @@ impl App {
             KeyCode::Char('q') => self.running = false,
             KeyCode::Char('y') => {
                 if self.copy_selection()
-                    && let Some(page) = &mut self.page
+                    && let Some(page) = self.pages.current_mut()
                 {
                     page.clear_selection();
                 }
             }
             code => {
-                if let Some(page) = &mut self.page {
+                if let Some(page) = self.pages.current_mut() {
                     match (code, cursor_motion(code)) {
                         (KeyCode::Esc, _) => page.clear_selection(),
                         (KeyCode::Char('v'), _) => page.mark_start(),
@@ -739,17 +622,17 @@ impl App {
             KeyCode::Char('/') => self.open_search(),
             KeyCode::Char('t') => self.open_tree(),
             KeyCode::Char('v') => {
-                if let Some(page) = &mut self.page {
+                if let Some(page) = self.pages.current_mut() {
                     page.start_selecting();
                 }
             }
             KeyCode::Esc => {
-                if let Some(page) = &mut self.page {
+                if let Some(page) = self.pages.current_mut() {
                     page.clear_selection();
                 }
             }
-            KeyCode::Char('h') | KeyCode::Backspace => self.go_back(),
-            KeyCode::Char('l') => self.go_forward(),
+            KeyCode::Char('h') | KeyCode::Backspace => self.pages.back(),
+            KeyCode::Char('l') => self.pages.forward(),
             KeyCode::Enter => {
                 let result = self.follow_focused_link();
                 self.report(result);
@@ -787,7 +670,7 @@ impl App {
             KeyCode::Char('{') => Page::previous_row,
             _ => return Err(NotImplemented),
         };
-        if let Some(page) = &mut self.page {
+        if let Some(page) = self.pages.current_mut() {
             act(page);
         }
         Ok(())
@@ -795,20 +678,8 @@ impl App {
 
     /// Picks up the progress of background work, such as a test run.
     pub fn update(&mut self) {
-        let Some(run) = &mut self.run else {
-            return;
-        };
-        let Progress { events, report } = run.progress();
-        let results = self.results.entry(run.file().to_owned()).or_default();
-        for event in events {
-            results.apply(run.tables(), event);
-        }
-        if let Some(report) = report {
-            results.finish(&report);
-            if let Some(message) = &report.message {
-                self.status = Some(failed_run(message));
-            }
-            self.run = None;
+        if let Some(message) = self.session.update() {
+            self.status = Some(message);
         }
     }
 
@@ -821,7 +692,7 @@ impl App {
     /// Whether background work, such as a test run, is still going.
     #[must_use]
     pub fn is_busy(&self) -> bool {
-        self.run.is_some()
+        self.session.is_busy()
     }
 
     /// Draws the current screen, and adapts to its size.
@@ -834,8 +705,8 @@ impl App {
         frame.render_widget(Block::new().style(theme.plain()), body);
         if let Some(graph) = &mut self.graph {
             graph.draw(frame, body, theme);
-        } else if let Some(page) = &mut self.page {
-            page.show_results(self.results.get(page.file()));
+        } else if let Some(page) = self.pages.current_mut() {
+            page.show_results(self.session.results(page.file()));
             page.fit(self.page_size);
             frame.render_widget(Paragraph::new(page.lines(theme)), body);
         }
@@ -870,7 +741,7 @@ impl App {
     /// The status bar message: what just happened, or else what to do next,
     /// or else what is going on.
     fn message(&self) -> Option<String> {
-        let page = self.page.as_ref().filter(|page| page.is_selecting());
+        let page = self.pages.current().filter(|page| page.is_selecting());
         let hint = page.map(|page| {
             if page.has_start() {
                 "Move to the end, then press y"
@@ -878,16 +749,14 @@ impl App {
                 "Move to the start, then press v"
             }
         });
-        let running = self.run.as_ref();
-        let running = running.map(|run| format!("Running {}...", run.file()));
+        let running = self.session.running_file();
+        let running = running.map(|file| format!("Running {file}..."));
         self.status.clone().or(hint.map(String::from)).or(running)
     }
 
     /// The result of the open file, if it has tests.
     fn file_result(&self) -> Option<&'static str> {
-        let page = self.page.as_ref().filter(|page| page.is_test_file())?;
-        let results = self.results.get(page.file());
-        Some(results.map_or(NOT_RUN, |results| results.summary(page.tables())))
+        self.session.file_result(self.pages.current()?.opened())
     }
 
     /// Takes the bytes waiting to be written to the terminal, such as a
@@ -899,12 +768,9 @@ impl App {
     /// A snapshot of the application.
     #[must_use]
     pub fn state(&self) -> AppState {
-        let page = self.page.as_ref();
-        let results = page
-            .and_then(|page| self.results.get(page.file()))
-            .cloned()
-            .unwrap_or_default();
-        let tables = page.map_or(&[][..], Page::tables);
+        let page = self.pages.current();
+        let outcome =
+            page.map_or_else(Outcome::default, |page| self.session.outcome(page.opened()));
         AppState {
             running: self.running,
             document: page.map(|page| page.file().to_owned()),
@@ -920,15 +786,11 @@ impl App {
                 .and_then(Page::focused_table)
                 .map(|table| table.name.clone()),
             focused_row: page.and_then(Page::focused_row),
-            table_results: results.by_table(tables),
-            row_results: results
-                .by_row()
-                .into_iter()
-                .map(|(line, result)| (line, result.to_string()))
-                .collect(),
-            file_result: self.file_result().map(String::from),
-            failures: results.failures(tables),
-            temoc_arguments: self.temoc_arguments.clone(),
+            table_results: outcome.tables,
+            row_results: outcome.rows,
+            file_result: outcome.file.map(String::from),
+            failures: outcome.failures,
+            temoc_arguments: self.session.temoc_arguments().map(<[String]>::to_vec),
             selection: page.and_then(Page::selected_text),
             theme: self.theme,
             tree: self
@@ -943,11 +805,6 @@ impl App {
             graph: self.graph.as_ref().map(Graph::state),
         }
     }
-}
-
-/// What the status bar says about a run that could not finish.
-fn failed_run(message: &str) -> String {
-    format!("temoc failed: {message}")
 }
 
 /// How a key moves the cursor in selection mode.
@@ -1035,9 +892,11 @@ fn draw_search(search: &Search, frame: &mut Frame, theme: Theme) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::session::CONFIGURATION;
     use ratatui::Terminal;
     use ratatui::backend::TestBackend;
     use ratatui::buffer::Cell;
+    use std::fs;
     use std::fs::Permissions;
     use std::os::unix::fs::PermissionsExt;
     use std::path::Path;
@@ -1475,7 +1334,7 @@ mod tests {
 
     /// Where a link of the docs README is on a 40 column screen.
     fn link_spot(app: &App, text: &str) -> (u16, u16) {
-        let lines = app.page.as_ref().unwrap().lines(Theme::default());
+        let lines = app.pages.current().unwrap().lines(Theme::default());
         let (row, column) = lines
             .iter()
             .enumerate()
@@ -1538,8 +1397,8 @@ mod tests {
         press(&mut app, KeyCode::Esc);
         status_bar(&mut app);
         assert_eq!(
-            app.page
-                .as_ref()
+            app.pages
+                .current()
                 .unwrap()
                 .lines(Theme::default())
                 .first()
@@ -1788,7 +1647,7 @@ mod tests {
         status_bar(&mut app);
         app.visit("README.md", None).unwrap();
         assert_eq!(app.state().file_result.as_deref(), Some("passed"));
-        assert!(app.page.as_ref().is_some_and(|page| {
+        assert!(app.pages.current().is_some_and(|page| {
             let lines = page.lines(Theme::default());
             lines.iter().any(|l| l.to_string() == "✓ passed")
         }));
@@ -1858,7 +1717,7 @@ mod tests {
         })
         .unwrap();
         assert_eq!(
-            app.configuration(),
+            app.session.configuration(),
             Ok(root.join(CONFIGURATION).to_string_lossy().into_owned())
         );
     }

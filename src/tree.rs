@@ -24,6 +24,12 @@ pub struct Row {
 }
 
 impl Row {
+    /// Whether it is a folder.
+    #[must_use]
+    pub fn is_folder(&self) -> bool {
+        matches!(self.kind, Kind::Folder { .. })
+    }
+
     /// The row as it reads on screen, without its indentation.
     #[must_use]
     pub fn label(&self) -> String {
@@ -35,7 +41,7 @@ impl Row {
     }
 }
 
-/// The file tree pop-up.
+/// The file tree.
 #[derive(Debug, Clone)]
 pub struct FileTree {
     files: Vec<String>,

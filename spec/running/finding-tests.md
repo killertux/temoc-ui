@@ -34,10 +34,10 @@ see temoc's error when you
 A test table is named after the nearest heading above it. A table with no heading
 above it uses its fixture class. Names appear in the results of a run.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation        | workspace  | arguments        | focused table? |
-| ------------------ | ---------- | ---------------- | -------------- |
-| Named by a heading | calculator | passing.md       | Addition       |
-| Uses the fixture   | detection  | double-quoted.md | Calculator     |
-| Not a test file    | docs       | reference.md     | none           |
+| # situation        | workspace  | path             | table results?                             |
+| ------------------ | ---------- | ---------------- | ------------------------------------------ |
+| Named by a heading | calculator | passing.md       | Addition: not run, Multiplication: not run |
+| Uses the fixture   | detection  | double-quoted.md | Calculator: not run                        |
+| Not a test file    | docs       | reference.md     | none                                       |

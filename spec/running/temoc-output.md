@@ -14,7 +14,7 @@ separates the lines.
 ## The result of a run
 
 The result is the `status` of `run_finished`, which temoc always prints last. The
-`message` of a `run_error` is what temoc-ui shows for that run.
+`message` of a `run_error` is what temoc-ui reports for that run.
 
 temoc-ui ignores event types and fields it does not know, as temoc asks of it.
 
@@ -50,9 +50,9 @@ says what happened. Only the first line of `stderr` is shown.
 ## Messages
 
 A row that did not pass gets a message for each check that did not pass. It says
-which method it was, what was expected, if anything was, and what came back. The
-same words are used in the [note under the row](row-results.md#notes). Elsewhere they
-come after the line, as they do here.
+which method it was, what was expected, if anything was, and what came back. They
+come after the line, as they do here. The terminal uses the same words in the
+[note under the row](../tui/row-results.md#notes).
 
 A snooze only shows while it is active. temoc reports an expired snooze as a normal
 failure.

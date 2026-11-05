@@ -2,84 +2,73 @@
 
 Back to the [specification index](README.md).
 
-`/` opens the search box, which is the quickest way to jump anywhere in the
-workspace. `Enter` opens the top result, and `Esc` closes search without moving.
+Search is the quickest way to jump anywhere in the workspace. The
+[terminal](tui/search.md) shows it in a box over the document.
 
 ## What can be found
 
-With an empty search box, every markdown file in the workspace is listed in
-alphabetical order, ignoring case. Files count as markdown when their extension
-is `.md` in any case. Hidden folders and folders named `target` or `node_modules`
-are skipped.
+With nothing typed, every markdown file in the workspace is listed in alphabetical
+order, ignoring case. Files count as markdown when their extension is `.md` in any
+case. Hidden folders and folders named `target` or `node_modules` are skipped.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation   | workspace | keys | search open? | results?                                                                        |
-| ------------- | --------- | ---- | ------------ | ------------------------------------------------------------------------------- |
-| Closed at first | docs    |      | no           | none                                                                            |
-| All files     | docs      | `/`  | yes          | guide/getting-started.md, guide/long-page.md, notes.MD, README.md, reference.md |
+| # situation     | workspace | steps    | results?                                                                        |
+| --------------- | --------- | -------- | ------------------------------------------------------------------------------- |
+| Before a search | docs      |          | none                                                                            |
+| All files       | docs      | `search` | guide/getting-started.md, guide/long-page.md, notes.MD, README.md, reference.md |
 
 Typing narrows the results with a fuzzy match on file paths and headings. Letters
 must appear in order but need not be next to each other, and case is ignored. A
 heading result is written as `file > heading`. File matches come before heading
 matches.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation        | workspace | keys             | results?                                                   |
-| ------------------ | --------- | ---------------- | ---------------------------------------------------------- |
-| Matches a heading  | docs      | `/ "install"`    | guide/getting-started.md > Install                         |
-| Ignores case       | docs      | `/ "INSTALL"`    | guide/getting-started.md > Install                         |
-| Letters may be apart | docs    | `/ "instl"`      | guide/getting-started.md > Install                         |
-| No matches         | docs      | `/ "zzz"`        | none                                                       |
-| Hidden folders     | docs      | `/ "secret"`     | none                                                       |
-| Build folders      | docs      | `/ "build"`      | none                                                       |
-| Not markdown       | docs      | `/ "data"`       | none                                                       |
+| # situation          | workspace | steps            | results?                           |
+| -------------------- | --------- | ---------------- | ---------------------------------- |
+| Matches a heading    | docs      | `search install` | guide/getting-started.md > Install |
+| Ignores case         | docs      | `search INSTALL` | guide/getting-started.md > Install |
+| Letters may be apart | docs      | `search instl`   | guide/getting-started.md > Install |
+| No matches           | docs      | `search zzz`     | none                               |
+| Hidden folders       | docs      | `search secret`  | none                               |
+| Build folders        | docs      | `search build`   | none                               |
+| Not markdown         | docs      | `search data`    | none                               |
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation            | workspace | keys             | first result?            |
-| ---------------------- | --------- | ---------------- | ------------------------ |
-| Files before headings  | docs      | `/ "reference"`  | reference.md             |
-| Fuzzy file match       | docs      | `/ "getstart"`   | guide/getting-started.md |
+| # situation           | workspace | steps              | first result?            |
+| --------------------- | --------- | ------------------ | ------------------------ |
+| Files before headings | docs      | `search reference` | reference.md             |
+| Fuzzy file match      | docs      | `search getstart`  | guide/getting-started.md |
 
 ## Opening a result
 
-`Down` and `Up` choose a result. Opening a heading scrolls to it. Going
-[back](viewer/navigation.md#history) returns to where you were.
+Opening a heading goes to that heading. Going [back](viewer/links.md#history)
+returns to where you were.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation        | workspace | keys                     | document?                | search open? |
-| ------------------ | --------- | ------------------------ | ------------------------ | ------------ |
-| Open the top result | docs     | `/ "reference" Enter`    | reference.md             | no           |
-| Choose a result    | docs      | `/ Down Enter`           | guide/long-page.md       | no           |
-| Heading result     | docs      | `/ "install" Enter`      | guide/getting-started.md | no           |
-| Enter with no results | docs   | `/ "zzz" Enter`          | README.md                | yes          |
-| Cancel             | docs      | `/ "reference" Esc`      | README.md                | no           |
-| Back to the start  | docs      | `/ "reference" Enter h`  | README.md                | no           |
-
-[//]: # "decisionTable Tui"
-
-| # situation             | workspace | keys                | look for | visible? |
-| ----------------------- | --------- | ------------------- | -------- | -------- |
-| Scrolls to the heading  | docs      | `/ "middle" Enter`  | Middle   | yes      |
-| Leaves the top behind   | docs      | `/ "middle" Enter`  | Long Page | no      |
+| # situation        | workspace | steps                                  | document?                | anchor? |
+| ------------------ | --------- | -------------------------------------- | ------------------------ | ------- |
+| Open the top result | docs     | `search reference, open result 1`      | reference.md             | none    |
+| Choose a result    | docs      | `search, open result 2`                | guide/long-page.md       | none    |
+| Heading result     | docs      | `search install, open result 1`        | guide/getting-started.md | install |
+| No such result     | docs      | `search zzz, open result 1`            | README.md                | none    |
+| Back to the start  | docs      | `search reference, open result 1, back` | README.md               | none    |
 
 ## Showing only test files
 
-`Ctrl-t` shows only [test files](running/finding-tests.md), and pressing it again
-shows everything. The choice is remembered until temoc-ui closes.
+Search can show only [test files](running/finding-tests.md).
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation            | workspace  | keys                       | results?                                                    |
-| ---------------------- | ---------- | -------------------------- | ----------------------------------------------------------- |
-| All files              | calculator | `/`                        | broken.md, failing.md, mixed.md, passing.md, README.md, snoozed.md |
-| Only test files        | calculator | `/ Ctrl-t`                 | broken.md, failing.md, mixed.md, passing.md, snoozed.md     |
-| Back to all files      | calculator | `/ Ctrl-t Ctrl-t`          | broken.md, failing.md, mixed.md, passing.md, README.md, snoozed.md |
-| Combines with typing   | calculator | `/ Ctrl-t "pass"`          | passing.md, passing.md > Passing Tests                      |
-| Excludes other files   | calculator | `/ Ctrl-t "readme"`        | none                                                        |
-| Remembered next time   | calculator | `/ Ctrl-t Esc /`           | broken.md, failing.md, mixed.md, passing.md, snoozed.md     |
-| No test files          | docs       | `/ Ctrl-t`                 | none                                                        |
+| # situation          | workspace  | steps                                    | results?                                                           |
+| -------------------- | ---------- | ---------------------------------------- | ------------------------------------------------------------------ |
+| All files            | calculator | `search`                                 | broken.md, failing.md, mixed.md, passing.md, README.md, snoozed.md |
+| Only test files      | calculator | `search, only test files`                | broken.md, failing.md, mixed.md, passing.md, snoozed.md            |
+| Back to all files    | calculator | `search, only test files, only test files` | broken.md, failing.md, mixed.md, passing.md, README.md, snoozed.md |
+| Combines with typing | calculator | `search pass, only test files`           | passing.md, passing.md > Passing Tests                             |
+| Excludes other files | calculator | `search readme, only test files`         | none                                                               |
+| No test files        | docs       | `search, only test files`                | none                                                               |

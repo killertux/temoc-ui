@@ -1,4 +1,4 @@
-//! The keys notation described in `spec/writing-specs.md`.
+//! The keys notation described in `spec/tui/writing-specs.md`.
 
 use crossterm::event::{KeyCode, KeyModifiers, MouseEventKind};
 

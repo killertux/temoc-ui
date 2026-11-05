@@ -10,7 +10,7 @@ use ratatui::widgets::{Clear, Paragraph};
 /// How wide the column of keys is.
 const KEY_WIDTH: usize = 21;
 
-/// Every key and what it does, as `spec/keys.md` lists them.
+/// Every key and what it does, as `spec/tui/keys.md` lists them.
 const KEYS: [(&str, &str); 23] = [
     ("j, Down", "Scroll down one line"),
     ("k, Up", "Scroll up one line"),
@@ -100,7 +100,7 @@ mod tests {
 
     /// The first two cells of each row of the table of keys in the spec.
     fn keys_in_the_spec() -> Vec<(String, String)> {
-        include_str!("../spec/keys.md")
+        include_str!("../spec/tui/keys.md")
             .lines()
             .take_while(|line| !line.starts_with("## "))
             .filter(|line| line.starts_with("| "))

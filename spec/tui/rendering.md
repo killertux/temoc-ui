@@ -2,7 +2,7 @@
 
 Back to the [specification index](../README.md).
 
-Markdown is shown formatted, not as raw source. temoc-ui supports GitHub Flavored
+Markdown is shown formatted, not as raw source. The terminal supports GitHub Flavored
 Markdown, the same format temoc reads.
 
 ## Inline and block elements

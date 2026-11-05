@@ -12,99 +12,78 @@ Run the whole specification from the repository root:
 temoc -c temoc.toml
 ```
 
+## Core and interfaces
+
+The pages at this level describe what temoc-ui does whatever the interface is, and
+their tables never touch a screen, a key, or a colour. Each interface gets a folder
+of its own for what only it does, and for proof that it reaches the core behavior.
+The first is [`tui/`](tui/writing-specs.md), the terminal.
+
+A behavior belongs in the core if another interface would have to do the same.
+How it looks and what you press to get it belong to the interface.
+
 ## Reading a test table
 
 Each row is one independent scenario. Columns ending in `?` are what we expect to
 see. The other columns are inputs. Columns starting with `#` are comments that
 temoc ignores.
 
-Most pages use the `Tui` fixture. For each row it starts a fresh temoc-ui in an
-80 by 24 in-memory terminal, presses the keys, waits for any test run to finish,
-and then reads the screen.
+Most pages here use the `Core` fixture. For each row it opens a fresh temoc-ui with
+no interface, takes the steps, waits for any test run to finish, and then reads what
+happened. `TemocDetection` and `TemocOutput` look at one piece of temoc-ui by itself,
+as their pages describe.
 
 ### Inputs
 
-| Column      | Meaning                                                             |
-| ----------- | ------------------------------------------------------------------- |
-| `workspace` | The folder under [`samples/`](../samples) to start in.              |
-| `arguments` | Command line arguments for temoc-ui. Empty means none.              |
-| `keys`      | The keys to press, in order, separated by spaces.                   |
-| `look for`  | Text to check for. Used with `visible?` or `in graph?`.             |
-| `color term` | The value of `COLORTERM`. Empty means that it is not set.          |
-| `terminal background` | What the terminal answers when asked for its background, or `no answer`. Empty means `no answer`. |
+| Column      | Meaning                                                |
+| ----------- | ------------------------------------------------------ |
+| `workspace` | The folder under [`samples/`](../samples) to start in. |
+| `path`      | The path to open. Empty means none.                    |
+| `config`    | The configuration file to use. Empty means none.       |
+| `steps`     | What to do, in order, separated by commas.             |
 
-### Keys notation
+### Steps
 
-| Written as                                 | Meaning                       |
-| ------------------------------------------ | ----------------------------- |
-| `j`, `/`, `G`                              | Press that key.               |
-| `Enter`, `Esc`, `Tab`, `Backspace`         | Press that named key.         |
-| `Shift-Tab`, `PageUp`, `PageDown`          | Press that named key.         |
-| `Up`, `Down`, `Left`, `Right`, `Space`     | Press that named key.         |
-| `Ctrl-t`                                   | Hold Ctrl and press the key.  |
-| `"some text"`                              | Type each character in turn.  |
+| Written as                 | Meaning                                                          |
+| -------------------------- | ---------------------------------------------------------------- |
+| `open FILE`                | Open a file of the workspace.                                    |
+| `follow TARGET`            | Follow a link in the open document, as written in the markdown.  |
+| `back`, `forward`          | Go back or forward.                                              |
+| `search`, `search TEXT`    | Search for the text, or for nothing to list everything.          |
+| `only test files`          | Turn the test file filter of the search on or off.               |
+| `open result NUMBER`       | Open that result of the search, counting from 1.                 |
+| `run file`                 | Run the open file.                                               |
+| `run table LINE`           | Run the table with its directive on that line.                   |
+| `run row LINE`             | Run the row on that line.                                        |
 
-Keys wait for any test run to finish before the next one is pressed, which leaves
-nothing to see of a run in progress. `Wait` is for looking at one.
+Steps wait for any test run to finish before the next one is taken, which leaves
+nothing to see of a run in progress. `wait for row` is for looking at one.
 
-| Written as    | Meaning                                                                              |
-| ------------- | ------------------------------------------------------------------------------------ |
-| `Wait "text"` | Stop waiting for the run, and wait until the text is on screen. Later keys do not wait for the run either. |
-
-Mouse actions are written in the same column. They find their position from text
-on screen, searching from the top, so that they do not depend on the layout.
-
-| Written as                   | Meaning                                                       |
-| ---------------------------- | ------------------------------------------------------------- |
-| `Click "text"`               | Click the first character of the text.                        |
-| `Drag "from" "to"`           | Press on the first character of `from`, release on the last character of `to`. |
-| `DragBack "from" "to"`       | Press on the last character of `from`, release on the first character of `to`. |
-| `WheelDown`, `WheelUp`       | Turn the mouse wheel one step.                                |
-| `WheelLeft`, `WheelRight`    | Turn a sideways mouse wheel one step.                         |
-| `Shift-WheelDown`, `Shift-WheelUp` | Turn the mouse wheel one step while holding Shift.      |
-| `ClickOutside`               | Click a spot outside the open pop-up.                         |
+| Written as          | Meaning                                                                                                     |
+| ------------------- | ----------------------------------------------------------------------------------------------------------- |
+| `wait for row LINE` | Stop waiting for the run, and wait until that row is `running`. Later steps do not wait for the run either. |
 
 ### Expected values
 
-| Column            | Meaning                                                       |
-| ----------------- | ------------------------------------------------------------- |
-| `document?`       | Path of the open document within the workspace, or `none`.    |
-| `visible?`        | `yes` if the `look for` text is on screen, otherwise `no`.    |
-| `highlight?`      | How the `look for` text is highlighted: `green`, `red`, `yellow`, `reversed`, or `none`. `green`, `red` and `yellow` are the theme's colours for passed, failed and snoozed. |
-| `next line?`      | The text on the screen line below the `look for` text, or `none` if it is blank. |
-| `status?`         | The status bar message, or `none`.                            |
-| `still open?`     | `yes` while temoc-ui is running, `no` after it exits.         |
-| `focused link?`   | The text of the focused link, or `none`.                      |
-| `search open?`    | `yes` while the search box is showing.                        |
-| `results?`        | Search results in order, separated by commas, or `none`.      |
-| `first result?`   | The top search result, or `none`.                             |
-| `focused table?`  | The name of the focused test table, or `none`.                |
-| `focused row?`    | The line of the focused row, or `none`.                       |
-| `table results?`  | Each table's name and result, separated by commas.            |
-| `row results?`    | Each row that has a result, written `line: result` and separated by commas, or `none`. |
-| `file result?`    | The result for the whole document.                            |
-| `failures?`       | Each failure with its table and line, separated by semicolons, or `none`. |
-| `temoc arguments?`| The arguments of the last temoc command, or `none`.           |
-| `tree open?`      | `yes` while the file tree is showing.                         |
-| `tree?`           | The rows of the file tree in order, or `none`.                |
-| `tree selection?` | The selected row of the file tree, or `none`.                 |
-| `graph open?`     | `yes` while the graph view is showing.                        |
-| `columns?`        | The graph's columns, separated by semicolons, or `none`.      |
-| `links?`          | Every link in the graph, written `from -> to`.                |
-| `in graph?`       | `yes` if the `look for` text is in the graph, ignoring the panel. |
-| `distance?`       | Links from the start page to the selected file, or `not reachable`. |
-| `selected file?`  | The file selected in the graph, or `none`.                    |
-| `links out?`      | The links out of the selected file, or `none`.                |
-| `links in?`       | The links into the selected file, or `none`.                  |
-| `selection?`      | The selected text, or `none`.                                 |
-| `clipboard?`      | The text last copied to the clipboard, or `none`.             |
-| `clipboard sequence?` | The last clipboard escape sequence written, or `none`.    |
-| `theme?`          | The name of the theme in use.                                 |
-| `foreground?`     | The text colour at the `look for` text.                       |
-| `background?`     | The background colour at the `look for` text.                 |
-| `contrast?`       | The contrast between those two colours.                       |
-| `bar against page?` | The contrast between the status bar and the page.           |
-| `unpainted cells?` | How many cells use the terminal's default colours.           |
+| Column             | Meaning                                                                                |
+| ------------------ | -------------------------------------------------------------------------------------- |
+| `document?`        | Path of the open document within the workspace, or `none`.                             |
+| `anchor?`          | The heading the document was opened at, or `none`.                                     |
+| `problem?`         | Why temoc-ui did not start, why the last step was refused, or what stopped the last run, or `none`. |
+| `results?`         | Search results in order, separated by commas, or `none`.                               |
+| `first result?`    | The top search result, or `none`.                                                      |
+| `tree?`            | The rows of the file tree in order. A folder ends with `/`.                            |
+| `columns?`         | The graph's columns, separated by semicolons.                                          |
+| `links?`           | Every link in the graph, written `from -> to`.                                         |
+| `distance?`        | Links from the start page to the open document, or `not reachable`.                    |
+| `links out?`       | The links out of the open document, or `none`.                                         |
+| `links in?`        | The links into the open document, or `none`.                                           |
+| `file result?`     | The result for the whole document, or `none` when it has no tests.                     |
+| `table results?`   | Each table's name and result, separated by commas, or `none`.                          |
+| `row results?`     | Each row that has a result, written `line: result` and separated by commas, or `none`. |
+| `failures?`        | Each failure with its table and line, separated by semicolons, or `none`.              |
+| `temoc arguments?` | The arguments of the last temoc command, or `none`.                                    |
+| `running?`         | The file temoc is running, or `none`.                                                  |
 
 ## Sample workspaces
 
@@ -132,5 +111,6 @@ built by the spec harness.
 
 - Describe the behavior in plain language first, then show it with a table.
 - Keep each row independent, so that it can run alone.
+- Put it with the core unless only one interface would ever do it.
 - Add a link to the page from the [index](README.md).
 - Link back to the index at the top of the page.

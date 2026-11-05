@@ -1,11 +1,10 @@
 //! Turning markdown into styled lines for the terminal.
 
+use crate::document::{Document, LinkTarget, children, line_of, link_id};
 use crate::run::TableResult;
-use crate::temoc::{self, Failure, RunResult, TestFile};
+use crate::temoc::{Failure, RunResult};
 use crate::theme::Theme;
-use markdown::ParseOptions;
 use markdown::mdast::{AlignKind, List, Node, Table};
-use markdown::unist::Position;
 use ratatui::style::{Modifier, Style};
 use ratatui::text::{Line, Span};
 use std::collections::HashMap;
@@ -151,17 +150,6 @@ pub fn preview(markdown: &str) -> Result<Option<Preview>, String> {
     }))
 }
 
-/// A heading of a document.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Heading {
-    /// The heading as plain text.
-    pub text: String,
-    /// What a link uses to point at this heading, as on GitHub.
-    pub anchor: String,
-    /// The line of the markdown it starts on.
-    pub line: usize,
-}
-
 /// What stands out on a page.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct Marks<'page> {
@@ -233,77 +221,13 @@ struct SidewaysPlace {
     end: usize,
 }
 
-/// A parsed markdown document.
-#[derive(Debug, Clone)]
-pub struct Document {
-    root: Node,
-    targets: HashMap<usize, LinkTarget>,
-}
-
-/// What a link in the markdown says, by its offset in the markdown.
-#[derive(Debug, Clone)]
-struct LinkTarget {
-    text: String,
-    url: String,
-}
-
 impl Document {
-    /// Parses markdown the same way temoc does.
-    ///
-    /// # Errors
-    ///
-    /// Fails when the markdown cannot be parsed.
-    pub fn parse(markdown: &str) -> Result<Self, String> {
-        markdown::to_mdast(markdown, &ParseOptions::gfm())
-            .map(|root| Self {
-                targets: link_targets(&root),
-                root,
-            })
-            .map_err(|message| message.to_string())
-    }
-
-    /// What temoc would find in this document.
-    #[must_use]
-    pub fn tests(&self) -> TestFile {
-        temoc::tests_in(&self.root)
-    }
-
-    /// The top-level headings, in document order.
-    #[must_use]
-    pub fn headings(&self) -> Vec<Heading> {
-        let mut seen: HashMap<String, usize> = HashMap::new();
-        children(&self.root)
-            .iter()
-            .filter(|node| matches!(node, Node::Heading(_)))
-            .map(|node| {
-                let text = node.to_string();
-                let slug = slug(&text);
-                let count = seen.entry(slug.clone()).or_default();
-                let anchor = match *count {
-                    0 => slug,
-                    count => format!("{slug}-{count}"),
-                };
-                *count += 1;
-                Heading {
-                    text,
-                    anchor,
-                    line: line_of(node),
-                }
-            })
-            .collect()
-    }
-
-    /// Where the links of the document point, as written in the markdown.
-    pub fn link_urls(&self) -> impl Iterator<Item = &str> {
-        self.targets.values().map(|target| target.url.as_str())
-    }
-
     /// Lays the document out for a screen of this width. Each table with a
     /// result, given by the line it starts on, shows that result in its rows
     /// and below it.
     #[must_use]
     pub fn render(&self, width: u16, results: &HashMap<usize, TableResult<'_>>) -> Rendered {
-        let nodes = children(&self.root);
+        let nodes = children(self.root());
         let width = usize::from(width);
         let (mut rows, mut ranges) = placed_blocks(nodes, width, Look::Plain, true);
         let mut table_rows = TableRows::default();
@@ -332,7 +256,7 @@ impl Document {
                 .filter_map(|row| row_end(row))
                 .max()
                 .unwrap_or(0),
-            links: links_in(&rows, &self.targets),
+            links: links_in(&rows, self.targets()),
             blocks: nodes.iter().map(line_of).zip(ranges).collect(),
             table_rows,
             rows,
@@ -340,7 +264,7 @@ impl Document {
     }
 
     fn rows(&self, width: usize) -> Vec<Row> {
-        blocks(children(&self.root), width, Look::Plain, true)
+        blocks(children(self.root()), width, Look::Plain, true)
     }
 }
 
@@ -801,53 +725,11 @@ fn split_at_column(row: &[Piece], column: usize) -> (Row, Row) {
     (before, after)
 }
 
-/// Finds what each link says. Links can use a definition written anywhere in
-/// the document.
-fn link_targets(root: &Node) -> HashMap<usize, LinkTarget> {
-    let mut definitions = HashMap::new();
-    walk(root, &mut |node| {
-        if let Node::Definition(definition) = node {
-            definitions
-                .entry(definition.identifier.as_str())
-                .or_insert(definition.url.as_str());
-        }
-    });
-    let mut targets = HashMap::new();
-    walk(root, &mut |node| {
-        let found = match node {
-            Node::Link(link) => Some((&link.position, &link.children, link.url.as_str())),
-            Node::LinkReference(link) => definitions
-                .get(link.identifier.as_str())
-                .map(|url| (&link.position, &link.children, *url)),
-            _ => None,
-        };
-        if let Some((position, children, url)) = found {
-            let target = LinkTarget {
-                text: plain_text(children),
-                url: url.to_owned(),
-            };
-            targets.insert(link_id(position.as_ref()), target);
-        }
-    });
-    targets
-}
-
-fn walk<'node>(node: &'node Node, visit: &mut impl FnMut(&'node Node)) {
-    visit(node);
-    for child in children(node) {
-        walk(child, visit);
-    }
-}
-
 /// Inline elements as they read on screen, however they end up being wrapped.
 fn plain_text(nodes: &[Node]) -> String {
     let pieces = inline_pieces(nodes, Look::Plain);
     let text: String = pieces.iter().map(|piece| piece.text.as_str()).collect();
     text.replace('\n', " ")
-}
-
-fn link_id(position: Option<&Position>) -> usize {
-    position.map_or(0, |position| position.start.offset)
 }
 
 /// Finds the links in laid out rows. The pieces of a link always come one after
@@ -873,7 +755,7 @@ fn links_in(rows: &[Row], targets: &HashMap<usize, LinkTarget>) -> Vec<Link> {
                     if let Some(target) = targets.get(&id) {
                         links.push(Link {
                             id,
-                            text: target.text.clone(),
+                            text: plain_text(&target.text),
                             target: target.url.clone(),
                             rows: index..index + 1,
                             sideways: row_end(row).map(|end| SidewaysPlace {
@@ -888,10 +770,6 @@ fn links_in(rows: &[Row], targets: &HashMap<usize, LinkTarget>) -> Vec<Link> {
         }
     }
     links
-}
-
-fn line_of(node: &Node) -> usize {
-    node.position().map_or(0, |position| position.start.line)
 }
 
 /// Widens the rows of a table, so that a mark can be scrolled into view. Gives
@@ -940,18 +818,6 @@ fn result_rows(table: &TableResult<'_>, width: usize) -> Vec<Row> {
     ];
     rows.extend(note_rows(table.failures, width, ToString::to_string));
     rows
-}
-
-/// The anchor GitHub gives a heading with this text.
-fn slug(text: &str) -> String {
-    text.to_lowercase()
-        .chars()
-        .filter_map(|c| match c {
-            ' ' => Some('-'),
-            c if c.is_alphanumeric() || c == '-' || c == '_' => Some(c),
-            _ => None,
-        })
-        .collect()
 }
 
 /// Lays out block elements, skipping those that draw nothing.
@@ -1095,10 +961,6 @@ fn table_rows(table: &Table, look: Look) -> Vec<Row> {
         }
     }
     rows
-}
-
-fn children(node: &Node) -> &[Node] {
-    node.children().map_or(&[], Vec::as_slice)
 }
 
 fn column_widths(rows: &[Vec<Row>]) -> Vec<usize> {

@@ -1,14 +1,10 @@
-# Opening temoc-ui
+# Opening a Workspace
 
 Back to the [specification index](../README.md).
 
-temoc-ui takes one optional path, plus the `--config` option described in
-[Configuration](../running/configuration.md) and the `--theme` option described in
-[Themes](themes.md):
-
-```sh
-temoc-ui [PATH] [--config FILE] [--theme NAME]
-```
+temoc-ui starts from one optional path, and an optional
+[configuration file](../running/configuration.md). How an interface is given them is
+up to that interface: [the terminal](../tui/opening.md) reads its command line.
 
 ## The workspace
 
@@ -21,46 +17,37 @@ The workspace decides which files [search](../search.md) can find.
 ## What opens first
 
 With a file path, that file opens. Otherwise the workspace's `README.md` opens. If
-there is no `README.md`, search opens so that you can pick a file.
+there is no `README.md`, nothing opens, and it is up to the interface to offer the
+files of the workspace.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation            | workspace | arguments                   | document?                | search open? |
-| ---------------------- | --------- | --------------------------- | ------------------------ | ------------ |
-| No path                | docs      |                             | README.md                | no           |
-| File in the workspace  | docs      | reference.md                | reference.md             | no           |
-| File in a subfolder    | docs      | guide/getting-started.md    | guide/getting-started.md | no           |
-| File outside the folder | docs     | ../calculator/passing.md    | passing.md               | no           |
-| Folder with a README   | detection | ../docs                     | README.md                | no           |
-| Folder without a README | docs     | guide                       | none                     | yes          |
+| # situation             | workspace | path                     | document?                |
+| ----------------------- | --------- | ------------------------ | ------------------------ |
+| No path                 | docs      |                          | README.md                |
+| File in the workspace   | docs      | reference.md             | reference.md             |
+| File in a subfolder     | docs      | guide/getting-started.md | guide/getting-started.md |
+| File outside the folder | docs      | ../calculator/passing.md | passing.md               |
+| Folder with a README    | detection | ../docs                  | README.md                |
+| Folder without a README | docs      | guide                    | none                     |
 
 The workspace follows the same rules. Search shows what the workspace contains:
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation             | workspace | arguments                | keys | results?                                 |
-| ----------------------- | --------- | ------------------------ | ---- | ---------------------------------------- |
-| File inside keeps it    | docs      | guide/getting-started.md | `/`  | guide/getting-started.md, guide/long-page.md, notes.MD, README.md, reference.md |
-| Folder replaces it      | docs      | guide                    |      | getting-started.md, long-page.md         |
+| # situation          | workspace | path                     | steps    | results?                                                                        |
+| -------------------- | --------- | ------------------------ | -------- | ------------------------------------------------------------------------------- |
+| File inside keeps it | docs      | guide/getting-started.md | `search` | guide/getting-started.md, guide/long-page.md, notes.MD, README.md, reference.md |
+| Folder replaces it   | docs      | guide                    | `search` | getting-started.md, long-page.md                                                |
 
 ## Paths that cannot be opened
 
-temoc-ui prints a message and exits without opening.
+temoc-ui refuses to start, and says why.
 
-[//]: # "decisionTable Tui"
+[//]: # "decisionTable Core"
 
-| # situation     | workspace | arguments | still open? | status?                       |
-| --------------- | --------- | --------- | ----------- | ----------------------------- |
-| Missing path    | docs      | nope.md   | no          | Path not found: nope.md       |
-| Not markdown    | docs      | data.txt  | no          | Not a markdown file: data.txt |
-
-## Arguments that make no sense
-
-[//]: # "decisionTable Tui"
-
-| # situation      | workspace | arguments             | still open? | status?                       |
-| ---------------- | --------- | --------------------- | ----------- | ----------------------------- |
-| Unknown option   | docs      | --nope                | no          | Unknown option: --nope        |
-| Config without a file | docs | --config              | no          | --config needs a file         |
-| Two paths        | docs      | README.md reference.md | no         | Only one path can be opened   |
+| # situation  | workspace | path     | document? | problem?                      |
+| ------------ | --------- | -------- | --------- | ----------------------------- |
+| Missing path | docs      | nope.md  | none      | Path not found: nope.md       |
+| Not markdown | docs      | data.txt | none      | Not a markdown file: data.txt |

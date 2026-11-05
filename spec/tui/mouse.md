@@ -67,7 +67,7 @@ cannot be opened.
 ## Selecting a table
 
 Clicking a test table focuses it, so that `r`
-[runs it](../running/running-a-table.md). Clicking anything else leaves the focus
+[runs it](running.md#running-a-table). Clicking anything else leaves the focus
 where it was.
 
 [//]: # "decisionTable Tui"
@@ -82,7 +82,7 @@ where it was.
 ## Selecting a row
 
 Clicking a row of a test table focuses that row and its table, so that `Ctrl-r`
-[runs it](../running/running-a-row.md). Clicking the header of a table, or anything
+[runs it](running.md#running-a-row). Clicking the header of a table, or anything
 else, clears the focused row.
 
 [//]: # "decisionTable Tui"

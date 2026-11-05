@@ -1,6 +1,7 @@
 //! The fixtures used by the pages in `spec/`.
 
 use crate::clipboard;
+use crate::headless::{Played, Scenario};
 use crate::screen;
 use crate::session::{FakeTerminal, Outcome, Session};
 use ratatui::style::Color;
@@ -12,7 +13,7 @@ use temoc_ui::render::{self, Preview};
 use temoc_ui::temoc::{self, Event, RunReport, TestFile, Transcript};
 use temoc_ui::theme::Rgb;
 
-const NONE: &str = "none";
+pub const NONE: &str = "none";
 
 fn yes_no(value: bool) -> String {
     if value { "yes" } else { "no" }.into()
@@ -37,7 +38,195 @@ fn list(items: &[String], separator: &str) -> String {
     }
 }
 
-/// Runs a scenario against temoc-ui. See `spec/writing-specs.md`.
+/// Runs a scenario with no interface. See `spec/writing-specs.md`.
+#[derive(Default)]
+pub struct Core {
+    workspace: String,
+    path: String,
+    config: String,
+    steps: String,
+    played: Option<Played>,
+}
+
+#[fixture]
+impl Core {
+    #[slim(constructor)]
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    pub fn set_workspace(&mut self, workspace: String) {
+        self.workspace = workspace;
+    }
+
+    pub fn set_path(&mut self, path: String) {
+        self.path = path;
+    }
+
+    pub fn set_config(&mut self, config: String) {
+        self.config = config;
+    }
+
+    pub fn set_steps(&mut self, steps: String) {
+        self.steps = steps;
+    }
+
+    pub fn execute(&mut self) {
+        self.played = Some(Played::of(
+            &self.workspace,
+            &self.path,
+            &self.config,
+            &self.steps,
+        ));
+    }
+
+    #[must_use]
+    pub fn document(&self) -> String {
+        if matches!(self.played, Some(Played::Refused(_))) {
+            return NONE.into();
+        }
+        self.read(|scenario| or_none(scenario.document()))
+    }
+
+    #[must_use]
+    pub fn anchor(&self) -> String {
+        self.read(|scenario| or_none(scenario.anchor()))
+    }
+
+    #[must_use]
+    pub fn problem(&self) -> String {
+        if let Some(Played::Refused(problem)) = &self.played {
+            return problem.clone();
+        }
+        self.read(|scenario| or_none(scenario.problem()))
+    }
+
+    #[must_use]
+    pub fn results(&self) -> String {
+        self.read(|scenario| list(&scenario.results(), ", "))
+    }
+
+    #[must_use]
+    pub fn first_result(&self) -> String {
+        self.read(|scenario| or_none(scenario.results().first().cloned()))
+    }
+
+    #[must_use]
+    pub fn tree(&self) -> String {
+        self.read(|scenario| list(&scenario.tree(), ", "))
+    }
+
+    #[must_use]
+    pub fn columns(&self) -> String {
+        self.read(|scenario| {
+            let columns = scenario.graph().column_names();
+            let columns: Vec<String> = columns.iter().map(|column| column.join(", ")).collect();
+            list(&columns, "; ")
+        })
+    }
+
+    #[must_use]
+    pub fn links(&self) -> String {
+        self.read(|scenario| {
+            let links = scenario.graph().link_names();
+            let links: Vec<String> = links
+                .iter()
+                .map(|(from, to)| format!("{from} -> {to}"))
+                .collect();
+            list(&links, ", ")
+        })
+    }
+
+    #[must_use]
+    pub fn distance(&self) -> String {
+        self.read(|scenario| {
+            scenario.at_document(|graph, file| {
+                graph
+                    .distance(file)
+                    .map_or_else(|| "not reachable".into(), |distance| distance.to_string())
+            })
+        })
+    }
+
+    #[must_use]
+    pub fn links_out(&self) -> String {
+        self.read(|scenario| scenario.at_document(|graph, file| list(&graph.links_out(file), ", ")))
+    }
+
+    #[must_use]
+    pub fn links_in(&self) -> String {
+        self.read(|scenario| scenario.at_document(|graph, file| list(&graph.links_in(file), ", ")))
+    }
+
+    #[must_use]
+    pub fn file_result(&self) -> String {
+        self.read(|scenario| or_none(scenario.outcome().file.map(String::from)))
+    }
+
+    #[must_use]
+    pub fn table_results(&self) -> String {
+        self.read(|scenario| {
+            let tables = scenario.outcome().tables;
+            let tables: Vec<String> = tables
+                .iter()
+                .map(|(table, result)| format!("{table}: {result}"))
+                .collect();
+            list(&tables, ", ")
+        })
+    }
+
+    #[must_use]
+    pub fn row_results(&self) -> String {
+        self.read(|scenario| {
+            let rows = scenario.outcome().rows;
+            let rows: Vec<String> = rows
+                .iter()
+                .map(|(line, result)| format!("{line}: {result}"))
+                .collect();
+            list(&rows, ", ")
+        })
+    }
+
+    #[must_use]
+    pub fn failures(&self) -> String {
+        self.read(|scenario| list(&scenario.outcome().failures, "; "))
+    }
+
+    #[must_use]
+    pub fn temoc_arguments(&self) -> String {
+        self.read(|scenario| {
+            or_none(
+                scenario
+                    .session()
+                    .temoc_arguments()
+                    .map(|arguments| arguments.join(" ")),
+            )
+        })
+    }
+
+    #[must_use]
+    pub fn running(&self) -> String {
+        self.read(|scenario| or_none(scenario.session().running_file().map(String::from)))
+    }
+}
+
+impl Core {
+    fn read(&self, read: impl FnOnce(&Scenario) -> String) -> String {
+        match &self.played {
+            None => "scenario did not run".into(),
+            Some(Played::Refused(_)) => "temoc-ui did not start".into(),
+            Some(Played::Broken(problem)) => problem.clone(),
+            Some(Played::Finished(scenario)) => read(scenario),
+        }
+    }
+}
+
+/// Runs a scenario against temoc-ui. See `spec/tui/writing-specs.md`.
 #[derive(Default)]
 pub struct Tui {
     workspace: String,
