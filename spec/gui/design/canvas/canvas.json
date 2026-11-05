@@ -17,9 +17,9 @@
     "Help.dc.html": { "x": 1520, "y": 2720, "w": 1440, "h": 900, "title": "Help", "expand": "fill" },
     "NoConfig.dc.html": { "x": 3040, "y": 2720, "w": 1440, "h": 900, "title": "No temoc configuration", "expand": "fill" },
     "Failed.dc.html": { "x": 4560, "y": 2720, "w": 1440, "h": 900, "title": "temoc could not finish", "expand": "fill" },
-    "Parity.dc.html": { "x": 0, "y": 4080, "w": 1440, "h": 5000, "title": "TUI to GUI work list", "expand": "fill" },
+    "Parity.dc.html": { "x": 0, "y": 4080, "w": 1440, "h": 5520, "title": "TUI to GUI work list", "expand": "fill" },
     "Markdown.dc.html": { "x": 1520, "y": 4080, "w": 1440, "h": 3000, "title": "Markdown elements", "expand": "fill" },
-    "System.dc.html": { "x": 3040, "y": 4080, "w": 1440, "h": 3170, "title": "Tokens and components", "expand": "fill" }
+    "System.dc.html": { "x": 3040, "y": 4080, "w": 1440, "h": 3320, "title": "Tokens and components", "expand": "fill" }
   },
   "order": [
     "Main.dc.html",

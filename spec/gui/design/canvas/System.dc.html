@@ -8,12 +8,12 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;1,400;1,600&amp;display=swap">
 <style>
 body{margin:0}
 </style>
 </helmet>
-<div style="min-height: 100vh; box-sizing: border-box; padding: 48px 40px 72px; background: {{c.page}}; color: {{c.text}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 21px">
+<div style="min-height: 100vh; box-sizing: border-box; padding: 48px 40px 72px; background: {{c.page}}; color: {{c.text}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-ligatures: none; font-size: 13.5px; line-height: 21px">
   <div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 40px">
 
     <h1 style="margin: 0; color: {{c.heading}}; font-size: 34px; line-height: 42px; font-weight: 600">Tokens and components</h1>
@@ -34,14 +34,14 @@ body{margin:0}
             </sc-if>
             <sc-if value="{{t.isToken}}" hint-placeholder-val="{{ true }}">
               <div style="display: grid; grid-template-columns: 180px 170px 170px minmax(0, 1fr); align-items: center; border-top: 1px solid {{t.c.hair}}; font-size: 13px; line-height: 20px">
-                <code style="padding: 6px 12px; color: {{t.c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{t.name}}</code>
+                <code style="padding: 6px 12px; color: {{t.c.code}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{t.name}}</code>
                 <div style="padding: 6px 12px; display: flex; align-items: center; gap: 8px">
                   <span style="flex: 0 0 auto; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid {{t.c.line}}; border-radius: 4px; background: {{t.dark}}"></span>
-                  <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px">{{t.darkLabel}}</span>
+                  <span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px">{{t.darkLabel}}</span>
                 </div>
                 <div style="padding: 6px 12px; display: flex; align-items: center; gap: 8px">
                   <span style="flex: 0 0 auto; width: 22px; height: 22px; box-sizing: border-box; border: 1px solid {{t.c.line}}; border-radius: 4px; background: {{t.light}}"></span>
-                  <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px">{{t.lightLabel}}</span>
+                  <span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px">{{t.lightLabel}}</span>
                 </div>
                 <span style="padding: 6px 12px; color: {{t.c.quote}}">{{t.use}}</span>
               </div>
@@ -53,37 +53,38 @@ body{margin:0}
 
     <section style="display: flex; flex-direction: column; gap: 12px">
       <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Type</h2>
+      <p style="margin: 0; color: {{c.quote}}">JetBrains Mono everywhere, in two weights, without ligatures.</p>
       <div style="display: flex; flex-direction: column; border: 1px solid {{c.hair}}; border-radius: 6px">
         <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px">
           <span style="flex: 1 1 360px; color: {{c.heading}}; font-size: 30px; line-height: 38px; font-weight: 600">Heading 1</span>
-          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 600, 30 on 38</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">600, 30 on 38</span>
         </div>
         <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
           <span style="flex: 1 1 360px; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Heading 2</span>
-          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 600, 21 on 28</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">600, 21 on 28</span>
         </div>
         <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
           <span style="flex: 1 1 360px; color: {{c.heading}}; font-size: 17px; line-height: 24px; font-weight: 600">Heading 3 and below</span>
-          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 600, 17 on 24</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">600, 17 on 24</span>
         </div>
         <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
-          <span style="flex: 1 1 360px; font-size: 15px; line-height: 24px">Page text, with <strong style="font-weight: 600">bold</strong>, <em>italic</em>, <s>struck</s>, <code style="padding: 1px 5px; border-radius: 4px; background: {{c.chip}}; color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13.5px">inline code</code> and <a href="#type" style="color: {{c.link}}">a link</a></span>
-          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 400, 15 on 24</span>
+          <span style="flex: 1 1 360px; font-size: 14px; line-height: 23px">Page text, with <strong style="font-weight: 600">bold</strong>, <em>italic</em>, <s>struck</s>, <code style="padding: 1px 5px; border-radius: 4px; background: {{c.chip}}; color: {{c.code}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13.5px">inline code</code> and <a href="#type" style="color: {{c.link}}">a link</a></span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">400, 14 on 23</span>
         </div>
         <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
           <span style="flex: 1 1 360px; font-size: 13px; line-height: 20px">Panels, toolbar, status bar</span>
-          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Sans 400 and 600, 13 on 20</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">400 and 600, 13 on 20</span>
         </div>
         <div style="display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 24px; padding: 10px 14px; border-top: 1px solid {{c.hair}}">
-          <span style="flex: 1 1 360px; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">Tables, code, paths: mul expected 5, got 4</span>
-          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">Plex Mono 400 and 600, 13 on 20</span>
+          <span style="flex: 1 1 360px; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">Tables, code, paths: mul expected 5, got 4</span>
+          <span style="flex: 0 1 260px; color: {{c.quote}}; font-size: 13px">400 and 600, 13 on 20</span>
         </div>
       </div>
     </section>
 
     <section style="display: flex; flex-direction: column; gap: 12px">
       <h2 style="margin: 0; color: {{c.heading}}; font-size: 21px; line-height: 28px; font-weight: 600">Test table</h2>
-      <div style="max-width: 800px; border: 1px solid {{c.hair}}; border-radius: 6px; overflow: hidden; background: {{c.panel}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">
+      <div style="max-width: 800px; border: 1px solid {{c.hair}}; border-radius: 6px; overflow: hidden; background: {{c.panel}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">
         <div style="display: flex; align-items: center; background: {{c.bar}}; color: {{c.barText}}; font-weight: 600">
           <span style="flex: 0 0 36px"></span>
           <span style="flex: 0 0 220px; padding: 7px 12px">state</span>
@@ -95,7 +96,7 @@ body{margin:0}
             <span style="flex: 0 0 220px; padding: 7px 12px">{{s.name}}</span>
             <span style="flex: 1 1 auto; padding: 7px 12px">{{s.how}}</span>
             <sc-if value="{{s.hasRun}}" hint-placeholder-val="{{ false }}">
-              <button style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-right: 6px; padding: 3px 8px; border: 0; border-radius: 4px; background: {{s.runBg}}; color: {{s.runFg}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 12px; font-weight: 600">
+              <button style="flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-right: 6px; padding: 3px 8px; border: 0; border-radius: 4px; background: {{s.runBg}}; color: {{s.runFg}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600">
                 <svg width="10" height="10" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M2.5 1.5v9l7.5-4.5Z"></path></svg>
                 <span>Run row</span>
               </button>
@@ -113,7 +114,7 @@ body{margin:0}
       <div style="display: flex; flex-wrap: wrap; align-items: center; gap: 16px 36px">
         <sc-for list="{{nodes}}" as="n" hint-placeholder-count="7">
           <div style="display: flex; align-items: center; gap: 10px; font-size: 13px; line-height: 20px">
-            <span style="flex: 0 0 auto; width: {{n.size}}px; height: {{n.size}}px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid {{n.stroke}}; border-radius: 50%; background: {{n.fill}}; box-shadow: 0 0 0 3px {{n.halo}}; color: {{n.c.page}}; opacity: {{n.opacity}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; line-height: 1">{{n.mark}}</span>
+            <span style="flex: 0 0 auto; width: {{n.size}}px; height: {{n.size}}px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; border: 2px solid {{n.stroke}}; border-radius: 50%; background: {{n.fill}}; box-shadow: 0 0 0 3px {{n.halo}}; color: {{n.c.page}}; opacity: {{n.opacity}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; font-weight: 600; line-height: 1">{{n.mark}}</span>
             <span>{{n.name}}</span>
           </div>
         </sc-for>
@@ -136,13 +137,13 @@ body{margin:0}
           <button style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: {{c.sel}}; color: {{c.text}}; font: inherit; font-size: 13px">Page</button>
           <button style="height: 26px; padding: 0 10px; border: 0; border-radius: 5px; background: transparent; color: {{c.quote}}; font: inherit; font-size: 13px">Graph</button>
         </div>
-        <span style="min-width: 20px; padding: 0 5px; border: 1px solid {{c.hair}}; border-radius: 4px; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; text-align: center">/</span>
+        <span style="min-width: 20px; padding: 0 5px; border: 1px solid {{c.hair}}; border-radius: 4px; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 18px; text-align: center">/</span>
       </div>
       <div style="max-width: 800px; display: flex; flex-direction: column; gap: 12px; font-size: 15px; line-height: 24px">
         <div>Selected text: <span style="background: {{c.sel}}">Run the installer</span>.</div>
         <div style="display: flex; align-items: center; gap: 16px; min-height: 26px; padding: 0 12px; border: 1px solid {{c.hair}}; background: {{c.panel}}; color: {{c.quote}}; font-size: 13px; line-height: 18px">
           <span style="flex: 1 1 auto">Copied 17 characters</span>
-          <span style="color: {{c.failed}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 600">file: failed</span>
+          <span style="color: {{c.failed}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; font-weight: 600">file: failed</span>
         </div>
       </div>
     </section>
@@ -169,7 +170,7 @@ body{margin:0}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"$preview":{"width":1440,"height":3170}}'>
+<script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"$preview":{"width":1440,"height":3320}}'>
 const SHEETS = {
   dark: {
     page: '#14161A', panel: '#1A1D22', raised: '#22262C', hair: '#2D3239', chip: '#262A31', edge: '#3D444E', text: '#E4E6EA', heading: '#F4F5F7', code: '#D9B3FF', link: '#8AB4FF',
@@ -228,10 +229,11 @@ const PART_ROWS = [
   ['Graph', 'Nodes 16 to 44 across, by link count', 'egui::Scene for pan and zoom, with a force layout stepped each frame until it settles. Painter circles and lines, interact rects for dragging'],
   ['Graph details', '296 wide', 'The right side panel, in place of the Tests panel, while the graph shows'],
   ['Search', '640 wide, 88 from the top', 'egui::Modal or an Area at Order::Foreground, with a TextEdit'],
-  ['Help', '960 wide', 'egui::Modal with a Grid per topic'],
+  ['Help', '1160 wide', 'egui::Modal with a Grid per topic'],
   ['Status bar', '26 high', 'A bottom panel, with the file result in its colour'],
   ['Icons', '16, stroke 1.5', 'Drawn with Painter, so no icon font is needed'],
-  ['Marks', '14 semibold', 'Text, the same characters as the terminal. Check that the embedded font has ✓ ✗ ⋯ or fall back to one that does'],
+  ['Font', 'Regular, SemiBold and their italics', 'JetBrains Mono through FontDefinitions, for both the proportional and monospace families, under its OFL licence'],
+  ['Marks', '14 semibold', 'Text, the same characters as the terminal. JetBrains Mono has all of them, including ✓ ✗ ⋯'],
   ['Shapes', 'Radius 6, pop-ups 8', 'CornerRadius and Stroke on Frame. One soft Shadow, on pop-ups only']
 ];
 

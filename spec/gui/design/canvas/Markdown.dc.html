@@ -8,12 +8,12 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;1,400;1,600&amp;display=swap">
 <style>
 body{margin:0}
 </style>
 </helmet>
-<div style="min-height: 100vh; box-sizing: border-box; padding: 48px 40px 72px; background: {{c.page}}; color: {{c.text}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 15px; line-height: 24px">
+<div style="min-height: 100vh; box-sizing: border-box; padding: 48px 40px 72px; background: {{c.page}}; color: {{c.text}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-ligatures: none; font-size: 14px; line-height: 23px">
   <div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column">
 
     <h1 style="margin: 0 0 28px; color: {{c.heading}}; font-size: 34px; line-height: 42px; font-weight: 600">Markdown elements</h1>
@@ -25,7 +25,7 @@ body{margin:0}
     </div>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px"># Heading 1
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px"># Heading 1
 ## Heading 2
 ### Heading 3
 #### Heading 4
@@ -43,20 +43,20 @@ body{margin:0}
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">**bold**, *italic*, ***both***,
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">**bold**, *italic*, ***both***,
 ~~struck~~ and `inline code`.
 
 Two spaces end this line,
 so the next one starts below.</pre>
       <div style="min-width: 0; display: flex; flex-direction: column; gap: 12px">
-        <div><strong style="font-weight: 600">bold</strong>, <em>italic</em>, <strong style="font-weight: 600"><em>both</em></strong>, <s>struck</s> and <code style="padding: 1px 5px; border-radius: 4px; background: {{c.chip}}; color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13.5px">inline code</code>.</div>
+        <div><strong style="font-weight: 600">bold</strong>, <em>italic</em>, <strong style="font-weight: 600"><em>both</em></strong>, <s>struck</s> and <code style="padding: 1px 5px; border-radius: 4px; background: {{c.chip}}; color: {{c.code}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13.5px">inline code</code>.</div>
         <div>Two spaces end this line,<br>so the next one starts below.</div>
       </div>
-      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">One LayoutJob per paragraph, with a TextFormat per run. Bold and italic need their own embedded font files. Strikethrough and the code chip's background are TextFormat fields.</div>
+      <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">One LayoutJob per paragraph, with a TextFormat per run. Bold and italic need their own embedded font files: JetBrains Mono SemiBold, Italic and SemiBold Italic. Strikethrough and the code chip's background are TextFormat fields.</div>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">[A page](guide/start.md)
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">[A page](guide/start.md)
 [A heading](guide/start.md#install)
 [Website](https://example.com)
 [Gone](missing.md)
@@ -82,7 +82,7 @@ https://example.com/autolink
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">- One item
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">- One item
 - Another
   - Nested
     - Deeper
@@ -107,7 +107,7 @@ https://example.com/autolink
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">- [x] Done
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">- [x] Done
 - [ ] Still to do</pre>
       <div style="min-width: 0; display: flex; flex-direction: column; gap: 4px">
         <div style="display: flex; align-items: center; gap: 10px">
@@ -125,7 +125,7 @@ https://example.com/autolink
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">> A quote can hold **any** block.
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">> A quote can hold **any** block.
 >
 > > And another quote.</pre>
       <div style="min-width: 0; display: flex; gap: 12px; color: {{c.quote}}">
@@ -142,7 +142,7 @@ https://example.com/autolink
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">> [!NOTE]
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">> [!NOTE]
 > temoc-ui is in early development.
 
 > [!TIP]
@@ -167,7 +167,7 @@ https://example.com/autolink
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">```sh
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">```sh
 cargo run -- samples/docs
 temoc -c temoc.toml
 ```
@@ -178,24 +178,24 @@ No language here.
       <div style="min-width: 0; display: flex; flex-direction: column; gap: 12px">
         <div style="border: 1px solid {{c.hair}}; border-radius: 6px; overflow: hidden; background: {{c.panel}}">
           <div style="display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 28px; padding: 0 6px 0 14px; border-bottom: 1px solid {{c.hair}}; color: {{c.quote}}; font-size: 12px; line-height: 16px">
-            <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace">sh</span>
+            <span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace">sh</span>
             <button style="padding: 2px 8px; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit">Copy</button>
           </div>
-          <pre style="margin: 0; padding: 12px 14px; overflow-x: auto; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">cargo run -- samples/docs
+          <pre style="margin: 0; padding: 12px 14px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">cargo run -- samples/docs
 temoc -c temoc.toml</pre>
         </div>
         <div style="border: 1px solid {{c.hair}}; border-radius: 6px; overflow: hidden; background: {{c.panel}}">
           <div style="display: flex; align-items: center; justify-content: flex-end; min-height: 28px; padding: 0 6px; border-bottom: 1px solid {{c.hair}}; color: {{c.quote}}; font-size: 12px; line-height: 16px">
             <button style="padding: 2px 8px; border: 0; border-radius: 4px; background: transparent; color: inherit; font: inherit">Copy</button>
           </div>
-          <pre style="margin: 0; padding: 12px 14px; overflow-x: auto; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">No language here.</pre>
+          <pre style="margin: 0; padding: 12px 14px; overflow-x: auto; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">No language here.</pre>
         </div>
       </div>
       <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">Frame, a header row, then a monospace Label. Tabs become four spaces, as in the terminal. Copy uses ctx.copy_text and says so in the status bar. Code stays plain text, with no syntax colours.</div>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">| Left | Centre | Right |
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">| Left | Centre | Right |
 | :--- | :----: | ----: |
 | a    | b      | 1     |
 | `c`  | **d**  | 20    |</pre>
@@ -211,7 +211,7 @@ temoc -c temoc.toml</pre>
           <span style="padding: 7px 12px; text-align: right">1</span>
         </div>
         <div style="display: grid; grid-template-columns: repeat(3, minmax(90px, 1fr)); border-top: 1px solid {{c.hair}}">
-          <span style="padding: 7px 12px"><code style="padding: 1px 5px; border-radius: 4px; background: {{c.chip}}; color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px">c</code></span>
+          <span style="padding: 7px 12px"><code style="padding: 1px 5px; border-radius: 4px; background: {{c.chip}}; color: {{c.code}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px">c</code></span>
           <span style="padding: 7px 12px; text-align: center; font-weight: 600">d</span>
           <span style="padding: 7px 12px; text-align: right">20</span>
         </div>
@@ -220,7 +220,7 @@ temoc -c temoc.toml</pre>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">| First Column | Second Column | Third Column | Fourth Column | Last Column |
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">| First Column | Second Column | Third Column | Fourth Column | Last Column |
 | ------------ | ------------- | ------------ | ------------- | ----------- |
 | one          | two           | three        | four          | five        |</pre>
       <div style="min-width: 0; display: flex; flex-direction: column; gap: 12px">
@@ -234,19 +234,19 @@ temoc -c temoc.toml</pre>
             </div>
           </div>
         </div>
-        <pre style="margin: 0; padding: 12px 14px; overflow-x: auto; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.panel}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">A line of a code block that is much too long for the reading column, so only this block scrolls sideways.</pre>
+        <pre style="margin: 0; padding: 12px 14px; overflow-x: auto; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.panel}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">A line of a code block that is much too long for the reading column, so only this block scrolls sideways.</pre>
       </div>
       <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">Tables and code never wrap. Each gets its own horizontal ScrollArea and scrollbar, and only that block moves: the page around it stays still. Shift and wheel scroll the block under the pointer. Left and Right scroll that block, or the focused table.</div>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">[//]: # "decisionTable Calculator"
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">[//]: # "decisionTable Calculator"
 
 | customer | plan    | seats | discount | region | total? |
 | -------- | ------- | ----- | -------- | ------ | ------ |
 | Ada      | team    | 12    | 10%      | eu     | 1080   |
 | Grace    | company | 40    | 15%      | us     | 3400   |</pre>
-      <div style="min-width: 0; align-self: start; overflow-x: auto; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.panel}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">
+      <div style="min-width: 0; align-self: start; overflow-x: auto; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.panel}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">
         <div style="width: 780px">
           <div style="display: flex; background: {{c.raised}}; font-weight: 600">
             <span style="flex: 0 0 36px; position: sticky; left: 0; background: {{c.raised}}"></span>
@@ -266,21 +266,21 @@ temoc -c temoc.toml</pre>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">![The results of a run](images/run.png)
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">![The results of a run](images/run.png)
 
 ![Not there](images/missing.png)</pre>
       <div style="min-width: 0; display: flex; flex-direction: column; gap: 12px">
-        <div style="height: 150px; display: flex; align-items: center; justify-content: center; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.panel}}; color: {{c.quote}}; font-size: 13px">[image: images/run.png, up to the reading column's width]</div>
+        <div style="height: 150px; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 0 16px; border: 1px solid {{c.hair}}; border-radius: 6px; background: {{c.panel}}; color: {{c.quote}}; font-size: 13px; line-height: 20px; text-align: center">[image: images/run.png, up to the reading column's width]</div>
         <div style="display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px dashed {{c.line}}; border-radius: 6px; color: {{c.quote}}; font-size: 13px; line-height: 20px">
           <span>Not there</span>
-          <span style="font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px">images/missing.png</span>
+          <span style="font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px">images/missing.png</span>
         </div>
       </div>
       <div style="color: {{c.quote}}; font-size: 13px; line-height: 20px">The terminal shows only the alt text. The GUI draws the picture with egui::Image and the image loaders from egui_extras, scaled down to the reading column and never up. Only files in the workspace load, so opening a page makes no network request. Anything else falls back to its alt text and path.</div>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">A claim that needs a source.[^1]
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">A claim that needs a source.[^1]
 
 ---
 
@@ -294,7 +294,7 @@ temoc -c temoc.toml</pre>
     </section>
 
     <section style="display: grid; grid-template-columns: repeat(auto-fit, minmax(min(300px, 100%), 1fr)); gap: 32px; padding: 22px 0; border-top: 1px solid {{c.hair}}">
-      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">&lt;!-- A comment --&gt;
+      <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px; line-height: 19px">&lt;!-- A comment --&gt;
 
 &lt;details&gt;
 &lt;summary&gt;Raw HTML&lt;/summary&gt;
@@ -302,7 +302,7 @@ temoc -c temoc.toml</pre>
 
 [//]: # "import Sample.Fixtures"</pre>
       <div style="min-width: 0">
-        <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">&lt;details&gt;
+        <pre style="margin: 0; white-space: pre-wrap; color: {{c.quote}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 13px; line-height: 20px">&lt;details&gt;
 &lt;summary&gt;Raw HTML&lt;/summary&gt;
 &lt;/details&gt;</pre>
       </div>

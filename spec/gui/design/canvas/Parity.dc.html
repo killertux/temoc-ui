@@ -8,17 +8,17 @@
 <body>
 <x-dc>
 <helmet>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&amp;family=IBM+Plex+Sans:wght@400;500;600&amp;display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,400;0,600;1,400;1,600&amp;display=swap">
 <style>
 body{margin:0}
 </style>
 </helmet>
-<div style="min-height: 100vh; box-sizing: border-box; padding: 48px 40px 72px; background: {{c.page}}; color: {{c.text}}; font-family: 'IBM Plex Sans', system-ui, sans-serif; font-size: 14px; line-height: 21px">
+<div style="min-height: 100vh; box-sizing: border-box; padding: 48px 40px 72px; background: {{c.page}}; color: {{c.text}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-variant-ligatures: none; font-size: 13.5px; line-height: 21px">
   <div style="max-width: 1360px; margin: 0 auto; display: flex; flex-direction: column; gap: 32px">
 
     <div style="display: flex; flex-direction: column; gap: 8px; max-width: 760px">
       <h1 style="margin: 0; color: {{c.heading}}; font-size: 34px; line-height: 42px; font-weight: 600">What the GUI has to do</h1>
-      <p style="margin: 0; font-size: 16px; line-height: 25px">Every behaviour in <code style="color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px">spec/tui/</code> and the code behind it, with what happens to it in egui. Core behaviour in the rest of <code style="color: {{c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 14px">spec/</code> carries over unchanged.</p>
+      <p style="margin: 0; font-size: 16px; line-height: 25px">Every behaviour in <code style="color: {{c.code}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 14px">spec/tui/</code> and the code behind it, with what happens to it in egui. Core behaviour in the rest of <code style="color: {{c.code}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 14px">spec/</code> carries over unchanged.</p>
     </div>
 
     <div style="display: flex; flex-wrap: wrap; gap: 8px 20px">
@@ -38,7 +38,7 @@ body{margin:0}
             <h3 style="margin: 0; font-size: 15px; line-height: 22px; font-weight: 600">{{lane.title}}</h3>
             <sc-for list="{{lane.items}}" as="m" hint-placeholder-count="5">
               <div style="display: flex; flex-wrap: wrap; gap: 0 10px; font-size: 13px; line-height: 20px">
-                <code style="color: {{m.c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{m.file}}</code>
+                <code style="color: {{m.c.code}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12.5px">{{m.file}}</code>
                 <span style="color: {{m.c.quote}}">{{m.why}}</span>
               </div>
             </sc-for>
@@ -70,7 +70,7 @@ body{margin:0}
                     <span style="padding: 0 6px; border: 1px solid {{r.c.bar}}; border-radius: 4px; background: {{r.c.bar}}; color: {{r.c.barText}}; font-size: 12px; font-weight: 600; line-height: 18px">Spec edit</span>
                   </sc-if>
                 </div>
-                <code style="padding: 9px 12px; color: {{r.c.code}}; font-family: 'IBM Plex Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 20px; overflow-wrap: anywhere">{{r.code}}</code>
+                <code style="padding: 9px 12px; color: {{r.c.code}}; font-family: 'JetBrains Mono', ui-monospace, Menlo, monospace; font-size: 12px; line-height: 20px; overflow-wrap: anywhere">{{r.code}}</code>
               </div>
             </sc-for>
           </div>
@@ -80,7 +80,7 @@ body{margin:0}
   </div>
 </div>
 </x-dc>
-<script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"$preview":{"width":1440,"height":5000}}'>
+<script type="text/x-dc" data-dc-script data-props='{"tone":{"editor":"enum","options":["dark","light"],"default":"dark","section":"Look"},"$preview":{"width":1440,"height":5520}}'>
 const PALETTES = {
   dark: { page: '#14161A', panel: '#1A1D22', raised: '#22262C', hair: '#2D3239', text: '#E4E6EA', heading: '#F4F5F7', code: '#D9B3FF', link: '#8AB4FF', quote: '#A3ABB8', line: '#7F8896', teal: '#6FD3C7', bar: '#8AB4FF', barText: '#10141A' },
   light: { page: '#FFFFFF', panel: '#F6F7F9', raised: '#EDEFF2', hair: '#DFE3E8', text: '#1E2227', heading: '#11141A', code: '#7A3EC8', link: '#0B57D0', quote: '#59626D', line: '#7A838E', teal: '#0A6C74', bar: '#0B57D0', barText: '#FFFFFF' }
@@ -186,7 +186,7 @@ const GROUPS = [
     ['Contrast rules', 'Tests hold text to 4.5 and lines to 3.', 'The same limits as tests on the GUI palette, including text over tints.', 'Rebuild', 'theme.rs tests']
   ] },
   { title: 'The project', rows: [
-    ['Build', 'ratatui and crossterm, always built.', 'A gui feature adds eframe 0.37, egui_extras for images and the embedded fonts. Without it, --gui says the feature is not built.', 'New', 'Cargo.toml'],
+    ['Build', 'ratatui and crossterm, always built.', 'A gui feature adds eframe 0.37, egui_extras for images and embedded JetBrains Mono. Without it, --gui says the feature is not built.', 'New', 'Cargo.toml'],
     ['Specification', 'spec/tui/ and a Tui fixture driving a headless terminal.', 'spec/gui/ is written and snoozed. Still to build: a Gui fixture, with egui_kittest driving the UI headless.', 'New', 'spec/gui/, fixtures/'],
     ['Core pages', 'spec/viewer/graph.md put columns in core, and spec/viewer/links.md said no browser is launched.', 'Done. Columns moved to spec/tui/graph.md, and the browser rule is now up to each interface. Distance stays in core.', 'Rethink', 'spec/viewer/'],
     ['Web interface', 'Was listed as planned in the README and spec/README.md.', 'Done. Both pages now point at the GUI instead.', 'Drop', 'README.md, spec/README.md'],
