@@ -15,7 +15,7 @@ them as you move between pages, until temoc-ui closes. A page without tests has 
 panel, whatever the button says.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation               | workspace  | arguments  | actions                                                      | tree open? | tests panel open? |
 | ------------------------- | ---------- | ---------- | ------------------------------------------------------------ | ---------- | ----------------- |
@@ -31,7 +31,7 @@ panel, whatever the button says.
 The status bar says what just happened on the left. On a test page that has results,
 the [file result](../running/running-a-file.md#results) is on the right.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation      | workspace  | arguments  | actions | status? | file result? |
 | ---------------- | ---------- | ---------- | ------- | ------- | ------------ |

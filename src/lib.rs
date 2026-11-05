@@ -8,6 +8,8 @@ pub mod app;
 pub mod clipboard;
 pub mod document;
 pub mod graph;
+#[cfg(feature = "gui")]
+pub mod gui;
 pub mod help;
 pub mod history;
 pub mod links;

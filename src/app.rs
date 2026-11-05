@@ -43,14 +43,15 @@ pub struct Launch {
 
 /// The arguments of the command line, once they are understood.
 #[derive(Debug, Default, PartialEq, Eq)]
-struct Arguments<'launch> {
-    path: Option<&'launch str>,
-    config: Option<&'launch str>,
-    theme: Option<&'launch str>,
+pub(crate) struct Arguments<'launch> {
+    pub(crate) path: Option<&'launch str>,
+    pub(crate) config: Option<&'launch str>,
+    pub(crate) theme: Option<&'launch str>,
+    gui: bool,
 }
 
 impl<'launch> Arguments<'launch> {
-    fn read(arguments: &'launch [String]) -> Result<Self, String> {
+    pub(crate) fn read(arguments: &'launch [String]) -> Result<Self, String> {
         let mut read = Self::default();
         let mut arguments = arguments.iter().map(String::as_str);
         while let Some(argument) = arguments.next() {
@@ -58,6 +59,8 @@ impl<'launch> Arguments<'launch> {
                 read.config = Some(arguments.next().ok_or("--config needs a file")?);
             } else if argument == "--theme" {
                 read.theme = Some(arguments.next().ok_or("--theme needs a name")?);
+            } else if argument == "--gui" {
+                read.gui = true;
             } else if argument.starts_with('-') {
                 return Err(format!("Unknown option: {argument}"));
             } else if read.path.replace(argument).is_some() {
@@ -66,6 +69,13 @@ impl<'launch> Arguments<'launch> {
         }
         Ok(read)
     }
+}
+
+/// Whether these command line arguments ask for the graphical interface.
+/// Arguments that make no sense do not, so that the terminal explains them.
+#[must_use]
+pub fn wants_gui(arguments: &[String]) -> bool {
+    Arguments::read(arguments).is_ok_and(|arguments| arguments.gui)
 }
 
 /// A snapshot of the application, for anything that needs to observe it.
@@ -937,6 +947,7 @@ mod tests {
                 path,
                 config,
                 theme: None,
+                gui: false,
             };
             assert_eq!(Arguments::read(&arguments), Ok(read));
         }

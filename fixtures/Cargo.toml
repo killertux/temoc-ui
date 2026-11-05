@@ -7,9 +7,10 @@ publish = false
 
 [dependencies]
 crossterm = "0.29.0"
+egui_kittest = "0.37"
 ratatui = "0.30.2"
 rust_slim = { version = "0.3.1", features = ["macros"] }
-temoc-ui = { path = ".." }
+temoc-ui = { path = "..", features = ["gui"] }
 
 [lints]
 workspace = true

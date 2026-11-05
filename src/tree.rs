@@ -24,6 +24,12 @@ pub struct Row {
 }
 
 impl Row {
+    /// The file or folder, relative to the workspace.
+    #[must_use]
+    pub fn path(&self) -> &str {
+        &self.path
+    }
+
     /// Whether it is a folder.
     #[must_use]
     pub fn is_folder(&self) -> bool {
@@ -78,6 +84,16 @@ impl FileTree {
             top: 0,
             follow: true,
         }
+    }
+
+    /// Selects `document` and opens the folders above it, leaving every other
+    /// folder as it is.
+    pub fn reveal(&mut self, document: &str) {
+        self.open.extend(folders_above(document));
+        self.rows = rows_of(&self.files, &self.open);
+        let found = self.rows.iter().position(|row| row.path == document);
+        self.selected = found.unwrap_or(self.selected);
+        self.follow = true;
     }
 
     /// The rows, in order.
@@ -263,6 +279,27 @@ mod tests {
     }
 
     const NESTED: [&str; 4] = ["a/b/deep.md", "a/near.md", "c/other.md", "top.md"];
+
+    #[test]
+    fn revealing_a_document_opens_its_folders_and_selects_it() {
+        let mut tree = tree(&NESTED, Some("top.md"));
+        tree.reveal("a/b/deep.md");
+        assert_eq!(
+            labels(&tree),
+            ["▾ a", "▾ b", "deep.md", "near.md", "▸ c", "top.md"]
+        );
+        assert_eq!(tree.chosen_file(), Some("a/b/deep.md"));
+    }
+
+    #[test]
+    fn revealing_a_document_leaves_other_folders_open() {
+        let mut tree = tree(&NESTED, Some("c/other.md"));
+        tree.reveal("a/near.md");
+        assert_eq!(
+            labels(&tree),
+            ["▾ a", "▸ b", "near.md", "▾ c", "other.md", "top.md"]
+        );
+    }
 
     #[test]
     fn folders_come_before_files_at_every_level() {

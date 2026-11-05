@@ -11,9 +11,9 @@ The tables test behavior: what opens, what runs, what is on screen, and what a c
 a key does. They do not test colours, sizes or positions. How the GUI looks is in the
 [design](design/README.md), and these pages link to it.
 
-The GUI is not built yet, so every table here is snoozed.
+The GUI is partly built, and a table that is still to come is snoozed.
 
-The `Gui` fixture will start a fresh temoc-ui with `--gui` for each row, in a headless
+The `Gui` fixture starts a fresh temoc-ui with `--gui` for each row, in a headless
 window of 1000 by 700, using `egui_kittest`. It takes the actions, waits for any test run
 to finish, and then reads what is on screen through the window's accessibility tree, so
 that it finds things by name and not by position.

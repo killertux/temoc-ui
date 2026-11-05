@@ -9,7 +9,7 @@ opens it, and `Esc` closes search without moving.
 ![Search](design/images/search.png)
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation      | workspace | actions                               | search open? | results?                                                                        |
 | ---------------- | --------- | ------------------------------------- | ------------ | ------------------------------------------------------------------------------- |
@@ -24,7 +24,7 @@ opens it, and `Esc` closes search without moving.
 Clicking a result opens it too. Going [back](navigation.md#history) returns to where
 you were.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation           | workspace | actions                                     | document?                | search open? |
 | --------------------- | --------- | ------------------------------------------- | ------------------------ | ------------ |
@@ -38,7 +38,7 @@ you were.
 
 While the search box has the keyboard, letters are typed and do nothing else.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation     | workspace | actions        | search open? | still open? | mode? | help open? |
 | --------------- | --------- | -------------- | ------------ | ----------- | ----- | ---------- |
@@ -52,7 +52,7 @@ While the search box has the keyboard, letters are typed and do nothing else.
 [test files](../search.md#showing-only-test-files), and doing it again shows everything.
 The choice is remembered until temoc-ui closes.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation          | workspace  | actions                     | results?                                                           |
 | -------------------- | ---------- | --------------------------- | ------------------------------------------------------------------ |

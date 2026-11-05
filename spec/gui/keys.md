@@ -56,7 +56,7 @@ are typed there, and `Ctrl-q` still quits.
 | Esc hides it     | docs      | `? Esc`               | no         |
 | Over the graph   | docs      | `Ctrl-g ?`            | yes        |
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation           | workspace | actions        | still open? |
 | --------------------- | --------- | -------------- | ----------- |

@@ -1,0 +1,813 @@
+//! The graphical interface, built with egui. See `spec/gui/`.
+
+mod icons;
+mod look;
+mod markdown;
+
+use crate::app::{Arguments, Launch};
+use crate::history::History;
+use crate::search::Search;
+use crate::session::{Opened, Session, Start};
+use crate::temoc::RunResult;
+use crate::tree::FileTree;
+use crate::workspace;
+pub use eframe::egui;
+use egui::accesskit::Role;
+use egui::{
+    Align, Area, Button, CentralPanel, Color32, Context, Event, Frame, Id, Key, Label, Layout,
+    Modifiers, OpenUrl, Order, Panel, Response, RichText, ScrollArea, TextEdit, Theme, Ui, Vec2,
+    ViewportCommand, WidgetInfo,
+};
+use icons::Icon;
+use look::Palette;
+use std::collections::BTreeMap;
+use std::time::Duration;
+
+/// How often a run is looked at while nothing else happens.
+const TICK: Duration = Duration::from_millis(100);
+/// How far the page sits from its edges.
+const PAGE_MARGIN: i8 = 32;
+/// The widest the search box gets.
+const SEARCH_WIDTH: f32 = 640.0;
+/// The keys listed by help, as in `spec/gui/keys.md`.
+const KEYS: [(&str, &str); 23] = [
+    ("j, Down", "Scroll down one line"),
+    ("k, Up", "Scroll up one line"),
+    ("PageDown, Space", "Scroll down one page"),
+    ("PageUp", "Scroll up one page"),
+    ("g, G", "Go to the top or bottom"),
+    ("Left, Right", "Scroll a wide table or code sideways"),
+    ("Tab, Shift-Tab", "Focus the next or previous link"),
+    ("Enter", "Follow the focused link"),
+    ("h, Backspace", "Go back"),
+    ("l", "Go forward"),
+    ("/", "Open search"),
+    ("Ctrl-t", "In search, show only test files"),
+    ("], [", "Focus the next or previous test table"),
+    ("}, {", "Focus the next or previous test row"),
+    ("r", "Run the focused table"),
+    ("Ctrl-r", "Run the focused row"),
+    ("R", "Run the whole file"),
+    ("t", "Show or hide the file tree"),
+    ("Ctrl-g", "Show or hide the graph"),
+    ("T", "Swap between dark and light"),
+    ("Ctrl-c", "Copy the selected text"),
+    ("?", "Show or hide help"),
+    ("q, Ctrl-q", "Quit"),
+];
+
+/// What the fixture finds things by, in the description of a widget. Each one
+/// says what the widget is to anyone who cannot see where it sits.
+pub mod tags {
+    /// The path of the open document.
+    pub const DOCUMENT: &str = "document";
+    /// The status bar message.
+    pub const STATUS: &str = "status";
+    /// The result for the whole document.
+    pub const FILE_RESULT: &str = "file result";
+    /// The banner above the page.
+    pub const BANNER: &str = "banner";
+    /// The heading of the file tree.
+    pub const TREE: &str = "file tree";
+    /// A file of the tree that holds tests.
+    pub const TEST_FILE: &str = "test file";
+    /// The heading of the tests panel.
+    pub const TESTS_PANEL: &str = "tests panel";
+    /// A table in the tests panel.
+    pub const PANEL_TABLE: &str = "panel table";
+    /// Something the tests panel lists as not passed.
+    pub const NOT_PASSED: &str = "not passed";
+    /// The last temoc command.
+    pub const LAST_COMMAND: &str = "last command";
+    /// The search box.
+    pub const SEARCH: &str = "search";
+    /// A result of the search.
+    pub const SEARCH_RESULT: &str = "search result";
+    /// The heading of the help.
+    pub const HELP: &str = "help";
+}
+
+/// Something asked for during a frame, carried out at the end of it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+enum Command {
+    Open(String),
+    Follow(String),
+    ToggleFolder(usize),
+    Back,
+    Forward,
+    OpenSearch,
+    CloseSearch,
+    OpenResult(usize),
+    OnlyTestFiles,
+    RunFile,
+    ToggleTree,
+    ToggleTests,
+    ToggleHelp,
+    CloseHelp,
+    SwapMode,
+    Quit,
+}
+
+/// What is showing around and over the page.
+#[derive(Debug, Clone, Copy)]
+struct Panels {
+    tree: bool,
+    tests: bool,
+    help: bool,
+}
+
+/// The graphical interface.
+#[derive(Debug)]
+pub struct Gui {
+    session: Session,
+    pages: History<Opened>,
+    tree: FileTree,
+    /// Every test file of the workspace, for marking them in the tree.
+    test_files: BTreeMap<String, Opened>,
+    panels: Panels,
+    search: Option<Search>,
+    /// What is typed in the search box, as egui edits it.
+    query: String,
+    /// Whether search shows only test files. Outlives the search box.
+    only_tests: bool,
+    status: Option<String>,
+    /// What stopped the last run, if anything did.
+    failure: Option<String>,
+    /// Where the link under the pointer goes.
+    hovered_link: Option<String>,
+    commands: Vec<Command>,
+    /// Whether the fonts and colours are in place.
+    installed: bool,
+    open: bool,
+}
+
+/// Opens the window, and returns once it closes.
+///
+/// # Errors
+///
+/// Fails with a message for the user when temoc-ui cannot start, or when the
+/// window cannot open.
+pub fn open(launch: &Launch) -> Result<(), String> {
+    let gui = Gui::start(launch)?;
+    let viewport = egui::ViewportBuilder::default().with_title("temoc-ui");
+    let options = eframe::NativeOptions {
+        viewport,
+        ..eframe::NativeOptions::default()
+    };
+    eframe::run_native("temoc-ui", options, Box::new(|_| Ok(Box::new(gui))))
+        .map_err(|error| error.to_string())
+}
+
+impl eframe::App for Gui {
+    fn ui(&mut self, ui: &mut Ui, _frame: &mut eframe::Frame) {
+        self.show(ui);
+    }
+}
+
+impl Gui {
+    /// Finds the workspace and opens what opens first, before any window shows.
+    ///
+    /// # Errors
+    ///
+    /// Fails with a message for the user when the arguments make no sense or
+    /// the path given cannot be opened.
+    pub fn start(launch: &Launch) -> Result<Self, String> {
+        let arguments = Arguments::read(&launch.arguments)?;
+        if arguments.theme.is_some() {
+            return Err("--theme does not work with --gui".into());
+        }
+        let session = Session::start(&Start {
+            current_dir: launch.current_dir.clone(),
+            path: arguments.path.map(String::from),
+            config: arguments.config.map(String::from),
+            extra_path: launch.extra_path.clone(),
+        })?;
+        let first_file = session.first_file().map(String::from);
+        let tree = FileTree::open(session.workspace(), first_file.as_deref());
+        let test_files = workspace::markdown_files(session.workspace())
+            .into_iter()
+            .filter_map(|file| match session.read(&file) {
+                Ok(opened) if opened.is_test_file() => Some((file, opened)),
+                // Opening a file that cannot be read says what is wrong with it.
+                Ok(_) | Err(_) => None,
+            })
+            .collect();
+        let mut gui = Self {
+            session,
+            pages: History::default(),
+            tree,
+            test_files,
+            panels: Panels {
+                tree: true,
+                tests: true,
+                help: false,
+            },
+            search: None,
+            query: String::new(),
+            only_tests: false,
+            status: None,
+            failure: None,
+            hovered_link: None,
+            commands: Vec::new(),
+            installed: false,
+            open: true,
+        };
+        match first_file {
+            Some(file) => gui.visit(&file)?,
+            None => gui.open_search(),
+        }
+        Ok(gui)
+    }
+
+    /// Whether temoc is running.
+    #[must_use]
+    pub fn is_busy(&self) -> bool {
+        self.session.is_busy()
+    }
+
+    /// The arguments of the last temoc command.
+    #[must_use]
+    pub fn temoc_arguments(&self) -> Option<&[String]> {
+        self.session.temoc_arguments()
+    }
+
+    /// `false` once the window has been asked to close.
+    #[must_use]
+    pub fn is_open(&self) -> bool {
+        self.open
+    }
+
+    /// Draws one frame, and reacts to what happened since the last one.
+    pub fn show(&mut self, ui: &mut Ui) {
+        let ctx = ui.ctx().clone();
+        if !self.installed {
+            look::install(&ctx);
+            self.installed = true;
+        }
+        if ctx.input(|input| input.viewport().close_requested()) {
+            self.open = false;
+        }
+        if let Some(failure) = self.session.update() {
+            self.status = Some(failure.clone());
+            self.failure = Some(failure);
+        }
+        self.read_keys(&ctx);
+        let palette = look::palette(ctx.theme());
+        self.hovered_link = None;
+        self.toolbar(ui);
+        self.status_bar(ui, palette);
+        if self.panels.tree {
+            self.tree_panel(ui, palette);
+        }
+        if self.panels.tests && self.opened().is_some_and(Opened::is_test_file) {
+            self.tests_panel(ui, palette);
+        }
+        self.page(ui, palette);
+        if self.search.is_some() {
+            self.search_box(&ctx);
+        }
+        if self.panels.help {
+            help(&ctx);
+        }
+        self.carry_out(&ctx);
+        if self.session.is_busy() {
+            ctx.request_repaint_after(TICK);
+        }
+    }
+
+    fn opened(&self) -> Option<&Opened> {
+        self.pages.current()
+    }
+
+    /// Goes to a file of the workspace, leaving the current page behind.
+    fn visit(&mut self, file: &str) -> Result<(), String> {
+        self.pages.visit(self.session.read(file)?);
+        self.tree.reveal(file);
+        Ok(())
+    }
+
+    fn open_search(&mut self) {
+        self.query.clear();
+        self.search = Some(Search::open(self.session.workspace(), self.only_tests));
+    }
+
+    /// Takes the keys meant for temoc-ui out of this frame's input.
+    fn read_keys(&mut self, ctx: &Context) {
+        let searching = self.search.is_some();
+        let help_open = self.panels.help;
+        let mut commands = Vec::new();
+        ctx.input_mut(|input| {
+            input.events.retain(|event| {
+                let command = match event {
+                    Event::Key {
+                        key,
+                        pressed: true,
+                        modifiers,
+                        ..
+                    } => key_command(*key, *modifiers, searching, help_open),
+                    Event::Text(text) if !searching => text_command(text),
+                    _ => None,
+                };
+                let taken = command.is_some();
+                commands.extend(command);
+                !taken
+            });
+        });
+        self.commands.extend(commands);
+    }
+
+    fn carry_out(&mut self, ctx: &Context) {
+        for command in std::mem::take(&mut self.commands) {
+            let result = self.apply(ctx, command);
+            if let Err(message) = result {
+                self.status = Some(message);
+            }
+        }
+    }
+
+    fn apply(&mut self, ctx: &Context, command: Command) -> Result<(), String> {
+        match command {
+            Command::Open(file) => {
+                self.status = None;
+                self.visit(&file)?;
+            }
+            Command::Follow(target) => self.follow(ctx, &target)?,
+            Command::ToggleFolder(row) => {
+                if self.tree.select_shown(row) {
+                    self.tree.toggle_folder();
+                }
+            }
+            Command::Back => {
+                self.pages.back();
+                self.reveal_document();
+            }
+            Command::Forward => {
+                self.pages.forward();
+                self.reveal_document();
+            }
+            Command::OpenSearch => self.open_search(),
+            Command::CloseSearch => self.search = None,
+            Command::OpenResult(index) => self.open_result(index)?,
+            Command::OnlyTestFiles => {
+                self.only_tests = !self.only_tests;
+                if let Some(search) = &mut self.search {
+                    search.toggle_only_tests();
+                }
+            }
+            Command::RunFile => {
+                self.status = None;
+                self.failure = None;
+                self.session.run_file(self.pages.current())?;
+            }
+            Command::ToggleTree => self.panels.tree = !self.panels.tree,
+            Command::ToggleTests => self.panels.tests = !self.panels.tests,
+            Command::ToggleHelp => self.panels.help = !self.panels.help,
+            Command::CloseHelp => self.panels.help = false,
+            Command::SwapMode => ctx.set_theme(match ctx.theme() {
+                Theme::Dark => Theme::Light,
+                Theme::Light => Theme::Dark,
+            }),
+            Command::Quit => {
+                self.open = false;
+                ctx.send_viewport_cmd(ViewportCommand::Close);
+            }
+        }
+        Ok(())
+    }
+
+    fn reveal_document(&mut self) {
+        if let Some(file) = self.opened().map(|opened| opened.file().to_owned()) {
+            self.tree.reveal(&file);
+        }
+    }
+
+    /// Follows a link of the open document.
+    fn follow(&mut self, ctx: &Context, target: &str) -> Result<(), String> {
+        if is_website(target) {
+            ctx.open_url(OpenUrl::new_tab(target));
+            self.status = Some(format!("Opened in your browser: {target}"));
+            return Ok(());
+        }
+        let Some(document) = self.opened().map(|opened| opened.file().to_owned()) else {
+            return Ok(());
+        };
+        let place = self.session.follow(&document, target)?;
+        self.status = None;
+        self.visit(&place.file)
+    }
+
+    /// Opens a result of the search, or the chosen one.
+    fn open_result(&mut self, index: usize) -> Result<(), String> {
+        let hits = self.search.as_ref().map(Search::results);
+        let Some(hit) = hits.and_then(|hits| hits.get(index)).cloned() else {
+            return Ok(());
+        };
+        self.search = None;
+        self.status = None;
+        self.visit(&hit.file)
+    }
+
+    fn toolbar(&mut self, ui: &mut Ui) {
+        let document = self.opened().map(|opened| opened.file().to_owned());
+        let test_page = self.opened().is_some_and(Opened::is_test_file);
+        let busy = self.session.is_busy();
+        let mut commands = Vec::new();
+        Panel::top("toolbar").show(ui, |ui| {
+            ui.horizontal(|ui| {
+                let tree = (Icon::LeftPanel, "Show or hide the file tree");
+                icon_button(ui, tree, Command::ToggleTree, &mut commands);
+                icon_button(ui, (Icon::Back, "Go back"), Command::Back, &mut commands);
+                let forward = (Icon::Forward, "Go forward");
+                icon_button(ui, forward, Command::Forward, &mut commands);
+                if let Some(document) = &document {
+                    let response = ui.label(document);
+                    tagged(&response, tags::DOCUMENT, document);
+                }
+                let search = ui.add(Button::new("Search files and headings"));
+                if search.clicked() {
+                    commands.push(Command::OpenSearch);
+                }
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if test_page {
+                        let run = ui.add_enabled(!busy, Button::new("Run file"));
+                        if run.clicked() {
+                            commands.push(Command::RunFile);
+                        }
+                    }
+                    let tests = (Icon::RightPanel, "Show or hide the tests panel");
+                    icon_button(ui, tests, Command::ToggleTests, &mut commands);
+                    let help = ui.add(Button::new("?")).on_hover_text("Show help");
+                    named(&help, Role::Button, "Show help");
+                    if help.clicked() {
+                        commands.push(Command::ToggleHelp);
+                    }
+                    let mode = (Icon::Contrast, "Swap between dark and light");
+                    icon_button(ui, mode, Command::SwapMode, &mut commands);
+                });
+            });
+        });
+        self.commands.extend(commands);
+    }
+
+    fn status_bar(&self, ui: &mut Ui, palette: &Palette) {
+        let running = self.session.running_file();
+        let running = running.map(|file| format!("Running {file}..."));
+        let status = self.status.clone().or(running);
+        let result = self
+            .opened()
+            .and_then(|opened| self.session.file_result(opened));
+        Panel::bottom("status").show(ui, |ui| {
+            ui.horizontal(|ui| {
+                if let Some(status) = status.or_else(|| self.hovered_link.clone()) {
+                    let response = ui.label(&status);
+                    tagged(&response, tags::STATUS, &status);
+                }
+                ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
+                    if let Some(result) = result {
+                        let text = RichText::new(format!("file: {result}"))
+                            .color(result_colour(result, palette));
+                        let response = ui.label(text);
+                        tagged(&response, tags::FILE_RESULT, result);
+                    }
+                });
+            });
+        });
+    }
+
+    fn tree_panel(&mut self, ui: &mut Ui, palette: &Palette) {
+        let document = self.opened().map(|opened| opened.file().to_owned());
+        let mut commands = Vec::new();
+        Panel::left("tree").default_size(248.0).show(ui, |ui| {
+            let heading = ui.label(RichText::new("Files").color(palette.line));
+            tagged(&heading, tags::TREE, "Files");
+            ScrollArea::vertical().show(ui, |ui| {
+                for (index, row) in self.tree.rows().iter().enumerate() {
+                    let selected = Some(row.path()) == document.as_deref();
+                    let indent = "  ".repeat(row.depth);
+                    let opened = self.test_files.get(row.path());
+                    let mark = opened
+                        .and_then(|opened| self.session.file_result(opened))
+                        .and_then(mark_of);
+                    let text = match mark {
+                        Some(mark) => format!("{indent}{} {mark}", row.label()),
+                        None => format!("{indent}{}", row.label()),
+                    };
+                    let response = ui.add(Button::selectable(selected, text));
+                    let name = if row.is_folder() {
+                        format!("{}/", row.name)
+                    } else {
+                        row.name.clone()
+                    };
+                    response.widget_info(|| {
+                        WidgetInfo::selected(Role::TreeItem, true, selected, &name)
+                    });
+                    ui.ctx().accesskit_node_builder(response.id, |node| {
+                        node.set_selected(selected);
+                        if opened.is_some() {
+                            node.set_description(tags::TEST_FILE);
+                        }
+                        if let Some(mark) = mark {
+                            node.set_value(mark);
+                        }
+                    });
+                    if response.clicked() {
+                        commands.push(if row.is_folder() {
+                            Command::ToggleFolder(index)
+                        } else {
+                            Command::Open(row.path().to_owned())
+                        });
+                    }
+                }
+            });
+        });
+        self.commands.extend(commands);
+    }
+
+    fn tests_panel(&self, ui: &mut Ui, palette: &Palette) {
+        let Some(opened) = self.opened() else {
+            return;
+        };
+        let outcome = self.session.outcome(opened);
+        let command = self.session.temoc_arguments();
+        let command = command.map(|arguments| format!("temoc {}", arguments.join(" ")));
+        Panel::right("tests").default_size(284.0).show(ui, |ui| {
+            let heading = ui.label(RichText::new("This file").color(palette.line));
+            tagged(&heading, tags::TESTS_PANEL, "This file");
+            if let Some(result) = outcome.file {
+                let text = RichText::new(result).color(result_colour(result, palette));
+                ui.label(text.size(17.0));
+            }
+            ui.add_space(12.0);
+            ui.label(RichText::new("Tables").color(palette.line));
+            for (table, result) in &outcome.tables {
+                let text = format!("{table}: {result}");
+                let response = ui.label(&text);
+                tagged(&response, tags::PANEL_TABLE, &text);
+            }
+            if !outcome.failures.is_empty() {
+                ui.add_space(12.0);
+                ui.label(RichText::new("What did not pass").color(palette.line));
+                for failure in &outcome.failures {
+                    let response = ui.label(RichText::new(failure).color(palette.failed));
+                    tagged(&response, tags::NOT_PASSED, failure);
+                }
+            }
+            if let Some(command) = &command {
+                ui.add_space(12.0);
+                ui.label(RichText::new("Last command").color(palette.line));
+                let text = RichText::new(command).monospace().color(palette.code);
+                let response = ui.label(text);
+                tagged(&response, tags::LAST_COMMAND, command);
+            }
+        });
+    }
+
+    fn page(&mut self, ui: &mut Ui, palette: &Palette) {
+        let banner = self.banner();
+        let mut links = markdown::Links::default();
+        let frame = Frame::new().fill(palette.page).inner_margin(PAGE_MARGIN);
+        CentralPanel::default().frame(frame).show(ui, |ui| {
+            if let Some(banner) = &banner {
+                let frame = Frame::new().fill(palette.chip).inner_margin(10);
+                frame.show(ui, |ui| {
+                    ui.set_width(ui.available_width());
+                    let text = RichText::new(banner).color(palette.failed);
+                    let response = ui.add(Label::new(text).wrap());
+                    tagged(&response, tags::BANNER, banner);
+                });
+                ui.add_space(12.0);
+            }
+            let Some(opened) = self.pages.current() else {
+                return;
+            };
+            ScrollArea::vertical()
+                .id_salt(opened.file())
+                .auto_shrink(false)
+                .show(ui, |ui| {
+                    links = markdown::show(ui, opened.document(), palette);
+                });
+        });
+        if let Some(target) = links.clicked {
+            self.commands.push(Command::Follow(target));
+        }
+        self.hovered_link = links.hovered;
+    }
+
+    /// What the banner says: why this page cannot run, or what stopped the run.
+    fn banner(&self) -> Option<String> {
+        let test_page = self.opened().is_some_and(Opened::is_test_file);
+        let cannot_run = test_page.then(|| self.session.configuration().err());
+        self.failure.clone().or(cannot_run.flatten())
+    }
+
+    fn search_box(&mut self, ctx: &Context) {
+        let mut commands = Vec::new();
+        let only_tests = self.only_tests;
+        let width = SEARCH_WIDTH.min(ctx.content_rect().width() - 32.0);
+        let left = (ctx.content_rect().width() - width) / 2.0;
+        let query = &mut self.query;
+        let Some(search) = &mut self.search else {
+            return;
+        };
+        Area::new(Id::unique("search"))
+            .order(Order::Foreground)
+            .fixed_pos(egui::pos2(left, 88.0))
+            .show(ctx, |ui| {
+                Frame::popup(ui.style()).show(ui, |ui| {
+                    ui.set_width(width);
+                    let edit = TextEdit::singleline(query).desired_width(f32::INFINITY);
+                    let response = ui.add(edit);
+                    response.request_focus();
+                    tagged(&response, tags::SEARCH, "Search");
+                    if response.changed() {
+                        follow_query(search, query);
+                    }
+                    let filter = ui.selectable_label(only_tests, "Test files only");
+                    if filter.clicked() {
+                        commands.push(Command::OnlyTestFiles);
+                    }
+                    ScrollArea::vertical().max_height(360.0).show(ui, |ui| {
+                        for (index, hit) in search.results().iter().enumerate() {
+                            let text = hit.to_string();
+                            let chosen = index == search.selected();
+                            let response = ui.add(Button::selectable(chosen, &text));
+                            tagged(&response, tags::SEARCH_RESULT, &text);
+                            if response.clicked() {
+                                commands.push(Command::OpenResult(index));
+                            }
+                        }
+                    });
+                });
+            });
+        ctx.input_mut(|input| {
+            if input.consume_key(Modifiers::NONE, Key::ArrowDown) {
+                search.choose_next();
+            }
+            if input.consume_key(Modifiers::NONE, Key::ArrowUp) {
+                search.choose_previous();
+            }
+            if input.consume_key(Modifiers::NONE, Key::Enter) {
+                commands.push(Command::OpenResult(search.selected()));
+            }
+        });
+        self.commands.extend(commands);
+    }
+}
+
+/// Makes the search match what the box says, one character at a time.
+fn follow_query(search: &mut Search, query: &str) {
+    while !query.starts_with(search.query()) {
+        search.delete_character();
+    }
+    let typed = query.get(search.query().len()..).unwrap_or_default();
+    typed.chars().for_each(|c| search.type_character(c));
+}
+
+/// What a key does, for the keys that are not text.
+fn key_command(
+    key: Key,
+    modifiers: Modifiers,
+    searching: bool,
+    help_open: bool,
+) -> Option<Command> {
+    if modifiers.command {
+        return match key {
+            Key::Q => Some(Command::Quit),
+            Key::T if searching => Some(Command::OnlyTestFiles),
+            _ => None,
+        };
+    }
+    match key {
+        Key::Escape if searching => Some(Command::CloseSearch),
+        Key::Escape if help_open => Some(Command::CloseHelp),
+        Key::Backspace if !searching => Some(Command::Back),
+        _ => None,
+    }
+}
+
+/// What typing a character does, outside the search box.
+fn text_command(text: &str) -> Option<Command> {
+    match text {
+        "/" => Some(Command::OpenSearch),
+        "?" => Some(Command::ToggleHelp),
+        "h" => Some(Command::Back),
+        "l" => Some(Command::Forward),
+        "q" => Some(Command::Quit),
+        "R" => Some(Command::RunFile),
+        "t" => Some(Command::ToggleTree),
+        "T" => Some(Command::SwapMode),
+        _ => None,
+    }
+}
+
+/// Whether a link points away from the workspace.
+fn is_website(target: &str) -> bool {
+    target.starts_with("http://") || target.starts_with("https://")
+}
+
+/// The mark for a result written as a word.
+fn mark_of(result: &str) -> Option<&'static str> {
+    RESULTS
+        .iter()
+        .find(|known| known.name() == result)
+        .map(|known| known.mark())
+}
+
+const RESULTS: [RunResult; 7] = [
+    RunResult::Passed,
+    RunResult::Skipped,
+    RunResult::Snoozed,
+    RunResult::Partial,
+    RunResult::Failed,
+    RunResult::Error,
+    RunResult::Running,
+];
+
+fn result_colour(result: &str, palette: &Palette) -> Color32 {
+    match result {
+        "passed" => palette.passed,
+        "snoozed" => palette.snoozed,
+        "failed" | "error" => palette.failed,
+        _ => palette.quote,
+    }
+}
+
+/// Shows the keys over everything else.
+fn help(ctx: &Context) {
+    let width = 640.0_f32.min(ctx.content_rect().width() - 32.0);
+    let left = (ctx.content_rect().width() - width) / 2.0;
+    Area::new(Id::unique("help"))
+        .order(Order::Foreground)
+        .fixed_pos(egui::pos2(left, 48.0))
+        .show(ctx, |ui| {
+            Frame::popup(ui.style()).show(ui, |ui| {
+                ui.set_width(width);
+                let heading = ui.heading("Keys");
+                tagged(&heading, tags::HELP, "Keys");
+                ui.add_space(8.0);
+                egui::Grid::new("keys")
+                    .spacing(Vec2::new(24.0, 4.0))
+                    .show(ui, |ui| {
+                        for (key, action) in KEYS {
+                            ui.label(RichText::new(key).monospace());
+                            ui.label(action);
+                            ui.end_row();
+                        }
+                    });
+            });
+        });
+}
+
+/// A button in the toolbar with an icon and the name it goes by.
+fn icon_button(
+    ui: &mut Ui,
+    (icon, name): (Icon, &str),
+    command: Command,
+    commands: &mut Vec<Command>,
+) {
+    if icons::button(ui, icon, name).clicked() {
+        commands.push(command);
+    }
+}
+
+/// Gives a widget the name it goes by, whatever it shows.
+fn named(response: &Response, role: Role, name: &str) {
+    response.widget_info(|| WidgetInfo::labeled(role, true, name));
+}
+
+/// Says what a widget is, for the accessibility tree.
+fn tagged(response: &Response, tag: &str, name: &str) {
+    named(response, Role::Label, name);
+    response.ctx.accesskit_node_builder(response.id, |node| {
+        node.set_description(tag);
+    });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn every_result_has_its_mark() {
+        assert_eq!(mark_of("passed"), Some("✓"));
+        assert_eq!(mark_of("failed"), Some("✗"));
+        assert_eq!(mark_of("not run"), None);
+    }
+
+    #[test]
+    fn websites_are_told_from_files() {
+        assert!(is_website("https://github.com/killertux/temoc"));
+        assert!(!is_website("guide/getting-started.md"));
+    }
+
+    #[test]
+    fn the_search_follows_what_the_box_says() {
+        let mut search = Search::open(std::path::Path::new("samples/docs"), false);
+        follow_query(&mut search, "ref");
+        assert_eq!(search.query(), "ref");
+        follow_query(&mut search, "re");
+        assert_eq!(search.query(), "re");
+        follow_query(&mut search, "guide");
+        assert_eq!(search.query(), "guide");
+    }
+}

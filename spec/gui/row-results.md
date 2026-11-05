@@ -77,7 +77,7 @@ and not to a row.
 Results stay on the page while you read something else, and a new run clears
 [only what it is about to run](../running/row-results.md#starting-again).
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation    | workspace  | arguments  | actions                                     | document?  | file result? |
 | -------------- | ---------- | ---------- | ------------------------------------------- | ---------- | ------------ |

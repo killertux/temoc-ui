@@ -55,8 +55,8 @@ What only the terminal does. Start with
 
 ## Graphical interface
 
-What only the GUI does. None of it is built yet, so every table here is snoozed. Start
-with [how these pages work](gui/writing-specs.md). The pages describe behavior, and
+What only the GUI does. It is partly built, and a table that is still to come is snoozed.
+Start with [how these pages work](gui/writing-specs.md). The pages describe behavior, and
 the [design](gui/design/README.md) shows how it should look.
 
 - [Opening the GUI](gui/opening.md): the `--gui` flag.

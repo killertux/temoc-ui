@@ -25,7 +25,7 @@ pub enum Input {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
-enum Token {
+pub enum Token {
     Word(String),
     Quoted(String),
 }
@@ -65,7 +65,7 @@ fn quoted(tokens: &mut impl Iterator<Item = Token>, action: &str) -> Result<Stri
     }
 }
 
-fn tokenize(keys: &str) -> Result<Vec<Token>, String> {
+pub fn tokenize(keys: &str) -> Result<Vec<Token>, String> {
     let mut tokens = Vec::new();
     let mut characters = keys.chars().peekable();
     while let Some(&character) = characters.peek() {

@@ -12,6 +12,8 @@ All of these must pass:
 cargo fmt --all --check
 cargo clippy --workspace --all-targets --all-features -- -D warnings
 cargo test --workspace --all-features
+cargo clippy -p temoc-ui --all-targets -- -D warnings
+cargo test -p temoc-ui
 temoc -c temoc.toml
 ```
 

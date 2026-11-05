@@ -109,7 +109,7 @@ A link to a file that does not exist stays on the page and says why.
 each. See [how history works](../viewer/links.md#history). Going back restores how far
 the page was scrolled and the focused link.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # action     | workspace | actions                                     | document?    |
 | ------------ | --------- | ------------------------------------------- | ------------ |

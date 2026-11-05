@@ -17,7 +17,7 @@ The path decides [the workspace and what opens first](../viewer/opening.md). If 
 opens, [search](search.md) opens so that you can pick a file.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation             | workspace | arguments    | document?    | search open? |
 | ----------------------- | --------- | ------------ | ------------ | ------------ |
@@ -27,7 +27,7 @@ opens, [search](search.md) opens so that you can pick a file.
 
 `--config` reaches temoc as it does from the terminal.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation    | workspace     | arguments                       | actions | temoc arguments?                         |
 | -------------- | ------------- | ------------------------------- | ------- | ---------------------------------------- |
@@ -39,7 +39,7 @@ temoc-ui prints a message and exits before any window opens, as the terminal doe
 Themes are for the terminal, so `--theme` is refused with `--gui`. The GUI has
 [its own two modes](themes.md).
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation  | workspace | arguments    | still open? | status?                       |
 | ------------ | --------- | ------------ | ----------- | ----------------------------- |

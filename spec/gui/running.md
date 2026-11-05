@@ -14,7 +14,7 @@ There are buttons for everything, and the [terminal's keys](../tui/running.md) w
 `Run file` is in the toolbar, on test pages only.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation    | workspace  | arguments  | actions           | run file? | temoc arguments?                        |
 | -------------- | ---------- | ---------- | ----------------- | --------- | --------------------------------------- |
@@ -119,7 +119,7 @@ Closing the window [stops the run](../running/row-results.md#while-a-run-goes-on
 On a test page, a panel beside the page sums up the file: its result, its tables, what
 did not pass, and the last temoc command. Clicking a table or a failure focuses it.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation   | workspace  | arguments  | actions | tests panel?                               | not passed?                                  | last command?                                 |
 | ------------- | ---------- | ---------- | ------- | ------------------------------------------ | -------------------------------------------- | --------------------------------------------- |
@@ -142,7 +142,7 @@ The page stays readable either way.
 
 ![temoc could not finish](design/images/failed.png)
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation         | workspace    | arguments | actions | banner?                                                                 | status?                                                                 |
 | ------------------- | ------------ | --------- | ------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------- |

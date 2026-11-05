@@ -41,5 +41,10 @@ jobs:
       - name: Test
         run: cargo test --workspace --all-features
 
+      - name: Without the GUI
+        run: |
+          cargo clippy -p temoc-ui --all-targets -- -D warnings
+          cargo test -p temoc-ui
+
       - name: Spec
         run: temoc -c temoc.toml

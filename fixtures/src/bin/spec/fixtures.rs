@@ -1,6 +1,7 @@
 //! The fixtures used by the pages in `spec/`.
 
 use crate::clipboard;
+use crate::gui::{Played as GuiPlayed, Scene};
 use crate::headless::{Played, Scenario};
 use crate::screen;
 use crate::session::{FakeTerminal, Outcome, Session};
@@ -9,6 +10,8 @@ use rust_slim::fixture;
 use std::path::Path;
 use temoc_ui::app::AppState;
 use temoc_ui::graph::GraphState;
+use temoc_ui::gui::egui::Theme;
+use temoc_ui::gui::tags;
 use temoc_ui::render::{self, Preview};
 use temoc_ui::temoc::{self, Event, RunReport, TestFile, Transcript};
 use temoc_ui::theme::Rgb;
@@ -213,6 +216,177 @@ impl Core {
             Some(Played::Refused(_)) => "temoc-ui did not start".into(),
             Some(Played::Broken(problem)) => problem.clone(),
             Some(Played::Finished(scenario)) => read(scenario),
+        }
+    }
+}
+
+/// Runs a scenario against the GUI. See `spec/gui/writing-specs.md`.
+#[derive(Default)]
+pub struct Gui {
+    workspace: String,
+    arguments: String,
+    actions: String,
+    system_mode: String,
+    played: Option<GuiPlayed>,
+}
+
+#[fixture]
+impl Gui {
+    #[slim(constructor)]
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn reset(&mut self) {
+        *self = Self::default();
+    }
+
+    pub fn set_workspace(&mut self, workspace: String) {
+        self.workspace = workspace;
+    }
+
+    pub fn set_arguments(&mut self, arguments: String) {
+        self.arguments = arguments;
+    }
+
+    pub fn set_actions(&mut self, actions: String) {
+        self.actions = actions;
+    }
+
+    pub fn set_system_mode(&mut self, system_mode: String) {
+        self.system_mode = system_mode;
+    }
+
+    pub fn execute(&mut self) {
+        self.played = Some(GuiPlayed::of(
+            &self.workspace,
+            &self.arguments,
+            &self.actions,
+            &self.system_mode,
+        ));
+    }
+
+    #[must_use]
+    pub fn still_open(&self) -> String {
+        match &self.played {
+            Some(GuiPlayed::Refused(_)) => yes_no(false),
+            _ => self.read(|scene| yes_no(scene.window().is_open())),
+        }
+    }
+
+    #[must_use]
+    pub fn status(&self) -> String {
+        if let Some(GuiPlayed::Refused(message)) = &self.played {
+            return message.clone();
+        }
+        self.read(|scene| or_none(scene.first_tagged(tags::STATUS)))
+    }
+
+    #[must_use]
+    pub fn document(&self) -> String {
+        self.read(|scene| or_none(scene.first_tagged(tags::DOCUMENT)))
+    }
+
+    #[must_use]
+    pub fn banner(&self) -> String {
+        self.read(|scene| or_none(scene.first_tagged(tags::BANNER)))
+    }
+
+    #[must_use]
+    pub fn file_result(&self) -> String {
+        self.read(|scene| or_none(scene.first_tagged(tags::FILE_RESULT)))
+    }
+
+    #[must_use]
+    pub fn temoc_arguments(&self) -> String {
+        self.read(|scene| {
+            let arguments = scene.window().temoc_arguments();
+            or_none(arguments.map(|arguments| arguments.join(" ")))
+        })
+    }
+
+    #[must_use]
+    pub fn search_open(&self) -> String {
+        self.read(|scene| yes_no(scene.is_tagged(tags::SEARCH)))
+    }
+
+    #[must_use]
+    pub fn results(&self) -> String {
+        self.read(|scene| list(&scene.tagged(tags::SEARCH_RESULT), ", "))
+    }
+
+    #[must_use]
+    pub fn tree_open(&self) -> String {
+        self.read(|scene| yes_no(scene.is_tagged(tags::TREE)))
+    }
+
+    #[must_use]
+    pub fn tree(&self) -> String {
+        self.read(|scene| list(&scene.tree(), ", "))
+    }
+
+    #[must_use]
+    pub fn tree_selection(&self) -> String {
+        self.read(|scene| or_none(scene.tree_selection()))
+    }
+
+    #[must_use]
+    pub fn tree_test_files(&self) -> String {
+        self.read(|scene| list(&scene.tree_test_files(), ", "))
+    }
+
+    #[must_use]
+    pub fn tree_marks(&self) -> String {
+        self.read(|scene| list(&scene.tree_marks(), ", "))
+    }
+
+    #[must_use]
+    pub fn tests_panel_open(&self) -> String {
+        self.read(|scene| yes_no(scene.is_tagged(tags::TESTS_PANEL)))
+    }
+
+    #[must_use]
+    pub fn tests_panel(&self) -> String {
+        self.read(|scene| list(&scene.tagged(tags::PANEL_TABLE), ", "))
+    }
+
+    #[must_use]
+    pub fn not_passed(&self) -> String {
+        self.read(|scene| list(&scene.tagged(tags::NOT_PASSED), "; "))
+    }
+
+    #[must_use]
+    pub fn last_command(&self) -> String {
+        self.read(|scene| or_none(scene.first_tagged(tags::LAST_COMMAND)))
+    }
+
+    #[must_use]
+    pub fn run_file(&self) -> String {
+        self.read(|scene| or_none(scene.run_file().map(String::from)))
+    }
+
+    #[must_use]
+    pub fn help_open(&self) -> String {
+        self.read(|scene| yes_no(scene.is_tagged(tags::HELP)))
+    }
+
+    #[must_use]
+    pub fn mode(&self) -> String {
+        self.read(|scene| match scene.mode() {
+            Theme::Dark => "dark".into(),
+            Theme::Light => "light".into(),
+        })
+    }
+}
+
+impl Gui {
+    fn read(&self, read: impl FnOnce(&Scene) -> String) -> String {
+        match &self.played {
+            None => "scenario did not run".into(),
+            Some(GuiPlayed::Refused(_)) => NONE.into(),
+            Some(GuiPlayed::Broken(problem)) => problem.clone(),
+            Some(GuiPlayed::Finished(scene)) => read(scene),
         }
     }
 }

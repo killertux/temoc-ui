@@ -167,7 +167,8 @@ by other rows, which temoc reports as an error in the row.
 
 - A graphical interface built with [egui](https://github.com/emilk/egui), opened with
   `--gui` in builds with the `gui` feature. Its [specification](spec/gui/writing-specs.md)
-  and [design](spec/gui/design/README.md) are written, and it is not built yet.
+  and [design](spec/gui/design/README.md) are written, and it is partly built: the window,
+  file tree, search, and running a file work, and the rest is on its way.
 
 ## The specification
 

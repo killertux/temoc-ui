@@ -13,7 +13,7 @@ The colours are in the [design](design/images/tokens.png).
 The GUI follows the system. If the system does not say, it opens dark.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation         | workspace | system mode | mode? |
 | ------------------- | --------- | ----------- | ----- |
@@ -26,7 +26,7 @@ The GUI follows the system. If the system does not say, it opens dark.
 `T` or the toolbar button swaps between dark and light. The choice lasts until temoc-ui
 closes, and nothing else on screen changes.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation     | workspace | system mode | actions                                  | mode? | document?    |
 | --------------- | --------- | ----------- | ---------------------------------------- | ----- | ------------ |

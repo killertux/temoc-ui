@@ -8,7 +8,7 @@ The [file tree](../viewer/file-tree.md) is a side panel that stays open while yo
 The open document is selected, and the folders above it start open.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation          | workspace | arguments                | actions | tree open? | tree?                                                                       | tree selection?    |
 | -------------------- | --------- | ------------------------ | ------- | ---------- | --------------------------------------------------------------------------- | ------------------ |
@@ -24,7 +24,7 @@ Clicking a folder opens or closes it, and clicking a file opens that file. The t
 stays open, and follows the document however you got there. Going
 [back](navigation.md#history) returns to the previous document.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation       | workspace | actions                                        | document?                | tree open? | tree selection?    |
 | ----------------- | --------- | ---------------------------------------------- | ------------------------ | ---------- | ------------------ |
@@ -33,7 +33,7 @@ stays open, and follows the document however you got there. Going
 | Go back           | docs      | `Click tree "reference.md" h`                  | README.md                | yes        | README.md          |
 | It follows a link | docs      | `Click "Reference"`                            | reference.md             | yes        | reference.md       |
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation    | workspace | actions                                 | tree?                                                                       |
 | -------------- | --------- | --------------------------------------- | --------------------------------------------------------------------------- |
@@ -46,7 +46,7 @@ stays open, and follows the document however you got there. Going
 from other pages. A file that has a result shows
 [its mark](row-results.md#marks), and keeps it while you read something else.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation    | workspace  | arguments  | actions                     | tree test files?                                        | tree marks?                    |
 | -------------- | ---------- | ---------- | --------------------------- | ------------------------------------------------------- | ------------------------------ |
