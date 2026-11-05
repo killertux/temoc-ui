@@ -10,6 +10,7 @@ use rust_slim::fixture;
 use std::path::Path;
 use temoc_ui::app::AppState;
 use temoc_ui::graph::GraphState;
+use temoc_ui::gui::Position;
 use temoc_ui::gui::egui::Theme;
 use temoc_ui::gui::tags;
 use temoc_ui::render::{self, Preview};
@@ -227,6 +228,7 @@ pub struct Gui {
     arguments: String,
     actions: String,
     row: String,
+    look_for: String,
     system_mode: String,
     played: Option<GuiPlayed>,
 }
@@ -257,6 +259,10 @@ impl Gui {
 
     pub fn set_row(&mut self, row: String) {
         self.row = row;
+    }
+
+    pub fn set_look_for(&mut self, look_for: String) {
+        self.look_for = look_for;
     }
 
     pub fn set_system_mode(&mut self, system_mode: String) {
@@ -369,6 +375,46 @@ impl Gui {
     #[must_use]
     pub fn run_file(&self) -> String {
         self.read(|scene| or_none(scene.run_file().map(String::from)))
+    }
+
+    #[must_use]
+    pub fn page_scroll(&self) -> String {
+        self.read(|scene| match scene.window().page_position() {
+            Some(Position::Start) => "top".into(),
+            Some(Position::Middle) => "middle".into(),
+            Some(Position::End) => "bottom".into(),
+            None => NONE.into(),
+        })
+    }
+
+    #[must_use]
+    pub fn sideways(&self) -> String {
+        self.read(|scene| match scene.sideways(&self.look_for) {
+            Some(Position::Start) => "start".into(),
+            Some(Position::Middle) => "middle".into(),
+            Some(Position::End) => "end".into(),
+            None => NONE.into(),
+        })
+    }
+
+    #[must_use]
+    pub fn visible(&self) -> String {
+        self.read(|scene| yes_no(scene.shows(&self.look_for)))
+    }
+
+    #[must_use]
+    pub fn mark_shown(&self) -> String {
+        self.read(|scene| yes_no(scene.shows_mark_of(&self.look_for)))
+    }
+
+    #[must_use]
+    pub fn focused_link(&self) -> String {
+        self.read(|scene| or_none(scene.focused_link()))
+    }
+
+    #[must_use]
+    pub fn opened_url(&self) -> String {
+        self.read(|scene| or_none(scene.window().opened_url().map(String::from)))
     }
 
     #[must_use]

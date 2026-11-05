@@ -23,15 +23,14 @@ The GUI follows the system. If the system does not say, it opens dark.
 
 ## Swapping
 
-`T` or the toolbar button swaps between dark and light. The choice lasts until temoc-ui
+The toolbar button swaps between dark and light. The choice lasts until temoc-ui
 closes, and nothing else on screen changes.
 
 [//]: # "decisionTable Gui"
 
-| # situation     | workspace | system mode | actions                                  | mode? | document?    |
-| --------------- | --------- | ----------- | ---------------------------------------- | ----- | ------------ |
-| The key         | docs      | dark        | `T`                                      | light | README.md    |
-| The button      | docs      | dark        | `Click "Swap between dark and light"`    | light | README.md    |
-| And back        | docs      | dark        | `T T`                                    | dark  | README.md    |
-| From light      | docs      | light       | `T`                                      | dark  | README.md    |
-| Moving on       | docs      | dark        | `T Click "Reference"`                    | light | reference.md |
+| # situation | workspace | system mode | actions                                                                   | mode? | document?    |
+| ----------- | --------- | ----------- | ------------------------------------------------------------------------- | ----- | ------------ |
+| The button  | docs      | dark        | `Click "Swap between dark and light"`                                     | light | README.md    |
+| And back    | docs      | dark        | `Click "Swap between dark and light" Click "Swap between dark and light"` | dark  | README.md    |
+| From light  | docs      | light       | `Click "Swap between dark and light"`                                     | dark  | README.md    |
+| Moving on   | docs      | dark        | `Click "Swap between dark and light" Click "Reference"`                   | light | reference.md |

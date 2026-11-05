@@ -32,9 +32,9 @@ that it finds things by name and not by position.
 
 ### Actions
 
-Keys are written as on the [terminal pages](../tui/writing-specs.md#keys-notation): `j`,
-`Enter`, `Ctrl-g`, or `"some text"` to type each character in turn. Everything `Ctrl` does
-here is `Cmd` on macOS. Keys wait for any test run to finish before the next action.
+Keys are written as on the [terminal pages](../tui/writing-specs.md#keys-notation): `Down`,
+`Enter`, `Ctrl-g`, `Alt-Shift-Up`, or `"some text"` to type each character in turn.
+Everything `Ctrl` does here is `Cmd` on macOS. Keys wait for any test run to finish before the next action.
 
 | Written as                     | Meaning                                                                  |
 | ------------------------------ | ------------------------------------------------------------------------ |
@@ -52,7 +52,8 @@ here is `Cmd` on macOS. Keys wait for any test run to finish before the next act
 | `Drag graph`                   | Drag the background of the graph.                                        |
 | `Drag "from" "to"`             | Press on the first character of `from`, release on the last character of `to`. |
 | `Wheel "text"`                 | Turn the mouse wheel one step over that text.                            |
-| `Shift-Wheel "text"`           | Turn the mouse wheel one step over that text while holding Shift.        |
+| `Wheel sideways "text"`        | Scroll one step sideways over that text, as a trackpad or tilting wheel does. |
+| `Mouse back`, `Mouse forward`  | Press that button of the mouse.                                          |
 | `Close window`                 | Close the window the way the system does.                                |
 
 ### Expected values

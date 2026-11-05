@@ -17,14 +17,14 @@ panel, whatever the button says.
 [//]: # "import Spec.Fixtures"
 [//]: # "decisionTable Gui"
 
-| # situation               | workspace  | arguments  | actions                                                      | tree open? | tests panel open? |
-| ------------------------- | ---------- | ---------- | ------------------------------------------------------------ | ---------- | ----------------- |
-| A test page               | calculator | passing.md |                                                              | yes        | yes               |
-| A page without tests      | calculator | README.md  |                                                              | yes        | no                |
-| Hiding the tree           | calculator | passing.md | `Click "Show or hide the file tree"`                         | no         | yes               |
-| Hiding the tests panel    | calculator | passing.md | `Click "Show or hide the tests panel"`                       | yes        | no                |
-| Showing it again          | calculator | passing.md | `Click "Show or hide the tests panel" Click "Show or hide the tests panel"` | yes | yes         |
-| It stays hidden           | calculator | passing.md | `Click "Show or hide the tests panel" Click tree "failing.md"` | yes      | no                |
+| # situation            | workspace  | arguments  | actions                                                                     | tree open? | tests panel open? |
+| ---------------------- | ---------- | ---------- | --------------------------------------------------------------------------- | ---------- | ----------------- |
+| A test page            | calculator | passing.md |                                                                             | yes        | yes               |
+| A page without tests   | calculator | README.md  |                                                                             | yes        | no                |
+| Hiding the tree        | calculator | passing.md | `Click "Show or hide the file tree"`                                        | no         | yes               |
+| Hiding the tests panel | calculator | passing.md | `Click "Show or hide the tests panel"`                                      | yes        | no                |
+| Showing it again       | calculator | passing.md | `Click "Show or hide the tests panel" Click "Show or hide the tests panel"` | yes        | yes               |
+| It stays hidden        | calculator | passing.md | `Click "Show or hide the tests panel" Click tree "failing.md"`              | yes        | no                |
 
 ## The status bar
 
@@ -33,8 +33,8 @@ the [file result](../running/running-a-file.md#results) is on the right.
 
 [//]: # "decisionTable Gui"
 
-| # situation      | workspace  | arguments  | actions | status? | file result? |
-| ---------------- | ---------- | ---------- | ------- | ------- | ------------ |
-| Nothing yet      | calculator | passing.md |         | none    | not run      |
-| After a run      | calculator | failing.md | `R`     | none    | failed       |
-| A page, no tests | calculator | README.md  |         | none    | none         |
+| # situation      | workspace  | arguments  | actions  | status? | file result? |
+| ---------------- | ---------- | ---------- | -------- | ------- | ------------ |
+| Nothing yet      | calculator | passing.md |          | none    | not run      |
+| After a run      | calculator | failing.md | `Ctrl-r` | none    | failed       |
+| A page, no tests | calculator | README.md  |          | none    | none         |

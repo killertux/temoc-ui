@@ -3,19 +3,19 @@
 Back to the [specification index](../README.md).
 
 The [file tree](../viewer/file-tree.md) is a side panel that stays open while you read.
-`t` or its toolbar button shows or hides it.
+`Ctrl-b` or its toolbar button shows or hides it.
 
 The open document is selected, and the folders above it start open.
 
 [//]: # "import Spec.Fixtures"
 [//]: # "decisionTable Gui"
 
-| # situation          | workspace | arguments                | actions | tree open? | tree?                                                                       | tree selection?    |
-| -------------------- | --------- | ------------------------ | ------- | ---------- | --------------------------------------------------------------------------- | ------------------ |
-| Open at first        | docs      |                          |         | yes        | guide/, notes.MD, README.md, reference.md                                   | README.md          |
-| Reveals the document | docs      | guide/getting-started.md |         | yes        | guide/, getting-started.md, long-page.md, notes.MD, README.md, reference.md | getting-started.md |
-| t hides it           | docs      |                          | `t`     | no         | none                                                                        | none               |
-| t shows it again     | docs      |                          | `t t`   | yes        | guide/, notes.MD, README.md, reference.md                                   | README.md          |
+| # situation          | workspace | arguments                | actions         | tree open? | tree?                                                                       | tree selection?    |
+| -------------------- | --------- | ------------------------ | --------------- | ---------- | --------------------------------------------------------------------------- | ------------------ |
+| Open at first        | docs      |                          |                 | yes        | guide/, notes.MD, README.md, reference.md                                   | README.md          |
+| Reveals the document | docs      | guide/getting-started.md |                 | yes        | guide/, getting-started.md, long-page.md, notes.MD, README.md, reference.md | getting-started.md |
+| The key hides        | docs      |                          | `Ctrl-b`        | no         | none                                                                        | none               |
+| The key shows it     | docs      |                          | `Ctrl-b Ctrl-b` | yes        | guide/, notes.MD, README.md, reference.md                                   | README.md          |
 
 ## Using it
 
@@ -26,12 +26,12 @@ stays open, and follows the document however you got there. Going
 
 [//]: # "decisionTable Gui"
 
-| # situation       | workspace | actions                                        | document?                | tree open? | tree selection?    |
-| ----------------- | --------- | ---------------------------------------------- | ------------------------ | ---------- | ------------------ |
-| Open a file       | docs      | `Click tree "reference.md"`                    | reference.md             | yes        | reference.md       |
-| From a folder     | docs      | `Click tree "guide" Click tree "long-page.md"` | guide/long-page.md       | yes        | long-page.md       |
-| Go back           | docs      | `Click tree "reference.md" h`                  | README.md                | yes        | README.md          |
-| It follows a link | docs      | `Click "Reference"`                            | reference.md             | yes        | reference.md       |
+| # situation       | workspace | actions                                        | document?          | tree open? | tree selection? |
+| ----------------- | --------- | ---------------------------------------------- | ------------------ | ---------- | --------------- |
+| Open a file       | docs      | `Click tree "reference.md"`                    | reference.md       | yes        | reference.md    |
+| From a folder     | docs      | `Click tree "guide" Click tree "long-page.md"` | guide/long-page.md | yes        | long-page.md    |
+| Go back           | docs      | `Click tree "reference.md" Alt-Left`           | README.md          | yes        | README.md       |
+| It follows a link | docs      | `Click "Reference"`                            | reference.md       | yes        | reference.md    |
 
 [//]: # "decisionTable Gui"
 
@@ -48,8 +48,8 @@ from other pages. A file that has a result shows
 
 [//]: # "decisionTable Gui"
 
-| # situation    | workspace  | arguments  | actions                     | tree test files?                                        | tree marks?                    |
-| -------------- | ---------- | ---------- | --------------------------- | ------------------------------------------------------- | ------------------------------ |
-| Before a run   | calculator | failing.md |                             | broken.md, failing.md, mixed.md, passing.md, snoozed.md | none                           |
-| After a run    | calculator | failing.md | `R`                         | broken.md, failing.md, mixed.md, passing.md, snoozed.md | failing.md: ✗                  |
-| Two files      | calculator | failing.md | `R Click tree "passing.md" R` | broken.md, failing.md, mixed.md, passing.md, snoozed.md | failing.md: ✗, passing.md: ✓ |
+| # situation  | workspace  | arguments  | actions                                 | tree test files?                                        | tree marks?                  |
+| ------------ | ---------- | ---------- | --------------------------------------- | ------------------------------------------------------- | ---------------------------- |
+| Before a run | calculator | failing.md |                                         | broken.md, failing.md, mixed.md, passing.md, snoozed.md | none                         |
+| After a run  | calculator | failing.md | `Ctrl-r`                                | broken.md, failing.md, mixed.md, passing.md, snoozed.md | failing.md: ✗                |
+| Two files    | calculator | failing.md | `Ctrl-r Click tree "passing.md" Ctrl-r` | broken.md, failing.md, mixed.md, passing.md, snoozed.md | failing.md: ✗, passing.md: ✓ |

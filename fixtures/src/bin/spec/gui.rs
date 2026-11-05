@@ -10,14 +10,19 @@ use std::time::{Duration, Instant};
 use temoc_ui::app::Launch;
 use temoc_ui::gui::egui::accesskit::Role;
 use temoc_ui::gui::egui::{
-    Event, Key, Modifiers, Pos2, Theme, ThemePreference, Vec2, ViewportEvent, ViewportId,
+    Event, Key, Modifiers, MouseWheelSource, MouseWheelUnit, PointerButton, Pos2, Rect, Theme,
+    ThemePreference, TouchPhase, Vec2, ViewportEvent, ViewportId,
 };
-use temoc_ui::gui::{Gui as Window, tags};
+use temoc_ui::gui::{Gui as Window, Position, tags};
 
 const WIDTH: f32 = 1000.0;
 const HEIGHT: f32 = 700.0;
 const RUN_TIMEOUT: Duration = Duration::from_mins(1);
 const POLL_INTERVAL: Duration = Duration::from_millis(10);
+/// How far one step of a mouse wheel goes.
+const WHEEL_STEP: f32 = 40.0;
+/// How far one step sideways goes, which is a nudge on a trackpad.
+const TRACKPAD_STEP: f32 = 10.0;
 
 /// One of the actions described in `spec/gui/writing-specs.md`.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -32,6 +37,9 @@ enum Action {
     ClickTree(String),
     Hover(String),
     HoverRow(String),
+    /// Turning the wheel over text, which moves the page by this much.
+    Wheel(String, Vec2),
+    MouseButton(PointerButton),
     Leave,
     WaitRow(String),
     CloseWindow,
@@ -67,6 +75,23 @@ impl Action {
                             Self::HoverRow(line(tokens.next(), "Hover row")?)
                         }
                         _ => return Err(NOT_IMPLEMENTED.into()),
+                    },
+                    "Wheel" => match tokens.next() {
+                        Some(Token::Quoted(text)) => Self::Wheel(text, Vec2::new(0.0, -WHEEL_STEP)),
+                        Some(Token::Word(word)) if word == "sideways" => {
+                            let text = quoted(tokens.next(), "Wheel sideways")?;
+                            Self::Wheel(text, Vec2::new(-TRACKPAD_STEP, 0.0))
+                        }
+                        _ => return Err(format!("unknown action in `{actions}`")),
+                    },
+                    "Mouse" => match tokens.next() {
+                        Some(Token::Word(word)) if word == "back" => {
+                            Self::MouseButton(PointerButton::Extra1)
+                        }
+                        Some(Token::Word(word)) if word == "forward" => {
+                            Self::MouseButton(PointerButton::Extra2)
+                        }
+                        _ => return Err(format!("unknown action in `{actions}`")),
                     },
                     "Leave" => Self::Leave,
                     "Wait" => match tokens.next() {
@@ -108,15 +133,27 @@ fn quoted(token: Option<Token>, action: &str) -> Result<String, String> {
 
 /// A key as written in an action.
 fn key(word: &str) -> Option<Action> {
-    if let Some(rest) = word.strip_prefix("Ctrl-") {
-        let key = Key::from_name(&rest.to_uppercase())?;
-        return Some(Action::Press(key, Modifiers::COMMAND));
+    let mut rest = word;
+    let mut modifiers = Modifiers::NONE;
+    for (prefix, modifier) in [
+        ("Ctrl-", Modifiers::COMMAND),
+        ("Alt-", Modifiers::ALT),
+        ("Shift-", Modifiers::SHIFT),
+    ] {
+        if let Some(after) = rest.strip_prefix(prefix) {
+            rest = after;
+            modifiers |= modifier;
+        }
     }
-    let mut characters = word.chars();
+    let mut characters = rest.chars();
     if let (Some(character), None) = (characters.next(), characters.next()) {
-        return Some(Action::Character(character));
+        if modifiers.is_none() {
+            return Some(Action::Character(character));
+        }
+        let key = Key::from_name(&character.to_uppercase().to_string())?;
+        return Some(Action::Press(key, modifiers));
     }
-    let key = match word {
+    let key = match rest {
         "Esc" => Key::Escape,
         "Up" => Key::ArrowUp,
         "Down" => Key::ArrowDown,
@@ -124,7 +161,7 @@ fn key(word: &str) -> Option<Action> {
         "Right" => Key::ArrowRight,
         named => Key::from_name(named)?,
     };
-    Some(Action::Press(key, Modifiers::NONE))
+    Some(Action::Press(key, modifiers))
 }
 
 /// What happened when a scenario ran.
@@ -231,6 +268,29 @@ impl Scene {
             }
             Action::Hover(text) => self.named(text)?.hover(),
             Action::HoverRow(line) => self.row(line)?.hover(),
+            Action::Wheel(text, delta) => {
+                self.hover_over(text)?;
+                // The pointer has to be there before the wheel turns.
+                self.harness.run_ok();
+                self.harness.event(Event::MouseWheel {
+                    unit: MouseWheelUnit::Point,
+                    delta: *delta,
+                    phase: TouchPhase::Move,
+                    source: MouseWheelSource::Wheel,
+                    modifiers: Modifiers::NONE,
+                });
+            }
+            Action::MouseButton(button) => {
+                let pos = Pos2::new(WIDTH / 2.0, HEIGHT / 2.0);
+                for pressed in [true, false] {
+                    self.harness.event(Event::PointerButton {
+                        pos,
+                        button: *button,
+                        pressed,
+                        modifiers: Modifiers::NONE,
+                    });
+                }
+            }
             Action::Leave => self.harness.hover_at(Pos2::new(WIDTH, HEIGHT)),
             Action::WaitRow(line) => self.wait_for_row(line)?,
             Action::CloseWindow => {
@@ -325,6 +385,59 @@ impl Scene {
                 "enabled"
             }
         })
+    }
+
+    /// Moves the pointer over the part of this text that shows.
+    fn hover_over(&self, text: &str) -> Result<(), String> {
+        let rects = self.text_rects(text);
+        let mut parts = rects.iter();
+        let part = parts.find_map(|rect| self.window().visible_part(*rect));
+        let part = part.ok_or(format!("`{text}` does not show"))?;
+        self.harness.hover_at(part.center());
+        Ok(())
+    }
+
+    /// Where each piece of text with this in it is.
+    fn text_rects(&self, text: &str) -> Vec<Rect> {
+        let nodes = self.harness.query_all_by(|node| {
+            let says = |said: Option<String>| said.is_some_and(|said| said.contains(text));
+            says(node.label()) || says(node.value())
+        });
+        nodes.map(|node| node.rect()).collect()
+    }
+
+    /// Whether this text is on screen.
+    pub fn shows(&self, text: &str) -> bool {
+        let rects = self.text_rects(text);
+        let mut rects = rects.iter();
+        rects.any(|rect| self.window().visible_part(*rect).is_some())
+    }
+
+    /// Where the block holding this text is scrolled to.
+    pub fn sideways(&self, text: &str) -> Option<Position> {
+        let rects = self.text_rects(text);
+        let mut positions = rects.iter();
+        positions.find_map(|rect| self.window().sideways_at(rect.center().y))
+    }
+
+    /// Whether the mark of the row holding this text is on screen.
+    pub fn shows_mark_of(&self, text: &str) -> bool {
+        let rows = self.text_rects(text);
+        let tag = Some(tags::MARK);
+        let marks = self
+            .harness
+            .query_all_by(move |node| node.description().as_deref() == tag);
+        let mut marks = marks.map(|mark| mark.rect());
+        marks.any(|mark| {
+            let beside = |row: &Rect| row.y_range().contains(mark.center().y);
+            let page = self.window().page_rect();
+            rows.iter().any(beside) && page.is_some_and(|page| page.contains_rect(mark))
+        })
+    }
+
+    /// The text of the focused link.
+    pub fn focused_link(&self) -> Option<String> {
+        self.first_tagged(tags::FOCUSED_LINK)
     }
 
     /// The focused test table, by its name.

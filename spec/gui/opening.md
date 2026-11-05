@@ -29,9 +29,9 @@ opens, [search](search.md) opens so that you can pick a file.
 
 [//]: # "decisionTable Gui"
 
-| # situation    | workspace     | arguments                       | actions | temoc arguments?                         |
-| -------------- | ------------- | ------------------------------- | ------- | ---------------------------------------- |
-| With --config  | custom-config | tests.md --config ci/temoc.toml | `R`     | -c ci/temoc.toml --output jsonl tests.md |
+| # situation   | workspace     | arguments                       | actions  | temoc arguments?                         |
+| ------------- | ------------- | ------------------------------- | -------- | ---------------------------------------- |
+| With --config | custom-config | tests.md --config ci/temoc.toml | `Ctrl-r` | -c ci/temoc.toml --output jsonl tests.md |
 
 ## What cannot be opened
 

@@ -46,10 +46,10 @@ does nothing, and temoc-ui never changes a file.
 
 [//]: # "decisionTable Gui -- snooze until 2099-12-31"
 
-| # situation    | workspace | actions               | checked?                         |
-| -------------- | --------- | --------------------- | -------------------------------- |
-| As in the file | elements  |                       | Done item: yes, Open item: no    |
-| Clicking       | elements  | `Click "Open item"`   | Done item: yes, Open item: no    |
+| # situation    | workspace | actions             | checked?                      |
+| -------------- | --------- | ------------------- | ----------------------------- |
+| As in the file | elements  |                     | Done item: yes, Open item: no |
+| Clicking       | elements  | `Click "Open item"` | Done item: yes, Open item: no |
 
 ## Images
 
@@ -74,10 +74,10 @@ if it has one. `Copy` copies the whole block.
 
 [//]: # "decisionTable Gui -- snooze until 2099-12-31"
 
-| # situation  | workspace | actions        | look for    | visible? | clipboard?  | status?             |
-| ------------ | --------- | -------------- | ----------- | -------- | ----------- | ------------------- |
-| Its text     | elements  |                | echo copied | yes      | none        | none                |
-| Its language | elements  |                | sh          | yes      | none        | none                |
+| # situation  | workspace | actions        | look for    | visible? | clipboard?  | status?              |
+| ------------ | --------- | -------------- | ----------- | -------- | ----------- | -------------------- |
+| Its text     | elements  |                | echo copied | yes      | none        | none                 |
+| Its language | elements  |                | sh          | yes      | none        | none                 |
 | Copying      | elements  | `Click "Copy"` | echo copied | yes      | echo copied | Copied 11 characters |
 
 ## Footnotes

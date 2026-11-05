@@ -16,8 +16,8 @@ use crate::temoc::{Failure, RunResult, TestTable};
 use eframe::egui::accesskit::Role;
 use eframe::egui::{
     Align, Color32, CornerRadius, FontFamily, FontId, Label, Layout, Pos2, Rect, Response,
-    RichText, ScrollArea, Sense, Shape, Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2,
-    WidgetInfo, pos2, vec2,
+    RichText, Sense, Shape, Stroke, StrokeKind, TextWrapMode, Ui, UiBuilder, Vec2, WidgetInfo,
+    pos2, vec2,
 };
 use markdown::mdast::{Node, Table};
 
@@ -80,11 +80,7 @@ impl Drawing<'_> {
             let rows = ui
                 .horizontal_top(|ui| {
                     ui.add_space(GUTTER);
-                    ScrollArea::horizontal()
-                        .id_salt(("test table", test.line))
-                        .auto_shrink([false, true])
-                        .show(ui, |ui| self.cells(ui, table, &cells))
-                        .inner
+                    self.wide_block(ui, test.line, |page, ui| page.cells(ui, table, &cells))
                 })
                 .inner;
             let band = |rect: Rect| Rect::from_x_y_ranges(left..=left + width, rect.y_range());
@@ -297,7 +293,7 @@ impl Drawing<'_> {
             let table = cells.index;
             let commands = &mut self.happened.commands;
             commands.push(Command::Focus { table, line: None });
-            commands.push(Command::RunTable);
+            commands.push(Command::RunFocused);
         }
     }
 
@@ -318,7 +314,7 @@ impl Drawing<'_> {
         let response = self.run_button(ui, spot, name, look);
         describe_button(&response, &line.to_string());
         if response.clicked() {
-            self.happened.commands.push(Command::RunRow(Some(line)));
+            self.happened.commands.push(Command::RunRow(line));
         }
     }
 

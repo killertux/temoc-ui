@@ -3,6 +3,7 @@
 mod icons;
 mod look;
 mod markdown;
+mod view;
 
 use crate::app::{Arguments, Launch};
 use crate::focus::Focus;
@@ -16,13 +17,15 @@ pub use eframe::egui;
 use egui::accesskit::Role;
 use egui::{
     Align, Area, Button, CentralPanel, Color32, Context, Event, Frame, Id, Key, Label, Layout,
-    Modifiers, OpenUrl, Order, Panel, Response, RichText, ScrollArea, Sense, TextEdit, Theme, Ui,
-    UiBuilder, Vec2, ViewportCommand, WidgetInfo, vec2,
+    Modifiers, OpenUrl, Order, Panel, PointerButton, Response, RichText, ScrollArea, Sense,
+    TextEdit, Theme, Ui, UiBuilder, Vec2, ViewportCommand, WidgetInfo, vec2,
 };
 use icons::Icon;
 use look::Palette;
 use std::collections::BTreeMap;
 use std::time::Duration;
+pub use view::Position;
+use view::{Reach, Scroll, Sideways, View};
 
 /// How big the window opens, as in the design.
 const WINDOW: [f32; 2] = [1440.0, 900.0];
@@ -33,30 +36,32 @@ const PAGE_MARGIN: i8 = 32;
 /// The widest the search box gets.
 const SEARCH_WIDTH: f32 = 640.0;
 /// The keys listed by help, as in `spec/gui/keys.md`.
-const KEYS: [(&str, &str); 23] = [
-    ("j, Down", "Scroll down one line"),
-    ("k, Up", "Scroll up one line"),
+const KEYS: [(&str, &str); 19] = [
+    ("Up, Down", "Scroll up or down one line"),
     ("PageDown, Space", "Scroll down one page"),
     ("PageUp", "Scroll up one page"),
-    ("g, G", "Go to the top or bottom"),
+    ("Home, End", "Go to the top or bottom"),
     ("Left, Right", "Scroll a wide table or code sideways"),
     ("Tab, Shift-Tab", "Focus the next or previous link"),
     ("Enter", "Follow the focused link"),
-    ("h, Backspace", "Go back"),
-    ("l", "Go forward"),
-    ("/", "Open search"),
-    ("Ctrl-t", "In search, show only test files"),
-    ("], [", "Focus the next or previous test table"),
-    ("}, {", "Focus the next or previous test row"),
-    ("r", "Run the focused table"),
-    ("Ctrl-r", "Run the focused row"),
-    ("R", "Run the whole file"),
-    ("t", "Show or hide the file tree"),
+    ("Alt-Left, Ctrl-[", "Go back"),
+    ("Alt-Right, Ctrl-]", "Go forward"),
+    ("Ctrl-k, /", "Open search"),
+    ("Alt-Down, Alt-Up", "Focus the next or previous test table"),
+    (
+        "Alt-Shift-Down, Alt-Shift-Up",
+        "Focus the next or previous test row",
+    ),
+    (
+        "Ctrl-Enter",
+        "Run the focused row, or else the focused table",
+    ),
+    ("Ctrl-r", "Run the whole file"),
+    ("Ctrl-b", "Show or hide the file tree"),
     ("Ctrl-g", "Show or hide the graph"),
-    ("T", "Swap between dark and light"),
     ("Ctrl-c", "Copy the selected text"),
-    ("?", "Show or hide help"),
-    ("q, Ctrl-q", "Quit"),
+    ("F1, ?", "Show or hide help"),
+    ("Ctrl-q", "Quit"),
 ];
 
 /// What the fixture finds things by, in the description of a widget. Each one
@@ -98,6 +103,8 @@ pub mod tags {
     pub const NOTE: &str = "note";
     /// What a test table says below itself.
     pub const VERDICT: &str = "verdict";
+    /// The focused link.
+    pub const FOCUSED_LINK: &str = "focused link";
 }
 
 /// Something asked for during a frame, carried out at the end of it.
@@ -105,6 +112,11 @@ pub mod tags {
 enum Command {
     Open(String),
     Follow(String),
+    FollowFocused,
+    NextLink,
+    PreviousLink,
+    Scroll(Scroll),
+    Sideways(Sideways),
     ToggleFolder(usize),
     Back,
     Forward,
@@ -122,10 +134,10 @@ enum Command {
         line: Option<usize>,
     },
     RunFile,
-    /// Runs the focused table.
-    RunTable,
-    /// Runs the row on a line, or else the focused one.
-    RunRow(Option<usize>),
+    /// Runs the focused row, or else the focused table.
+    RunFocused,
+    /// Runs the row on a line.
+    RunRow(usize),
     ToggleTree,
     ToggleTests,
     ToggleHelp,
@@ -137,10 +149,39 @@ enum Command {
 /// A page, and how it was left.
 #[derive(Debug)]
 struct Visit {
+    /// What tells this visit apart from others to the same file.
+    id: u64,
     opened: Opened,
     focus: Focus,
     /// Whether to bring what is focused into view.
     reveal: bool,
+    focused_link: Option<usize>,
+    /// Whether to bring the focused link into view.
+    reveal_link: bool,
+    /// The line of the heading to scroll to.
+    heading: Option<usize>,
+    /// The offset to scroll the page to.
+    scroll_to: Option<f32>,
+    /// The line of a block to scroll sideways, and the offset to go to.
+    nudge: Option<(usize, f32)>,
+    view: View,
+}
+
+impl Visit {
+    /// The line of the block that the focused table is in.
+    fn focused_block(&self) -> Option<usize> {
+        let table = self.focus.table(self.opened.tables())?;
+        Some(table.line)
+    }
+
+    /// Focuses the link this many places along, wrapping around at either end.
+    fn move_link(&mut self, next: impl FnOnce(Option<usize>, usize) -> usize) {
+        let count = self.view.links.len();
+        if count > 0 {
+            self.focused_link = Some(next(self.focused_link, count));
+            self.reveal_link = true;
+        }
+    }
 }
 
 /// What is showing around and over the page.
@@ -170,6 +211,10 @@ pub struct Gui {
     failure: Option<String>,
     /// Where the link under the pointer goes.
     hovered_link: Option<String>,
+    /// The last address opened in the web browser.
+    opened_url: Option<String>,
+    /// How many visits there have been.
+    visits: u64,
     commands: Vec<Command>,
     /// Whether the fonts and colours are in place.
     installed: bool,
@@ -245,12 +290,14 @@ impl Gui {
             status: None,
             failure: None,
             hovered_link: None,
+            opened_url: None,
+            visits: 0,
             commands: Vec::new(),
             installed: false,
             open: true,
         };
         match first_file {
-            Some(file) => gui.visit(&file)?,
+            Some(file) => gui.visit(&file, None)?,
             None => gui.open_search(),
         }
         Ok(gui)
@@ -266,6 +313,38 @@ impl Gui {
     #[must_use]
     pub fn temoc_arguments(&self) -> Option<&[String]> {
         self.session.temoc_arguments()
+    }
+
+    /// The last address opened in the web browser.
+    #[must_use]
+    pub fn opened_url(&self) -> Option<&str> {
+        self.opened_url.as_deref()
+    }
+
+    /// Where the page is scrolled to.
+    #[must_use]
+    pub fn page_position(&self) -> Option<Position> {
+        self.pages.current().map(|visit| visit.view.position())
+    }
+
+    /// Where the block at this height of the window is scrolled to.
+    #[must_use]
+    pub fn sideways_at(&self, height: f32) -> Option<Position> {
+        let visit = self.pages.current()?;
+        visit.view.sideways_at(height)
+    }
+
+    /// Where the page shows in the window.
+    #[must_use]
+    pub fn page_rect(&self) -> Option<egui::Rect> {
+        self.pages.current().map(|visit| visit.view.rect)
+    }
+
+    /// The part of this rectangle of the window that shows on the page, if
+    /// any of it does.
+    #[must_use]
+    pub fn visible_part(&self, rect: egui::Rect) -> Option<egui::Rect> {
+        self.pages.current()?.view.visible_part(rect)
     }
 
     /// `false` once the window has been asked to close.
@@ -290,7 +369,6 @@ impl Gui {
         }
         self.read_keys(&ctx);
         let palette = look::palette(ctx.theme());
-        self.hovered_link = None;
         self.toolbar(ui);
         self.status_bar(ui, palette);
         if self.panels.tree {
@@ -316,17 +394,34 @@ impl Gui {
         self.pages.current().map(|visit| &visit.opened)
     }
 
-    /// Goes to a file of the workspace, leaving the current page behind.
-    fn visit(&mut self, file: &str) -> Result<(), String> {
+    /// Goes to a file of the workspace, and to a heading of it if there is one,
+    /// leaving the current page behind.
+    fn visit(&mut self, file: &str, anchor: Option<&str>) -> Result<(), String> {
         let opened = self.session.read(file)?;
-        let focus = Focus::first_of(opened.tables());
+        let headings = opened.document().headings();
+        let mut headings = headings.iter();
+        let heading = anchor.and_then(|anchor| headings.find(|known| known.anchor == anchor));
+        self.visits = self.visits.saturating_add(1);
         self.pages.visit(Visit {
+            id: self.visits,
+            focus: Focus::first_of(opened.tables()),
+            heading: heading.map(|heading| heading.line),
             opened,
-            focus,
             reveal: false,
+            focused_link: None,
+            reveal_link: false,
+            scroll_to: None,
+            nudge: None,
+            view: View::default(),
         });
         self.tree.reveal(file);
         Ok(())
+    }
+
+    fn in_visit(&mut self, change: impl FnOnce(&mut Visit)) {
+        if let Some(visit) = self.pages.current_mut() {
+            change(visit);
+        }
     }
 
     /// Changes what is focused on the page, and brings it into view.
@@ -366,6 +461,11 @@ impl Gui {
                         modifiers,
                         ..
                     } => key_command(*key, *modifiers, searching, help_open),
+                    Event::PointerButton {
+                        button,
+                        pressed: true,
+                        ..
+                    } => button_command(*button),
                     Event::Text(text) if !searching => text_command(text),
                     _ => None,
                 };
@@ -390,9 +490,41 @@ impl Gui {
         match command {
             Command::Open(file) => {
                 self.status = None;
-                self.visit(&file)?;
+                self.visit(&file, None)?;
             }
             Command::Follow(target) => self.follow(ctx, &target)?,
+            Command::FollowFocused => {
+                let visit = self.pages.current();
+                let links = visit.and_then(|visit| {
+                    let link = visit.view.links.get(visit.focused_link?)?;
+                    Some(link.clone())
+                });
+                if let Some(target) = links {
+                    self.follow(ctx, &target)?;
+                }
+            }
+            Command::NextLink => self.in_visit(|visit| {
+                visit.move_link(|focused, count| match focused {
+                    Some(index) => index.saturating_add(1) % count,
+                    None => 0,
+                });
+            }),
+            Command::PreviousLink => self.in_visit(|visit| {
+                visit.move_link(|focused, count| {
+                    let previous = focused.and_then(|index| index.checked_sub(1));
+                    previous.unwrap_or(count.saturating_sub(1))
+                });
+            }),
+            Command::Scroll(scroll) => self.in_visit(|visit| {
+                visit.scroll_to = Some(visit.view.scrolled(scroll));
+            }),
+            Command::Sideways(way) => {
+                let pointer = ctx.pointer_latest_pos();
+                self.in_visit(|visit| {
+                    let fallback = visit.focused_block();
+                    visit.nudge = visit.view.nudged(pointer, fallback, way);
+                });
+            }
             Command::ToggleFolder(row) => {
                 if self.tree.select_shown(row) {
                     self.tree.toggle_folder();
@@ -426,18 +558,20 @@ impl Gui {
             Command::RunFile => {
                 self.run(|session, visit| session.run_file(visit.map(|visit| &visit.opened)))?;
             }
-            Command::RunTable => self.run(|session, visit| {
-                session.run_table(visit.and_then(|visit| {
-                    let table = visit.focus.table(visit.opened.tables())?;
+            Command::RunFocused => self.run(|session, visit| {
+                let focus = visit.map(|visit| (visit, visit.opened.tables()));
+                let row = focus
+                    .and_then(|(visit, tables)| Some((&visit.opened, visit.focus.row(tables)?)));
+                if row.is_some() {
+                    return session.run_row(row);
+                }
+                session.run_table(focus.and_then(|(visit, tables)| {
+                    let table = visit.focus.table(tables)?;
                     Some((&visit.opened, table.directive_line))
                 }))
             })?,
-            Command::RunRow(line) => self.run(|session, visit| {
-                session.run_row(visit.and_then(|visit| {
-                    let focused = || visit.focus.row(visit.opened.tables());
-                    Some((&visit.opened, line.or_else(focused)?))
-                }))
-            })?,
+            Command::RunRow(line) => self
+                .run(|session, visit| session.run_row(visit.map(|visit| (&visit.opened, line))))?,
             Command::ToggleTree => self.panels.tree = !self.panels.tree,
             Command::ToggleTests => self.panels.tests = !self.panels.tests,
             Command::ToggleHelp => self.panels.help = !self.panels.help,
@@ -464,6 +598,7 @@ impl Gui {
     fn follow(&mut self, ctx: &Context, target: &str) -> Result<(), String> {
         if is_website(target) {
             ctx.open_url(OpenUrl::new_tab(target));
+            self.opened_url = Some(target.to_owned());
             self.status = Some(format!("Opened in your browser: {target}"));
             return Ok(());
         }
@@ -472,7 +607,7 @@ impl Gui {
         };
         let place = self.session.follow(&document, target)?;
         self.status = None;
-        self.visit(&place.file)
+        self.visit(&place.file, place.anchor.as_deref())
     }
 
     /// Opens a result of the search, or the chosen one.
@@ -483,7 +618,8 @@ impl Gui {
         };
         self.search = None;
         self.status = None;
-        self.visit(&hit.file)
+        let anchor = hit.heading.map(|heading| heading.anchor);
+        self.visit(&hit.file, anchor.as_deref())
     }
 
     fn toolbar(&mut self, ui: &mut Ui) {
@@ -656,9 +792,22 @@ impl Gui {
     fn page(&mut self, ui: &mut Ui, palette: &Palette) {
         let banner = self.banner();
         let busy = self.session.is_busy();
-        let current = self.pages.current_mut();
-        let reveal = current.is_some_and(|visit| std::mem::take(&mut visit.reveal));
+        let mut wanted = markdown::Wanted::default();
+        let mut reveal = false;
+        let mut scroll_to = None;
+        if let Some(visit) = self.pages.current_mut() {
+            reveal = std::mem::take(&mut visit.reveal);
+            scroll_to = visit.scroll_to.take();
+            wanted = markdown::Wanted {
+                visit: visit.id,
+                focused_link: visit.focused_link,
+                reveal_link: std::mem::take(&mut visit.reveal_link),
+                heading: visit.heading.take(),
+                nudge: visit.nudge.take(),
+            };
+        }
         let mut happened = markdown::Happened::default();
+        let mut reach = None;
         let frame = Frame::new().fill(palette.page).inner_margin(PAGE_MARGIN);
         CentralPanel::default().frame(frame).show(ui, |ui| {
             if let Some(banner) = &banner {
@@ -682,15 +831,36 @@ impl Gui {
                 busy,
                 reveal,
             };
-            ScrollArea::vertical()
-                .id_salt(opened.file())
-                .auto_shrink(false)
-                .show(ui, |ui| {
-                    happened = markdown::show(ui, opened.document(), tests, palette);
-                });
+            let mut area = ScrollArea::vertical()
+                .id_salt(("page", visit.id))
+                .auto_shrink(false);
+            if let Some(offset) = scroll_to {
+                area = area.vertical_scroll_offset(offset);
+            }
+            let shown = area.show(ui, |ui| {
+                happened = markdown::show(ui, opened.document(), tests, wanted, palette);
+            });
+            let rect = shown.inner_rect;
+            let size = shown.content_size.y;
+            reach = Some((
+                rect,
+                Reach::of(shown.state.clamped_offset().y, size, rect.height()),
+            ));
         });
         self.commands.extend(happened.commands);
-        self.hovered_link = happened.hovered_link;
+        if self.hovered_link != happened.hovered_link {
+            // The status bar is drawn before the page, so it needs a new frame.
+            self.hovered_link = happened.hovered_link;
+            ui.ctx().request_repaint();
+        }
+        if let (Some(visit), Some((rect, reach))) = (self.pages.current_mut(), reach) {
+            visit.view = View {
+                rect,
+                reach,
+                blocks: happened.blocks,
+                links: happened.links,
+            };
+        }
     }
 
     /// What the banner says: why this page cannot run, or what stopped the run.
@@ -770,18 +940,63 @@ fn key_command(
     searching: bool,
     help_open: bool,
 ) -> Option<Command> {
-    if modifiers.command {
-        return match key {
-            Key::Q => Some(Command::Quit),
-            Key::R if !searching => Some(Command::RunRow(None)),
-            Key::T if searching => Some(Command::OnlyTestFiles),
-            _ => None,
-        };
-    }
     match key {
-        Key::Escape if searching => Some(Command::CloseSearch),
-        Key::Escape if help_open => Some(Command::CloseHelp),
-        Key::Backspace if !searching => Some(Command::Back),
+        Key::Q if modifiers.command => return Some(Command::Quit),
+        Key::F1 => return Some(Command::ToggleHelp),
+        Key::Escape if searching => return Some(Command::CloseSearch),
+        Key::Escape if help_open => return Some(Command::CloseHelp),
+        _ if searching => return None,
+        _ => {}
+    }
+    if modifiers.command {
+        command_key(key)
+    } else if modifiers.alt {
+        alt_key(key, modifiers.shift)
+    } else {
+        plain_key(key, modifiers.shift)
+    }
+}
+
+/// What a key does while `Ctrl` is held, which is `Cmd` on macOS.
+fn command_key(key: Key) -> Option<Command> {
+    match key {
+        Key::B => Some(Command::ToggleTree),
+        Key::K => Some(Command::OpenSearch),
+        Key::R => Some(Command::RunFile),
+        Key::Enter => Some(Command::RunFocused),
+        Key::OpenBracket => Some(Command::Back),
+        Key::CloseBracket => Some(Command::Forward),
+        _ => None,
+    }
+}
+
+/// What a key does while `Alt` is held.
+fn alt_key(key: Key, shift: bool) -> Option<Command> {
+    match key {
+        Key::ArrowLeft => Some(Command::Back),
+        Key::ArrowRight => Some(Command::Forward),
+        Key::ArrowDown if shift => Some(Command::NextRow),
+        Key::ArrowUp if shift => Some(Command::PreviousRow),
+        Key::ArrowDown => Some(Command::NextTable),
+        Key::ArrowUp => Some(Command::PreviousTable),
+        _ => None,
+    }
+}
+
+/// What a key does by itself, or with `Shift` where that makes a difference.
+fn plain_key(key: Key, shift: bool) -> Option<Command> {
+    match key {
+        Key::Tab if shift => Some(Command::PreviousLink),
+        Key::Tab => Some(Command::NextLink),
+        Key::Enter => Some(Command::FollowFocused),
+        Key::ArrowDown => Some(Command::Scroll(Scroll::LineDown)),
+        Key::ArrowUp => Some(Command::Scroll(Scroll::LineUp)),
+        Key::PageDown | Key::Space => Some(Command::Scroll(Scroll::PageDown)),
+        Key::PageUp => Some(Command::Scroll(Scroll::PageUp)),
+        Key::Home => Some(Command::Scroll(Scroll::Top)),
+        Key::End => Some(Command::Scroll(Scroll::Bottom)),
+        Key::ArrowLeft => Some(Command::Sideways(Sideways::Left)),
+        Key::ArrowRight => Some(Command::Sideways(Sideways::Right)),
         _ => None,
     }
 }
@@ -791,17 +1006,15 @@ fn text_command(text: &str) -> Option<Command> {
     match text {
         "/" => Some(Command::OpenSearch),
         "?" => Some(Command::ToggleHelp),
-        "h" => Some(Command::Back),
-        "l" => Some(Command::Forward),
-        "q" => Some(Command::Quit),
-        "]" => Some(Command::NextTable),
-        "[" => Some(Command::PreviousTable),
-        "}" => Some(Command::NextRow),
-        "{" => Some(Command::PreviousRow),
-        "r" => Some(Command::RunTable),
-        "R" => Some(Command::RunFile),
-        "t" => Some(Command::ToggleTree),
-        "T" => Some(Command::SwapMode),
+        _ => None,
+    }
+}
+
+/// What a button of the mouse does, for the ones that are not for clicking.
+fn button_command(button: PointerButton) -> Option<Command> {
+    match button {
+        PointerButton::Extra1 => Some(Command::Back),
+        PointerButton::Extra2 => Some(Command::Forward),
         _ => None,
     }
 }
