@@ -13,7 +13,7 @@ A row with a result gets the same mark as in the [terminal](../tui/row-results.m
 so that a result never depends on colour alone. A row with no result yet has no mark.
 
 [//]: # "import Spec.Fixtures"
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation  | workspace  | arguments  | actions | marks?                    |
 | ------------ | ---------- | ---------- | ------- | ------------------------- |
@@ -39,7 +39,7 @@ A row that did not pass has a note below it, with one line for each check that d
 pass. Only the first line of a message shows. See
 [how messages are worded](../running/temoc-output.md#messages).
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation       | workspace  | arguments  | actions | row | note?                                            |
 | ----------------- | ---------- | ---------- | ------- | --- | ------------------------------------------------ |
@@ -56,7 +56,7 @@ Each table that has a result says so below itself, followed by any
 [failures that belong to the table](../running/row-results.md#failures-outside-a-row)
 and not to a row.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation       | workspace  | arguments  | actions         | table verdicts?                  |
 | ----------------- | ---------- | ---------- | --------------- | -------------------------------- |

@@ -210,13 +210,25 @@ impl FileResults {
     /// Every failure, named after its table, in document order.
     #[must_use]
     pub fn failures(&self, tables: &[TestTable]) -> Vec<String> {
+        let failures = self.not_passed(tables).into_iter();
+        failures
+            .map(|(table, failure)| format!("{} {failure}", table.name))
+            .collect()
+    }
+
+    /// Every failure with its table, in document order.
+    #[must_use]
+    pub fn not_passed<'tables>(
+        &self,
+        tables: &'tables [TestTable],
+    ) -> Vec<(&'tables TestTable, &Failure)> {
         tables
             .iter()
             .filter_map(|table| Some((table, self.table(table)?)))
             .flat_map(|(table, result)| {
                 let rows = result.rows.values().flat_map(|row| &row.failures);
                 let failures = result.failures.iter().chain(rows);
-                failures.map(|failure| format!("{} {failure}", table.name))
+                failures.map(move |failure| (table, failure))
             })
             .collect()
     }

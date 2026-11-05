@@ -26,32 +26,55 @@ enum Action {
     Character(char),
     Text(String),
     Click(String),
+    /// The control with this name in the test table with that name.
+    ClickIn(String, String),
+    ClickRow(String),
     ClickTree(String),
     Hover(String),
+    HoverRow(String),
     Leave,
+    WaitRow(String),
     CloseWindow,
 }
 
 impl Action {
     fn read_all(actions: &str) -> Result<Vec<Self>, String> {
-        let mut tokens = tokenize(actions)?.into_iter();
+        let mut tokens = tokenize(actions)?.into_iter().peekable();
         let mut read = Vec::new();
         while let Some(token) = tokens.next() {
             read.push(match token {
                 Token::Quoted(text) => Self::Text(text),
                 Token::Word(word) => match word.as_str() {
                     "Click" => match tokens.next() {
-                        Some(Token::Quoted(name)) => Self::Click(name),
+                        Some(Token::Quoted(name)) => {
+                            if tokens.next_if(|token| is_word(token, "in")).is_some() {
+                                Self::ClickIn(name, quoted(tokens.next(), "Click in")?)
+                            } else {
+                                Self::Click(name)
+                            }
+                        }
                         Some(Token::Word(word)) if word == "tree" => {
                             Self::ClickTree(quoted(tokens.next(), "Click tree")?)
+                        }
+                        Some(Token::Word(word)) if word == "row" => {
+                            Self::ClickRow(line(tokens.next(), "Click row")?)
                         }
                         _ => return Err(NOT_IMPLEMENTED.into()),
                     },
                     "Hover" => match tokens.next() {
                         Some(Token::Quoted(text)) => Self::Hover(text),
+                        Some(Token::Word(word)) if word == "row" => {
+                            Self::HoverRow(line(tokens.next(), "Hover row")?)
+                        }
                         _ => return Err(NOT_IMPLEMENTED.into()),
                     },
                     "Leave" => Self::Leave,
+                    "Wait" => match tokens.next() {
+                        Some(Token::Word(word)) if word == "row" => {
+                            Self::WaitRow(line(tokens.next(), "Wait row")?)
+                        }
+                        _ => return Err(format!("unknown action in `{actions}`")),
+                    },
                     "Close" => match tokens.next() {
                         Some(Token::Word(word)) if word == "window" => Self::CloseWindow,
                         _ => return Err(format!("unknown action in `{actions}`")),
@@ -61,6 +84,18 @@ impl Action {
             });
         }
         Ok(read)
+    }
+}
+
+fn is_word(token: &Token, expected: &str) -> bool {
+    matches!(token, Token::Word(word) if word == expected)
+}
+
+/// The line of a row, as the row goes by it.
+fn line(token: Option<Token>, action: &str) -> Result<String, String> {
+    match token {
+        Some(Token::Word(line)) => Ok(line),
+        _ => Err(format!("`{action}` needs a line")),
     }
 }
 
@@ -105,6 +140,8 @@ pub enum Played {
 /// A temoc-ui in a headless window.
 pub struct Scene {
     harness: Harness<'static, Window>,
+    /// Whether actions wait for a run to finish. See `Wait row`.
+    waits_for_runs: bool,
 }
 
 impl Played {
@@ -146,14 +183,21 @@ impl Scene {
         // The harness picks a mode of its own, and the window follows the system.
         harness.ctx.set_theme(ThemePreference::System);
         harness.input_mut().system_theme = system;
-        let mut scene = Self { harness };
+        let mut scene = Self {
+            harness,
+            waits_for_runs: true,
+        };
         scene.settle()?;
         Ok(scene)
     }
 
     fn play(&mut self, actions: &[Action]) -> Result<(), String> {
-        for action in actions {
+        for (index, action) in actions.iter().enumerate() {
             self.take(action)?;
+            // The run that `Wait row` looks at may never finish by itself.
+            if matches!(actions.get(index + 1), Some(Action::WaitRow(_))) {
+                self.waits_for_runs = false;
+            }
             self.settle()?;
         }
         Ok(())
@@ -167,6 +211,15 @@ impl Scene {
             Action::Character(character) => self.type_character(*character),
             Action::Text(text) => text.chars().for_each(|c| self.type_character(c)),
             Action::Click(name) => self.named(name)?.click(),
+            Action::ClickIn(name, table) => {
+                let mut buttons = self.harness.query_all_by_role(Role::Button);
+                let button = buttons.find(|button| {
+                    let description = button.accesskit_node().description();
+                    label_of(button) == *name && description.as_deref() == Some(table)
+                });
+                button.ok_or(format!("no `{name}` in `{table}`"))?.click();
+            }
+            Action::ClickRow(line) => self.row(line)?.click(),
             Action::ClickTree(name) => {
                 let folder = format!("{name}/");
                 let mut rows = self.harness.query_all_by_role(Role::TreeItem);
@@ -177,7 +230,9 @@ impl Scene {
                 row.ok_or(format!("no `{name}` in the tree"))?.click();
             }
             Action::Hover(text) => self.named(text)?.hover(),
+            Action::HoverRow(line) => self.row(line)?.hover(),
             Action::Leave => self.harness.hover_at(Pos2::new(WIDTH, HEIGHT)),
+            Action::WaitRow(line) => self.wait_for_row(line)?,
             Action::CloseWindow => {
                 let viewports = &mut self.harness.input_mut().viewports;
                 let root = viewports.entry(ViewportId::ROOT).or_default();
@@ -195,9 +250,41 @@ impl Scene {
         self.harness.event(Event::Text(character.to_string()));
     }
 
+    /// The first thing with this name, which for text is what it says.
     fn named<'scene>(&'scene self, name: &'scene str) -> Result<Node<'scene>, String> {
-        let found = self.harness.query_all_by_label(name).next();
-        found.ok_or(format!("nothing is called `{name}`"))
+        let mut found = self.harness.query_all_by(move |node| {
+            node.label().as_deref() == Some(name) || node.value().as_deref() == Some(name)
+        });
+        found.next().ok_or(format!("nothing is called `{name}`"))
+    }
+
+    fn test_rows(&self) -> impl Iterator<Item = Node<'_>> {
+        let tag = Some(tags::TEST_ROW);
+        self.harness
+            .query_all_by(move |node| node.description().as_deref() == tag)
+    }
+
+    fn row(&self, line: &str) -> Result<Node<'_>, String> {
+        let mut rows = self.test_rows();
+        let row = rows.find(|row| label_of(row) == line);
+        row.ok_or(format!("no test row on line {line}"))
+    }
+
+    /// Lets the run go on until a row is running.
+    fn wait_for_row(&mut self, line: &str) -> Result<(), String> {
+        let deadline = Instant::now() + RUN_TIMEOUT;
+        loop {
+            self.harness.step();
+            let row = self.row(line).ok();
+            let result = row.and_then(|row| row.accesskit_node().value());
+            if result.as_deref() == Some("running") {
+                return Ok(());
+            }
+            if Instant::now() > deadline {
+                return Err(format!("row {line} never started"));
+            }
+            sleep(POLL_INTERVAL);
+        }
     }
 
     /// Lets the window react, and waits for any test run to finish.
@@ -205,7 +292,7 @@ impl Scene {
         // An action only reaches the window here, and may start a run.
         self.harness.run_ok();
         let deadline = Instant::now() + RUN_TIMEOUT;
-        while self.harness.state().is_busy() {
+        while self.waits_for_runs && self.harness.state().is_busy() {
             if Instant::now() > deadline {
                 return Err("the run did not finish".into());
             }
@@ -238,6 +325,76 @@ impl Scene {
                 "enabled"
             }
         })
+    }
+
+    /// The focused test table, by its name.
+    pub fn focused_table(&self) -> Option<String> {
+        let tag = Some(tags::TEST_TABLE);
+        let mut headers = self
+            .harness
+            .query_all_by(move |node| node.description().as_deref() == tag);
+        let header = headers.find(|header| header.accesskit_node().is_selected() == Some(true));
+        header.map(|header| label_of(&header))
+    }
+
+    /// The focused test row, by its line.
+    pub fn focused_row(&self) -> Option<String> {
+        let mut rows = self.test_rows();
+        let row = rows.find(|row| row.accesskit_node().is_selected() == Some(true));
+        row.map(|row| label_of(&row))
+    }
+
+    /// Each test row that has a result, written `line: result`.
+    pub fn row_results(&self) -> Vec<String> {
+        let rows = self.test_rows();
+        rows.filter_map(|row| {
+            let result = row.accesskit_node().value()?;
+            Some(format!("{}: {result}", label_of(&row)))
+        })
+        .collect()
+    }
+
+    /// The Run row buttons showing, written `line: enabled` or `line: disabled`.
+    pub fn run_rows(&self) -> Vec<String> {
+        let buttons = self.harness.query_all_by_role(Role::Button);
+        let buttons = buttons.filter(|button| label_of(button) == "Run row");
+        buttons
+            .map(|button| {
+                let node = button.accesskit_node();
+                let line = node.description().unwrap_or_default();
+                let state = if node.is_disabled() {
+                    "disabled"
+                } else {
+                    "enabled"
+                };
+                format!("{line}: {state}")
+            })
+            .collect()
+    }
+
+    /// The tables listed in the tests panel, written `name: result`.
+    pub fn panel_tables(&self) -> Vec<String> {
+        let tag = Some(tags::PANEL_TABLE);
+        let tables = self
+            .harness
+            .query_all_by(move |node| node.description().as_deref() == tag);
+        tables
+            .map(|table| {
+                let result = table.accesskit_node().value().unwrap_or_default();
+                format!(
+                    "{}: {result}",
+                    table.accesskit_node().label().unwrap_or_default()
+                )
+            })
+            .collect()
+    }
+
+    /// The notes under a test row.
+    pub fn notes(&self, line: &str) -> Vec<String> {
+        let prefix = format!("{line}: ");
+        let notes = self.tagged(tags::NOTE).into_iter();
+        let notes = notes.filter_map(|note| note.strip_prefix(&prefix).map(String::from));
+        notes.collect()
     }
 
     /// The labels of everything with this tag, in order.

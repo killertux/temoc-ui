@@ -28,7 +28,7 @@ There are buttons for everything, and the [terminal's keys](../tui/running.md) w
 The first table is focused when a test file opens. `]` and `[` move between tables, and
 clicking a table's header focuses it. Focus stops at the first and last tables.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation      | workspace  | arguments  | actions                     | focused table? |
 | ---------------- | ---------- | ---------- | --------------------------- | -------------- |
@@ -42,7 +42,7 @@ clicking a table's header focuses it. Focus stops at the first and last tables.
 
 Every test table has a `Run table` button, which runs that table and focuses it.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation  | workspace  | arguments  | actions                                | focused table? | temoc arguments?                           |
 | ------------ | ---------- | ---------- | -------------------------------------- | -------------- | ------------------------------------------ |
@@ -55,7 +55,7 @@ Every test table has a `Run table` button, which runs that table and focuses it.
 `}` and `{` move between the rows of the focused table, as in the
 [terminal](../tui/running.md#choosing-a-row). Clicking a row focuses it, and its table.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation       | workspace  | arguments  | actions        | focused row? | focused table? |
 | ----------------- | ---------- | ---------- | -------------- | ------------ | -------------- |
@@ -73,7 +73,7 @@ The focused row always shows the button. Rows of other tables have none.
 
 ![Hovering a row](design/images/row-hover.png)
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation        | workspace  | arguments    | actions                 | run row?    | focused row? |
 | ------------------ | ---------- | ------------ | ----------------------- | ----------- | ------------ |
@@ -85,7 +85,7 @@ The focused row always shows the button. Rows of other tables have none.
 | Focus and hover    | calculator | passing.md   | `Click row 20 Hover row 19` | 19: enabled, 20: enabled | 20 |
 | Not a test table   | docs       | reference.md | `Hover "Opens a file"`  | none        | none         |
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation     | workspace  | arguments  | actions                            | row results? | focused row? | temoc arguments?                           |
 | --------------- | ---------- | ---------- | ---------------------------------- | ------------ | ------------ | ------------------------------------------ |
@@ -98,7 +98,7 @@ The buttons that run something are disabled, and the keys are
 [refused](../running/row-results.md#while-a-run-goes-on). The page stays usable, and the
 status bar says what is running.
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation      | workspace | arguments  | actions                        | run file? | run row?     | status?                  |
 | ---------------- | --------- | ---------- | ------------------------------ | --------- | ------------ | ------------------------ |
@@ -108,7 +108,7 @@ status bar says what is running.
 
 Closing the window [stops the run](../running/row-results.md#while-a-run-goes-on).
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation    | workspace | arguments  | actions                      | still open? |
 | -------------- | --------- | ---------- | ---------------------------- | ----------- |
@@ -126,7 +126,7 @@ did not pass, and the last temoc command. Clicking a table or a failure focuses 
 | Before a run  | calculator | failing.md |         | Addition: not run, Multiplication: not run | none                                         | none                                          |
 | After a run   | calculator | failing.md | `R`     | Addition: passed, Multiplication: failed   | Multiplication line 20: mul expected 5, got 4 | temoc -c temoc.toml --output jsonl failing.md |
 
-[//]: # "decisionTable Gui -- snooze until 2099-12-31"
+[//]: # "decisionTable Gui"
 
 | # situation     | workspace  | arguments  | actions                                | focused table? | focused row? |
 | --------------- | ---------- | ---------- | -------------------------------------- | -------------- | ------------ |

@@ -3,8 +3,8 @@
 
 use eframe::egui::accesskit::Role;
 use eframe::egui::{
-    CornerRadius, Painter, Pos2, Rect, Response, Sense, Shape, Stroke, StrokeKind, Ui, Vec2,
-    WidgetInfo, pos2, vec2,
+    Align2, Color32, CornerRadius, FontId, Painter, Pos2, Rect, Response, Sense, Shape, Stroke,
+    StrokeKind, Ui, Vec2, WidgetInfo, pos2, vec2,
 };
 
 /// How wide and tall an icon is.
@@ -36,6 +36,45 @@ pub(super) fn button(ui: &mut Ui, icon: Icon, name: &str) -> Response {
     let stroke = Stroke::new(LINE, visuals.fg_stroke.color);
     draw(ui.painter(), icon, rect.center(), stroke);
     response.on_hover_text(name)
+}
+
+/// How a button that runs something looks.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct RunLook {
+    pub fill: Color32,
+    pub ink: Color32,
+}
+
+/// A button with a triangle and its name, which runs something. It fills the
+/// size it is given.
+pub(super) fn run_button(ui: &mut Ui, size: Vec2, name: &str, look: RunLook) -> Response {
+    let enabled = ui.is_enabled();
+    let (rect, response) = ui.allocate_exact_size(size, Sense::click());
+    response.widget_info(|| WidgetInfo::labeled(Role::Button, enabled, name));
+    let ink = if enabled {
+        look.ink
+    } else {
+        look.ink.gamma_multiply(0.5)
+    };
+    let painter = ui.painter();
+    painter.rect_filled(rect, CornerRadius::same(4), look.fill);
+    let left = rect.left() + 9.0;
+    let middle = rect.center().y;
+    let triangle = vec![
+        pos2(left, middle - 4.0),
+        pos2(left + 6.0, middle),
+        pos2(left, middle + 4.0),
+    ];
+    painter.add(Shape::convex_polygon(triangle, ink, Stroke::NONE));
+    let font = FontId::monospace(12.0);
+    painter.text(
+        pos2(left + 11.0, middle),
+        Align2::LEFT_CENTER,
+        name,
+        font,
+        ink,
+    );
+    response
 }
 
 fn draw(painter: &Painter, icon: Icon, center: Pos2, stroke: Stroke) {

@@ -226,6 +226,7 @@ pub struct Gui {
     workspace: String,
     arguments: String,
     actions: String,
+    row: String,
     system_mode: String,
     played: Option<GuiPlayed>,
 }
@@ -252,6 +253,10 @@ impl Gui {
 
     pub fn set_actions(&mut self, actions: String) {
         self.actions = actions;
+    }
+
+    pub fn set_row(&mut self, row: String) {
+        self.row = row;
     }
 
     pub fn set_system_mode(&mut self, system_mode: String) {
@@ -348,7 +353,7 @@ impl Gui {
 
     #[must_use]
     pub fn tests_panel(&self) -> String {
-        self.read(|scene| list(&scene.tagged(tags::PANEL_TABLE), ", "))
+        self.read(|scene| list(&scene.panel_tables(), ", "))
     }
 
     #[must_use]
@@ -364,6 +369,41 @@ impl Gui {
     #[must_use]
     pub fn run_file(&self) -> String {
         self.read(|scene| or_none(scene.run_file().map(String::from)))
+    }
+
+    #[must_use]
+    pub fn focused_table(&self) -> String {
+        self.read(|scene| or_none(scene.focused_table()))
+    }
+
+    #[must_use]
+    pub fn focused_row(&self) -> String {
+        self.read(|scene| or_none(scene.focused_row()))
+    }
+
+    #[must_use]
+    pub fn run_row(&self) -> String {
+        self.read(|scene| list(&scene.run_rows(), ", "))
+    }
+
+    #[must_use]
+    pub fn row_results(&self) -> String {
+        self.read(|scene| list(&scene.row_results(), ", "))
+    }
+
+    #[must_use]
+    pub fn marks(&self) -> String {
+        self.read(|scene| list(&scene.tagged(tags::MARK), ", "))
+    }
+
+    #[must_use]
+    pub fn note(&self) -> String {
+        self.read(|scene| list(&scene.notes(&self.row), "; "))
+    }
+
+    #[must_use]
+    pub fn table_verdicts(&self) -> String {
+        self.read(|scene| list(&scene.tagged(tags::VERDICT), ", "))
     }
 
     #[must_use]

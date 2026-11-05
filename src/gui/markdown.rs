@@ -1,40 +1,67 @@
 //! Drawing a document on the page.
 
+mod test_table;
+
+use super::Command;
 use super::look::{ITALIC, Palette, STRONG, STRONG_ITALIC};
-use crate::document::{Document, children, link_id};
+use crate::document::{Document, children, line_of, link_id};
+use crate::focus::Focus;
+use crate::run::FileResults;
+use crate::temoc::TestTable;
 use eframe::egui::{self, FontFamily, FontId, Frame, RichText, ScrollArea, Stroke, Ui};
 use markdown::mdast::{List, Node, Table};
 
 const BODY: f32 = 14.0;
 const CODE: f32 = 13.0;
 
-/// What happened to the links of the page in this frame.
-#[derive(Debug, Default)]
-pub(super) struct Links {
-    /// Where the link that was clicked points.
-    pub clicked: Option<String>,
-    /// Where the link under the pointer points.
-    pub hovered: Option<String>,
+/// What the page shows of its tests.
+#[derive(Debug, Clone, Copy)]
+pub(super) struct Tests<'page> {
+    /// The tables that can run, in document order.
+    pub tables: &'page [TestTable],
+    /// What the runs of this file have reported.
+    pub results: Option<&'page FileResults>,
+    pub focus: Focus,
+    /// Whether temoc is running, so that nothing else can start.
+    pub busy: bool,
+    /// Whether to bring what is focused into view.
+    pub reveal: bool,
 }
 
-/// Draws a document, and says what happened to its links.
-pub(super) fn show(ui: &mut Ui, document: &Document, palette: &Palette) -> Links {
+/// What happened on the page in this frame.
+#[derive(Debug, Default)]
+pub(super) struct Happened {
+    /// What the clicks on the page ask for.
+    pub commands: Vec<Command>,
+    /// Where the link under the pointer points.
+    pub hovered_link: Option<String>,
+}
+
+/// Draws a document, and says what happened on it.
+pub(super) fn show(
+    ui: &mut Ui,
+    document: &Document,
+    tests: Tests<'_>,
+    palette: &Palette,
+) -> Happened {
     let mut page = Drawing {
         document,
+        tests,
         palette,
-        links: Links::default(),
+        happened: Happened::default(),
     };
     for node in children(document.root()) {
         page.block(ui, node);
     }
-    page.links
+    page.happened
 }
 
 /// A document being drawn.
 struct Drawing<'page> {
     document: &'page Document,
+    tests: Tests<'page>,
     palette: &'page Palette,
-    links: Links,
+    happened: Happened,
 }
 
 /// How a run of text is styled.
@@ -71,7 +98,14 @@ impl Drawing<'_> {
             }
             Node::Blockquote(_) => self.quote(ui, node),
             Node::Code(code) => self.code(ui, &code.value),
-            Node::Table(table) => self.table(ui, table),
+            Node::Table(table) => {
+                let line = line_of(node);
+                let tables = self.tests.tables.iter().enumerate();
+                match tables.into_iter().find(|(_, test)| test.line == line) {
+                    Some((index, test)) => self.test_table(ui, table, index, test),
+                    None => self.table(ui, table),
+                }
+            }
             Node::ThematicBreak(_) => {
                 ui.separator();
             }
@@ -152,10 +186,11 @@ impl Drawing<'_> {
         };
         let response = ui.link(RichText::new(node.to_string()).size(BODY));
         if response.clicked() {
-            self.links.clicked = Some(target.url.clone());
+            let follow = Command::Follow(target.url.clone());
+            self.happened.commands.push(follow);
         }
         if response.hovered() {
-            self.links.hovered = Some(target.url.clone());
+            self.happened.hovered_link = Some(target.url.clone());
         }
     }
 

@@ -5,24 +5,27 @@ mod look;
 mod markdown;
 
 use crate::app::{Arguments, Launch};
+use crate::focus::Focus;
 use crate::history::History;
 use crate::search::Search;
 use crate::session::{Opened, Session, Start};
-use crate::temoc::RunResult;
+use crate::temoc::{Failure, RunResult, TestTable};
 use crate::tree::FileTree;
 use crate::workspace;
 pub use eframe::egui;
 use egui::accesskit::Role;
 use egui::{
     Align, Area, Button, CentralPanel, Color32, Context, Event, Frame, Id, Key, Label, Layout,
-    Modifiers, OpenUrl, Order, Panel, Response, RichText, ScrollArea, TextEdit, Theme, Ui, Vec2,
-    ViewportCommand, WidgetInfo,
+    Modifiers, OpenUrl, Order, Panel, Response, RichText, ScrollArea, Sense, TextEdit, Theme, Ui,
+    UiBuilder, Vec2, ViewportCommand, WidgetInfo, vec2,
 };
 use icons::Icon;
 use look::Palette;
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+/// How big the window opens, as in the design.
+const WINDOW: [f32; 2] = [1440.0, 900.0];
 /// How often a run is looked at while nothing else happens.
 const TICK: Duration = Duration::from_millis(100);
 /// How far the page sits from its edges.
@@ -85,6 +88,16 @@ pub mod tags {
     pub const SEARCH_RESULT: &str = "search result";
     /// The heading of the help.
     pub const HELP: &str = "help";
+    /// The header of a test table, named after the table.
+    pub const TEST_TABLE: &str = "test table";
+    /// A test row, named after its line.
+    pub const TEST_ROW: &str = "test row";
+    /// The mark of a test row, written `line: mark`.
+    pub const MARK: &str = "mark";
+    /// A note under a test row, written `line: note`.
+    pub const NOTE: &str = "note";
+    /// What a test table says below itself.
+    pub const VERDICT: &str = "verdict";
 }
 
 /// Something asked for during a frame, carried out at the end of it.
@@ -99,13 +112,35 @@ enum Command {
     CloseSearch,
     OpenResult(usize),
     OnlyTestFiles,
+    NextTable,
+    PreviousTable,
+    NextRow,
+    PreviousRow,
+    /// Focuses a table, and the row on a line of it if there is one.
+    Focus {
+        table: usize,
+        line: Option<usize>,
+    },
     RunFile,
+    /// Runs the focused table.
+    RunTable,
+    /// Runs the row on a line, or else the focused one.
+    RunRow(Option<usize>),
     ToggleTree,
     ToggleTests,
     ToggleHelp,
     CloseHelp,
     SwapMode,
     Quit,
+}
+
+/// A page, and how it was left.
+#[derive(Debug)]
+struct Visit {
+    opened: Opened,
+    focus: Focus,
+    /// Whether to bring what is focused into view.
+    reveal: bool,
 }
 
 /// What is showing around and over the page.
@@ -120,7 +155,7 @@ struct Panels {
 #[derive(Debug)]
 pub struct Gui {
     session: Session,
-    pages: History<Opened>,
+    pages: History<Visit>,
     tree: FileTree,
     /// Every test file of the workspace, for marking them in the tree.
     test_files: BTreeMap<String, Opened>,
@@ -149,7 +184,9 @@ pub struct Gui {
 /// window cannot open.
 pub fn open(launch: &Launch) -> Result<(), String> {
     let gui = Gui::start(launch)?;
-    let viewport = egui::ViewportBuilder::default().with_title("temoc-ui");
+    let viewport = egui::ViewportBuilder::default()
+        .with_title("temoc-ui")
+        .with_inner_size(WINDOW);
     let options = eframe::NativeOptions {
         viewport,
         ..eframe::NativeOptions::default()
@@ -276,14 +313,38 @@ impl Gui {
     }
 
     fn opened(&self) -> Option<&Opened> {
-        self.pages.current()
+        self.pages.current().map(|visit| &visit.opened)
     }
 
     /// Goes to a file of the workspace, leaving the current page behind.
     fn visit(&mut self, file: &str) -> Result<(), String> {
-        self.pages.visit(self.session.read(file)?);
+        let opened = self.session.read(file)?;
+        let focus = Focus::first_of(opened.tables());
+        self.pages.visit(Visit {
+            opened,
+            focus,
+            reveal: false,
+        });
         self.tree.reveal(file);
         Ok(())
+    }
+
+    /// Changes what is focused on the page, and brings it into view.
+    fn focus(&mut self, change: impl FnOnce(&mut Focus, &[TestTable])) {
+        if let Some(visit) = self.pages.current_mut() {
+            change(&mut visit.focus, visit.opened.tables());
+            visit.reveal = true;
+        }
+    }
+
+    /// Starts a run, which is a clean start for what the status bar says.
+    fn run(
+        &mut self,
+        start: impl FnOnce(&mut Session, Option<&Visit>) -> Result<(), String>,
+    ) -> Result<(), String> {
+        self.status = None;
+        self.failure = None;
+        start(&mut self.session, self.pages.current())
     }
 
     fn open_search(&mut self) {
@@ -354,11 +415,29 @@ impl Gui {
                     search.toggle_only_tests();
                 }
             }
+            Command::NextTable => self.focus(Focus::next_table),
+            Command::PreviousTable => self.focus(|focus, _| focus.previous_table()),
+            Command::NextRow => self.focus(Focus::next_row),
+            Command::PreviousRow => self.focus(Focus::previous_row),
+            Command::Focus { table, line } => self.focus(|focus, tables| {
+                focus.focus_table(table);
+                focus.focus_line(tables, line);
+            }),
             Command::RunFile => {
-                self.status = None;
-                self.failure = None;
-                self.session.run_file(self.pages.current())?;
+                self.run(|session, visit| session.run_file(visit.map(|visit| &visit.opened)))?;
             }
+            Command::RunTable => self.run(|session, visit| {
+                session.run_table(visit.and_then(|visit| {
+                    let table = visit.focus.table(visit.opened.tables())?;
+                    Some((&visit.opened, table.directive_line))
+                }))
+            })?,
+            Command::RunRow(line) => self.run(|session, visit| {
+                session.run_row(visit.and_then(|visit| {
+                    let focused = || visit.focus.row(visit.opened.tables());
+                    Some((&visit.opened, line.or_else(focused)?))
+                }))
+            })?,
             Command::ToggleTree => self.panels.tree = !self.panels.tree,
             Command::ToggleTests => self.panels.tests = !self.panels.tests,
             Command::ToggleHelp => self.panels.help = !self.panels.help,
@@ -480,7 +559,7 @@ impl Gui {
         Panel::left("tree").default_size(248.0).show(ui, |ui| {
             let heading = ui.label(RichText::new("Files").color(palette.line));
             tagged(&heading, tags::TREE, "Files");
-            ScrollArea::vertical().show(ui, |ui| {
+            ScrollArea::vertical().auto_shrink(false).show(ui, |ui| {
                 for (index, row) in self.tree.rows().iter().enumerate() {
                     let selected = Some(row.path()) == document.as_deref();
                     let indent = "  ".repeat(row.depth);
@@ -488,11 +567,11 @@ impl Gui {
                     let mark = opened
                         .and_then(|opened| self.session.file_result(opened))
                         .and_then(mark_of);
-                    let text = match mark {
-                        Some(mark) => format!("{indent}{} {mark}", row.label()),
-                        None => format!("{indent}{}", row.label()),
-                    };
-                    let response = ui.add(Button::selectable(selected, text));
+                    let text = format!("{indent}{}", row.label());
+                    let button = Button::selectable(selected, text)
+                        .right_text(mark.unwrap_or_default())
+                        .min_size(vec2(ui.available_width(), 0.0));
+                    let response = ui.add(button);
                     let name = if row.is_folder() {
                         format!("{}/", row.name)
                     } else {
@@ -523,13 +602,19 @@ impl Gui {
         self.commands.extend(commands);
     }
 
-    fn tests_panel(&self, ui: &mut Ui, palette: &Palette) {
-        let Some(opened) = self.opened() else {
+    fn tests_panel(&mut self, ui: &mut Ui, palette: &Palette) {
+        let Some(visit) = self.pages.current() else {
             return;
         };
+        let opened = &visit.opened;
+        let tables = opened.tables();
         let outcome = self.session.outcome(opened);
+        let results = self.session.results(opened.file());
+        let failures = results.map(|results| results.not_passed(tables));
+        let failures = failures.unwrap_or_default();
         let command = self.session.temoc_arguments();
         let command = command.map(|arguments| format!("temoc {}", arguments.join(" ")));
+        let mut commands = Vec::new();
         Panel::right("tests").default_size(284.0).show(ui, |ui| {
             let heading = ui.label(RichText::new("This file").color(palette.line));
             tagged(&heading, tags::TESTS_PANEL, "This file");
@@ -539,17 +624,22 @@ impl Gui {
             }
             ui.add_space(12.0);
             ui.label(RichText::new("Tables").color(palette.line));
-            for (table, result) in &outcome.tables {
-                let text = format!("{table}: {result}");
-                let response = ui.label(&text);
-                tagged(&response, tags::PANEL_TABLE, &text);
+            for (index, (table, result)) in outcome.tables.iter().enumerate() {
+                let focused = visit.focus.table_index() == Some(index);
+                if panel_table(ui, table, result, focused) {
+                    let table = index;
+                    commands.push(Command::Focus { table, line: None });
+                }
             }
-            if !outcome.failures.is_empty() {
+            if !failures.is_empty() {
                 ui.add_space(12.0);
                 ui.label(RichText::new("What did not pass").color(palette.line));
-                for failure in &outcome.failures {
-                    let response = ui.label(RichText::new(failure).color(palette.failed));
-                    tagged(&response, tags::NOT_PASSED, failure);
+                for (table, failure) in &failures {
+                    if panel_failure(ui, table, failure, palette) {
+                        let found = tables.iter().position(|known| known == *table);
+                        let line = Some(failure.line);
+                        commands.extend(found.map(|table| Command::Focus { table, line }));
+                    }
                 }
             }
             if let Some(command) = &command {
@@ -560,11 +650,15 @@ impl Gui {
                 tagged(&response, tags::LAST_COMMAND, command);
             }
         });
+        self.commands.extend(commands);
     }
 
     fn page(&mut self, ui: &mut Ui, palette: &Palette) {
         let banner = self.banner();
-        let mut links = markdown::Links::default();
+        let busy = self.session.is_busy();
+        let current = self.pages.current_mut();
+        let reveal = current.is_some_and(|visit| std::mem::take(&mut visit.reveal));
+        let mut happened = markdown::Happened::default();
         let frame = Frame::new().fill(palette.page).inner_margin(PAGE_MARGIN);
         CentralPanel::default().frame(frame).show(ui, |ui| {
             if let Some(banner) = &banner {
@@ -577,20 +671,26 @@ impl Gui {
                 });
                 ui.add_space(12.0);
             }
-            let Some(opened) = self.pages.current() else {
+            let Some(visit) = self.pages.current() else {
                 return;
+            };
+            let opened = &visit.opened;
+            let tests = markdown::Tests {
+                tables: opened.tables(),
+                results: self.session.results(opened.file()),
+                focus: visit.focus,
+                busy,
+                reveal,
             };
             ScrollArea::vertical()
                 .id_salt(opened.file())
                 .auto_shrink(false)
                 .show(ui, |ui| {
-                    links = markdown::show(ui, opened.document(), palette);
+                    happened = markdown::show(ui, opened.document(), tests, palette);
                 });
         });
-        if let Some(target) = links.clicked {
-            self.commands.push(Command::Follow(target));
-        }
-        self.hovered_link = links.hovered;
+        self.commands.extend(happened.commands);
+        self.hovered_link = happened.hovered_link;
     }
 
     /// What the banner says: why this page cannot run, or what stopped the run.
@@ -673,6 +773,7 @@ fn key_command(
     if modifiers.command {
         return match key {
             Key::Q => Some(Command::Quit),
+            Key::R if !searching => Some(Command::RunRow(None)),
             Key::T if searching => Some(Command::OnlyTestFiles),
             _ => None,
         };
@@ -693,6 +794,11 @@ fn text_command(text: &str) -> Option<Command> {
         "h" => Some(Command::Back),
         "l" => Some(Command::Forward),
         "q" => Some(Command::Quit),
+        "]" => Some(Command::NextTable),
+        "[" => Some(Command::PreviousTable),
+        "}" => Some(Command::NextRow),
+        "{" => Some(Command::PreviousRow),
+        "r" => Some(Command::RunTable),
         "R" => Some(Command::RunFile),
         "t" => Some(Command::ToggleTree),
         "T" => Some(Command::SwapMode),
@@ -758,6 +864,45 @@ fn help(ctx: &Context) {
         });
 }
 
+/// A table in the tests panel. Says whether it was clicked.
+fn panel_table(ui: &mut Ui, table: &str, result: &str, focused: bool) -> bool {
+    let text = match mark_of(result) {
+        Some(mark) => format!("{mark} {table}"),
+        None => format!("  {table}"),
+    };
+    let button = Button::selectable(focused, text)
+        .right_text(result)
+        .min_size(vec2(ui.available_width(), 0.0));
+    let response = ui.add(button);
+    named(&response, Role::Button, table);
+    ui.ctx().accesskit_node_builder(response.id, |node| {
+        node.set_description(tags::PANEL_TABLE);
+        node.set_value(result);
+    });
+    response.clicked()
+}
+
+/// A failure in the tests panel. Says whether it was clicked.
+fn panel_failure(ui: &mut Ui, table: &TestTable, failure: &Failure, palette: &Palette) -> bool {
+    let builder = UiBuilder::new()
+        .id_salt(("failure", failure.line, failure.note()))
+        .sense(Sense::click());
+    let drawn = ui.scope_builder(builder, |ui| {
+        ui.style_mut().interaction.selectable_labels = false;
+        ui.set_width(ui.available_width());
+        ui.label(format!("{}, line {}", table.name, failure.line));
+        let note = RichText::new(failure.note()).size(12.5).color(palette.note);
+        ui.add(Label::new(note).wrap());
+    });
+    let response = drawn.response;
+    tagged(
+        &response,
+        tags::NOT_PASSED,
+        &format!("{} {failure}", table.name),
+    );
+    response.clicked()
+}
+
 /// A button in the toolbar with an icon and the name it goes by.
 fn icon_button(
     ui: &mut Ui,
@@ -772,7 +917,7 @@ fn icon_button(
 
 /// Gives a widget the name it goes by, whatever it shows.
 fn named(response: &Response, role: Role, name: &str) {
-    response.widget_info(|| WidgetInfo::labeled(role, true, name));
+    response.widget_info(|| WidgetInfo::labeled(role, response.enabled(), name));
 }
 
 /// Says what a widget is, for the accessibility tree.

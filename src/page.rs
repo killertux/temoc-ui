@@ -1,5 +1,6 @@
 //! A document on screen: how far it is scrolled and what is focused.
 
+use crate::focus::Focus;
 use crate::render::{Link, Marks, Motion, Rendered, Spot};
 use crate::run::FileResults;
 use crate::session::Opened;
@@ -35,9 +36,7 @@ pub struct Page {
     /// How far wide tables and code blocks are scrolled sideways.
     left: usize,
     focused_link: Option<usize>,
-    focused_table: Option<usize>,
-    /// The focused row, among the rows of the focused table.
-    focused_row: Option<usize>,
+    focus: Focus,
     selection: Option<Selection>,
 }
 
@@ -47,14 +46,13 @@ impl Page {
     pub fn new(opened: Opened, size: Size) -> Self {
         Self {
             rendered: opened.document().render(size.width, &HashMap::new()),
-            focused_table: (!opened.tables().is_empty()).then_some(0),
+            focus: Focus::first_of(opened.tables()),
             opened,
             results: None,
             size,
             scroll: 0,
             left: 0,
             focused_link: None,
-            focused_row: None,
             selection: None,
         }
     }
@@ -294,14 +292,10 @@ impl Page {
             rows.is_some_and(|rows| rows.contains(&row))
         };
         if let Some(index) = self.tables().iter().position(holds_row) {
-            self.focused_table = Some(index);
+            self.focus.focus_table(index);
         }
         let clicked = self.rendered.table_line_at(row);
-        let table = self.focused_table();
-        self.focused_row = clicked.and_then(|clicked| {
-            let rows = &table?.rows;
-            rows.iter().position(|row| *row == clicked)
-        });
+        self.focus.focus_line(self.opened.tables(), clicked);
         let link = self.rendered.link_at(row, usize::from(column), self.left);
         if let Some(index) = link {
             self.focus_link(index);
@@ -342,7 +336,7 @@ impl Page {
     /// The focused test table.
     #[must_use]
     pub fn focused_table(&self) -> Option<&TestTable> {
-        self.tables().get(self.focused_table?)
+        self.focus.table(self.tables())
     }
 
     /// The row holding the header of the focused test table.
@@ -353,29 +347,19 @@ impl Page {
 
     /// Focuses the next test table, stopping at the last one.
     pub fn next_table(&mut self) {
-        let last = self.tables().len().saturating_sub(1);
-        if let Some(index) = self.focused_table {
-            self.focus_table(index.saturating_add(1).min(last));
-        }
+        self.focus.next_table(self.opened.tables());
+        self.reveal_focused_table();
     }
 
     /// Focuses the previous test table, stopping at the first one.
     pub fn previous_table(&mut self) {
-        if let Some(index) = self.focused_table {
-            self.focus_table(index.saturating_sub(1));
-        }
+        self.focus.previous_table();
+        self.reveal_focused_table();
     }
 
-    fn focus_table(&mut self, index: usize) {
-        if self.focused_table != Some(index) {
-            self.focused_row = None;
-        }
-        self.focused_table = Some(index);
-        if let Some(rows) = self
-            .tables()
-            .get(index)
-            .and_then(|table| self.table_rows(table))
-        {
+    fn reveal_focused_table(&mut self) {
+        let table = self.focused_table();
+        if let Some(rows) = table.and_then(|table| self.table_rows(table)) {
             self.reveal(&rows);
         }
     }
@@ -383,32 +367,24 @@ impl Page {
     /// The line of the focused row of the focused table.
     #[must_use]
     pub fn focused_row(&self) -> Option<usize> {
-        self.focused_table()?.rows.get(self.focused_row?).copied()
+        self.focus.row(self.tables())
     }
 
     /// Focuses the next row of the focused table, starting at the first one and
     /// stopping at the last one.
     pub fn next_row(&mut self) {
-        let last = self.last_row();
-        let next = self.focused_row.map_or(0, |index| index.saturating_add(1));
-        self.focus_row(last.map(|last| next.min(last)));
+        self.focus.next_row(self.opened.tables());
+        self.reveal_focused_row();
     }
 
     /// Focuses the previous row of the focused table, starting at the last one
     /// and stopping at the first one.
     pub fn previous_row(&mut self) {
-        let last = self.last_row();
-        let focused = self.focused_row;
-        self.focus_row(last.map(|last| focused.map_or(last, |index| index.saturating_sub(1))));
+        self.focus.previous_row(self.opened.tables());
+        self.reveal_focused_row();
     }
 
-    /// The position of the last row of the focused table.
-    fn last_row(&self) -> Option<usize> {
-        self.focused_table()?.rows.len().checked_sub(1)
-    }
-
-    fn focus_row(&mut self, index: Option<usize>) {
-        self.focused_row = index;
+    fn reveal_focused_row(&mut self) {
         let line = self.focused_row();
         if let Some(row) = line.and_then(|line| self.rendered.row_of_table_line(line)) {
             self.reveal(&(row..row.saturating_add(1)));

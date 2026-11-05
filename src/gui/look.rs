@@ -50,8 +50,14 @@ pub(super) struct Palette {
     pub passed: Color32,
     pub snoozed: Color32,
     pub failed: Color32,
+    pub note: Color32,
     pub bar: Color32,
     pub bar_text: Color32,
+    pub tint_passed: Color32,
+    pub tint_failed: Color32,
+    pub tint_snoozed: Color32,
+    pub selection: Color32,
+    pub hover: Color32,
 }
 
 const DARK: Palette = Palette {
@@ -69,8 +75,14 @@ const DARK: Palette = Palette {
     passed: Color32::from_rgb(0x5F, 0xD3, 0x8A),
     snoozed: Color32::from_rgb(0xEF, 0xC9, 0x5E),
     failed: Color32::from_rgb(0xFF, 0x8A, 0x80),
+    note: Color32::from_rgb(0xC7, 0x97, 0x92),
     bar: Color32::from_rgb(0x8A, 0xB4, 0xFF),
     bar_text: Color32::from_rgb(0x10, 0x14, 0x1A),
+    tint_passed: Color32::from_rgba_unmultiplied_const(95, 211, 138, 20),
+    tint_failed: Color32::from_rgba_unmultiplied_const(255, 138, 128, 36),
+    tint_snoozed: Color32::from_rgba_unmultiplied_const(239, 201, 94, 28),
+    selection: Color32::from_rgba_unmultiplied_const(138, 180, 255, 41),
+    hover: Color32::from_rgba_unmultiplied_const(255, 255, 255, 13),
 };
 
 const LIGHT: Palette = Palette {
@@ -88,8 +100,14 @@ const LIGHT: Palette = Palette {
     passed: Color32::from_rgb(0x11, 0x63, 0x29),
     snoozed: Color32::from_rgb(0x7D, 0x4E, 0x00),
     failed: Color32::from_rgb(0xB3, 0x26, 0x1E),
+    note: Color32::from_rgb(0x8C, 0x5A, 0x55),
     bar: Color32::from_rgb(0x0B, 0x57, 0xD0),
     bar_text: Color32::from_rgb(0xFF, 0xFF, 0xFF),
+    tint_passed: Color32::from_rgba_unmultiplied_const(17, 99, 41, 18),
+    tint_failed: Color32::from_rgba_unmultiplied_const(179, 38, 30, 23),
+    tint_snoozed: Color32::from_rgba_unmultiplied_const(125, 78, 0, 23),
+    selection: Color32::from_rgba_unmultiplied_const(11, 87, 208, 26),
+    hover: Color32::from_rgba_unmultiplied_const(0, 0, 0, 10),
 };
 
 /// The colours of a mode.
@@ -135,8 +153,8 @@ fn visuals(mut visuals: Visuals, palette: &Palette) -> Visuals {
     visuals.faint_bg_color = palette.chip;
     visuals.override_text_color = Some(palette.text);
     visuals.hyperlink_color = palette.link;
-    visuals.selection.bg_fill = palette.bar;
-    visuals.selection.stroke.color = palette.bar_text;
+    visuals.selection.bg_fill = palette.selection;
+    visuals.selection.stroke.color = palette.text;
     visuals.widgets.noninteractive.bg_stroke.color = palette.hair;
     visuals
 }
