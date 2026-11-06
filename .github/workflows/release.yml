@@ -1,0 +1,100 @@
+name: Release
+
+# Pushing a tag such as v0.1.0 builds every target and publishes a GitHub release.
+# Asset names carry no version, so install.sh can always fetch the latest release.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  checks:
+    uses: ./.github/workflows/ci.yml
+
+  version:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Tag matches Cargo.toml
+        run: |
+          version="$(sed -n 's/^version = "\(.*\)"$/\1/p' Cargo.toml | head -n 1)"
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match Cargo.toml version $version" >&2
+            exit 1
+          fi
+
+  build:
+    name: ${{ matrix.platform.target }} (${{ matrix.variant }})
+    needs: [checks, version]
+    runs-on: ${{ matrix.platform.runner }}
+    strategy:
+      matrix:
+        variant: [tui, gui]
+        # Linux builds on the oldest supported runner, so that the binaries link
+        # against an old glibc and run on as many distributions as possible.
+        platform:
+          - { target: aarch64-apple-darwin, runner: macos-latest }
+          - { target: x86_64-unknown-linux-gnu, runner: ubuntu-22.04 }
+          - { target: aarch64-unknown-linux-gnu, runner: ubuntu-22.04-arm }
+    env:
+      TARGET: ${{ matrix.platform.target }}
+      VARIANT: ${{ matrix.variant }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install Rust
+        run: |
+          rustup toolchain install stable --profile minimal --target "$TARGET"
+          rustup default stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.platform.target }}-${{ matrix.variant }}
+
+      - name: Build
+        run: |
+          if [ "$VARIANT" = gui ]; then
+            cargo build --release --locked --target "$TARGET" --features gui
+          else
+            cargo build --release --locked --target "$TARGET"
+          fi
+
+      - name: Package
+        run: |
+          asset="temoc-ui-$TARGET-$VARIANT.tar.gz"
+          mkdir dist
+          tar -czf "dist/$asset" -C "target/$TARGET/release" temoc-ui
+          cd dist
+          shasum -a 256 "$asset" > "$asset.sha256"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.platform.target }}-${{ matrix.variant }}
+          path: dist/*
+          if-no-files-found: error
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --repo "$GITHUB_REPOSITORY" \
+            --verify-tag \
+            --generate-notes

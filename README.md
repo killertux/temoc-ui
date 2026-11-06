@@ -35,15 +35,29 @@ cannot draw, such as pictures, alerts and a graph of your pages that you can dra
 
 ## Getting started
 
-You need a recent stable [Rust](https://www.rust-lang.org/tools/install) toolchain,
-and [temoc](https://github.com/killertux/temoc/releases) 0.10 or later on your `PATH`
-to run tests. Install temoc-ui from this repository:
+You need [temoc](https://github.com/killertux/temoc/releases) 0.10 or later on your
+`PATH` to run tests. Install the latest temoc-ui release on Apple silicon Macs and on
+Linux, on x86-64 or ARM:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/killertux/temoc-ui/main/install.sh | sh
+```
+
+That installs to `~/.local/bin`. For a smaller build with only the terminal interface,
+add `--tui`. `--dir` picks another folder and `--version` a specific release:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/killertux/temoc-ui/main/install.sh | sh -s -- --tui
+```
+
+Anywhere else, or to build from source, you need a recent stable
+[Rust](https://www.rust-lang.org/tools/install) toolchain:
 
 ```sh
 cargo install --git https://github.com/killertux/temoc-ui temoc-ui --features gui
 ```
 
-Without `--features gui` you get a smaller build with only the terminal interface.
+Without `--features gui` you get the terminal-only build.
 
 Then open a folder, or a single markdown file:
 
