@@ -3,6 +3,7 @@
 //! See `spec/writing-specs.md` for how the fixtures are used.
 
 mod clipboard;
+mod disk;
 mod fixtures;
 mod gui;
 mod headless;

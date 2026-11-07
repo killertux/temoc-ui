@@ -14,9 +14,10 @@ use crate::focus::Focus;
 use crate::history::History;
 use crate::run::NOT_RUN;
 use crate::search::Search;
-use crate::session::{Opened, Session, Start};
+use crate::session::{self, Opened, Session, Start};
 use crate::temoc::{Failure, RunResult, TestTable};
 use crate::tree::FileTree;
+use crate::watch::Changes;
 use crate::workspace;
 pub use eframe::egui;
 use egui::accesskit::Role;
@@ -216,9 +217,20 @@ struct Visit {
     /// The links of the page to files that do not exist, as they are written.
     missing: HashSet<String>,
     view: View,
+    /// Whether its file was deleted after it was read.
+    deleted: bool,
 }
 
 impl Visit {
+    /// Shows a newer version of the file, staying where the page was and
+    /// keeping the focus on the same table and row.
+    fn reload(&mut self, opened: Opened, missing: HashSet<String>) {
+        self.focus = self.focus.carried(self.opened.tables(), opened.tables());
+        self.opened = opened;
+        self.missing = missing;
+        self.deleted = false;
+    }
+
     /// The line of the block that the focused table is in.
     fn focused_block(&self) -> Option<usize> {
         let table = self.focus.table(self.opened.tables())?;
@@ -325,14 +337,8 @@ impl Gui {
         })?;
         let first_file = session.first_file().map(String::from);
         let tree = FileTree::open(session.workspace(), first_file.as_deref());
-        let test_files = workspace::markdown_files(session.workspace())
-            .into_iter()
-            .filter_map(|file| match session.read(&file) {
-                Ok(opened) if opened.is_test_file() => Some((file, opened)),
-                // Opening a file that cannot be read says what is wrong with it.
-                Ok(_) | Err(_) => None,
-            })
-            .collect();
+        let test_files = test_files(&session);
+        let status = session.watch_problem().map(String::from);
         let mut gui = Self {
             session,
             pages: History::default(),
@@ -348,7 +354,7 @@ impl Gui {
             search: None,
             query: String::new(),
             only_tests: false,
-            status: None,
+            status,
             failure: None,
             hovered_link: None,
             opened_url: None,
@@ -453,10 +459,16 @@ impl Gui {
         let ctx = ui.ctx().clone();
         if !self.installed {
             look::install(&ctx);
+            let waker = ctx.clone();
+            self.session.wake_with(move || waker.request_repaint());
             self.installed = true;
         }
         if ctx.input(|input| input.viewport().close_requested()) {
             self.open = false;
+        }
+        let changes = self.session.changes();
+        if !changes.is_empty() {
+            self.follow_changes(&changes);
         }
         if let Some(failure) = self.session.update() {
             self.status = Some(failure.clone());
@@ -490,9 +502,67 @@ impl Gui {
             help(&ctx);
         }
         self.carry_out(&ctx);
-        if self.session.is_busy() {
+        // A change is only reported once the files have been still a moment.
+        if self.session.is_busy() || self.session.is_settling() {
             ctx.request_repaint_after(TICK);
         }
+    }
+
+    /// Shows the files as they are now: every page whose file changed, the
+    /// file tree, search, and the graph.
+    fn follow_changes(&mut self, changes: &Changes) {
+        let session = &self.session;
+        for visit in self.pages.visits_mut() {
+            if changes.covers(visit.opened.file()) {
+                match session.reread(visit.opened.file()) {
+                    Ok(Some(opened)) => {
+                        let missing = missing_links(session, &opened);
+                        visit.reload(opened, missing);
+                    }
+                    Ok(None) => visit.deleted = true,
+                    Err(message) => self.status = Some(message),
+                }
+            } else {
+                // A link may lead to a file that came or went.
+                visit.missing = missing_links(session, &visit.opened);
+            }
+        }
+        let workspace = self.session.workspace();
+        self.tree.reload(workspace);
+        if let Some(search) = &mut self.search {
+            search.reload(workspace);
+        }
+        self.test_files = test_files(&self.session);
+        if let Some(graph) = &self.graph {
+            let selected = graph.selected_file().cloned();
+            self.graph = Some(GraphView::open(workspace, selected.as_deref()));
+        }
+    }
+
+    /// How many times files have changed on disk since the start.
+    #[must_use]
+    pub fn changes_seen(&self) -> u64 {
+        self.session.changes_seen()
+    }
+
+    /// Goes back or forward, unless the file there was deleted.
+    fn go(&mut self, back: bool) -> Result<(), String> {
+        let there = if back {
+            self.pages.behind()
+        } else {
+            self.pages.ahead()
+        };
+        if let Some(visit) = there {
+            self.session.still_there(visit.opened.file())?;
+        }
+        self.graph = None;
+        if back {
+            self.pages.back();
+        } else {
+            self.pages.forward();
+        }
+        self.reveal_document();
+        Ok(())
     }
 
     fn opened(&self) -> Option<&Opened> {
@@ -581,9 +651,7 @@ impl Gui {
     fn visit(&mut self, file: &str, anchor: Option<&str>) -> Result<(), String> {
         let opened = self.session.read(file)?;
         self.graph = None;
-        let urls = opened.document().link_urls();
-        let missing = urls.filter(|url| self.session.link_is_missing(file, url));
-        let missing = missing.map(String::from).collect();
+        let missing = missing_links(&self.session, &opened);
         let headings = opened.document().headings();
         let mut headings = headings.iter();
         let heading = anchor.and_then(|anchor| headings.find(|known| known.anchor == anchor));
@@ -600,6 +668,7 @@ impl Gui {
             nudge: None,
             missing,
             view: View::default(),
+            deleted: false,
         });
         self.tree.reveal(file);
         Ok(())
@@ -734,16 +803,8 @@ impl Gui {
                     self.tree.toggle_folder();
                 }
             }
-            Command::Back => {
-                self.graph = None;
-                self.pages.back();
-                self.reveal_document();
-            }
-            Command::Forward => {
-                self.graph = None;
-                self.pages.forward();
-                self.reveal_document();
-            }
+            Command::Back => self.go(true)?,
+            Command::Forward => self.go(false)?,
             Command::OpenSearch => self.open_search(),
             Command::CloseSearch => self.search = None,
             Command::OpenResult(index) => self.open_result(index)?,
@@ -818,7 +879,8 @@ impl Gui {
     fn toolbar(&mut self, ui: &mut Ui, palette: &Palette) {
         let document = self.opened().map(|opened| opened.file().to_owned());
         let test_page = self.opened().is_some_and(Opened::is_test_file);
-        let busy = self.session.is_busy();
+        let deleted = self.pages.current().is_some_and(|visit| visit.deleted);
+        let cannot_run = self.session.is_busy() || deleted;
         let mut commands = Vec::new();
         Panel::top("toolbar").show(ui, |ui| {
             ui.horizontal(|ui| {
@@ -833,7 +895,7 @@ impl Gui {
                 }
                 ui.with_layout(Layout::right_to_left(Align::Center), |ui| {
                     if test_page {
-                        let run = ui.add_enabled_ui(!busy, |ui| {
+                        let run = ui.add_enabled_ui(!cannot_run, |ui| {
                             icons::run_icon(ui, "Run file", palette.passed, icons::LARGE_RUN)
                         });
                         if run.inner.clicked() {
@@ -1067,11 +1129,15 @@ impl Gui {
         }
     }
 
-    /// What the banner says: why this page cannot run, or what stopped the run.
+    /// What the banner says: that the file of the page is gone, what stopped
+    /// the run, or why this page cannot run.
     fn banner(&self) -> Option<String> {
+        let visit = self.pages.current();
+        let deleted = visit.filter(|visit| visit.deleted);
+        let deleted = deleted.map(|visit| session::file_deleted(visit.opened.file()));
         let test_page = self.opened().is_some_and(Opened::is_test_file);
         let cannot_run = test_page.then(|| self.session.configuration().err());
-        self.failure.clone().or(cannot_run.flatten())
+        deleted.or(self.failure.clone()).or(cannot_run.flatten())
     }
 
     /// The field in the toolbar, in the middle of the window if there is room.
@@ -1204,6 +1270,25 @@ impl Gui {
 }
 
 /// Makes the search match what the box says, one character at a time.
+/// Every test file of the workspace, for marking them in the tree.
+fn test_files(session: &Session) -> BTreeMap<String, Opened> {
+    workspace::markdown_files(session.workspace())
+        .into_iter()
+        .filter_map(|file| match session.read(&file) {
+            Ok(opened) if opened.is_test_file() => Some((file, opened)),
+            // Opening a file that cannot be read says what is wrong with it.
+            Ok(_) | Err(_) => None,
+        })
+        .collect()
+}
+
+/// The links of a page to files that do not exist, as they are written.
+fn missing_links(session: &Session, opened: &Opened) -> HashSet<String> {
+    let urls = opened.document().link_urls();
+    let missing = urls.filter(|url| session.link_is_missing(opened.file(), url));
+    missing.map(String::from).collect()
+}
+
 fn follow_query(search: &mut Search, query: &str) {
     while !query.starts_with(search.query()) {
         search.delete_character();

@@ -1,13 +1,15 @@
 //! Scenarios for the `Core` fixture: temoc-ui with no interface at all.
 
+use crate::disk::{Change, Sandbox, wait_for_change};
 use crate::fixtures::NONE;
 use crate::session::{NOT_IMPLEMENTED, example_binaries, samples};
+use std::path::PathBuf;
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use temoc_ui::history::History;
 use temoc_ui::links::LinkGraph;
 use temoc_ui::search::Search;
-use temoc_ui::session::{Opened, Outcome, Session, Start};
+use temoc_ui::session::{self, Opened, Outcome, Session, Start};
 use temoc_ui::tree::{FileTree, Row};
 
 const RUN_TIMEOUT: Duration = Duration::from_mins(1);
@@ -27,6 +29,7 @@ enum Step {
     RunTable(usize),
     RunRow(usize),
     WaitForRow(usize),
+    Change(Change),
 }
 
 impl Step {
@@ -57,6 +60,28 @@ impl Step {
                 Some(line) => Ok(Self::WaitForRow(number(line)?)),
                 None => Err(format!("unknown step: {text}")),
             },
+            ("write", rest) => match rest.split_once(" from ") {
+                Some((file, version)) => Ok(Self::Change(Change::Write {
+                    file: file.into(),
+                    version: version.into(),
+                })),
+                None => Err(format!("unknown step: {text}")),
+            },
+            ("replace", rest) => match rest.split_once(" with ") {
+                Some((file, version)) => Ok(Self::Change(Change::Replace {
+                    file: file.into(),
+                    version: version.into(),
+                })),
+                None => Err(format!("unknown step: {text}")),
+            },
+            ("rename", rest) => match rest.split_once(" to ") {
+                Some((from, to)) => Ok(Self::Change(Change::Rename {
+                    from: from.into(),
+                    to: to.into(),
+                })),
+                None => Err(format!("unknown step: {text}")),
+            },
+            ("delete", file) if !file.is_empty() => Ok(Self::Change(Change::Delete(file.into()))),
             _ => Err(format!("unknown step: {text}")),
         }
     }
@@ -74,6 +99,8 @@ impl Step {
 struct Visit {
     opened: Opened,
     anchor: Option<String>,
+    /// Whether its file was deleted after it was read.
+    deleted: bool,
 }
 
 /// A temoc-ui with no interface, and what has been done to it.
@@ -84,16 +111,20 @@ pub struct Scenario {
     problem: Option<String>,
     /// Whether steps wait for a test run to finish.
     patient: bool,
+    /// The copy of the workspace that steps change, if they change it. It
+    /// goes last, so that temoc-ui is gone before it is.
+    _sandbox: Option<Sandbox>,
 }
 
 impl Scenario {
-    fn start(session: Session) -> Self {
+    fn start(session: Session, sandbox: Option<Sandbox>) -> Self {
         let mut scenario = Self {
             session,
             documents: History::default(),
             search: None,
             problem: None,
             patient: true,
+            _sandbox: sandbox,
         };
         if let Some(file) = scenario.session.first_file().map(String::from) {
             scenario.problem = scenario.visit(&file, None).err();
@@ -122,10 +153,16 @@ impl Scenario {
             Step::Open(file) => self.visit(file, None),
             Step::Follow(target) => self.follow(target),
             Step::Back => {
+                if let Some(visit) = self.documents.behind() {
+                    self.session.still_there(visit.opened.file())?;
+                }
                 self.documents.back();
                 Ok(())
             }
             Step::Forward => {
+                if let Some(visit) = self.documents.ahead() {
+                    self.session.still_there(visit.opened.file())?;
+                }
                 self.documents.forward();
                 Ok(())
             }
@@ -157,12 +194,55 @@ impl Scenario {
                     .run_row(visit.map(|visit| (&visit.opened, *line)))
             }
             Step::WaitForRow(_) => Err(NOT_IMPLEMENTED.to_owned()),
+            Step::Change(change) => self.change(change),
+        }
+    }
+
+    /// Changes a file, and waits for temoc-ui to notice. Says if the open
+    /// document is gone.
+    fn change(&mut self, change: &Change) -> Result<(), String> {
+        let before = self.session.changes_seen();
+        change.apply(self.session.workspace())?;
+        wait_for_change(before, || {
+            self.update();
+            Ok(self.session.changes_seen())
+        })?;
+        match self.documents.current() {
+            Some(visit) if visit.deleted => Err(session::file_deleted(visit.opened.file())),
+            _ => Ok(()),
+        }
+    }
+
+    /// Shows the files as they are now.
+    fn follow_changes(&mut self) {
+        let changes = self.session.changes();
+        if changes.is_empty() {
+            return;
+        }
+        for visit in self.documents.visits_mut() {
+            if changes.covers(visit.opened.file()) {
+                match self.session.reread(visit.opened.file()) {
+                    Ok(Some(opened)) => {
+                        visit.opened = opened;
+                        visit.deleted = false;
+                    }
+                    Ok(None) => visit.deleted = true,
+                    Err(problem) => self.problem = Some(problem),
+                }
+            }
+        }
+        if let Some(search) = &mut self.search {
+            search.reload(self.session.workspace());
         }
     }
 
     fn visit(&mut self, file: &str, anchor: Option<String>) -> Result<(), String> {
         let opened = self.session.read(file)?;
-        self.documents.visit(Visit { opened, anchor });
+        self.documents.visit(Visit {
+            opened,
+            anchor,
+            deleted: false,
+        });
         Ok(())
     }
 
@@ -180,8 +260,9 @@ impl Scenario {
         self.visit(&hit.file, hit.heading.map(|heading| heading.anchor))
     }
 
-    /// Picks up the progress of the run, and what stopped it.
+    /// Picks up files that changed, the progress of the run, and what stopped it.
     fn update(&mut self) {
+        self.follow_changes();
         if let Some(problem) = self.session.update() {
             self.problem = Some(problem);
         }
@@ -231,6 +312,14 @@ impl Scenario {
     pub fn results(&self) -> Vec<String> {
         let results = self.search.as_ref().map_or(&[][..], Search::results);
         results.iter().map(ToString::to_string).collect()
+    }
+
+    /// The headings of the open document, in order.
+    pub fn headings(&self) -> Vec<String> {
+        let visit = self.documents.current();
+        let headings = visit.map(|visit| visit.opened.document().headings());
+        let headings = headings.unwrap_or_default().into_iter();
+        headings.map(|heading| heading.text).collect()
     }
 
     /// The heading the open document was opened at.
@@ -289,8 +378,19 @@ impl Played {
     /// Starts temoc-ui in a sample workspace and takes the steps.
     pub fn of(workspace: &str, path: &str, config: &str, steps: &str) -> Self {
         let given = |text: &str| Some(text.to_owned()).filter(|text| !text.is_empty());
+        let steps = match Step::read_all(steps) {
+            Ok(steps) => steps,
+            Err(problem) => return Self::Broken(problem),
+        };
+        // Steps that change files work on a copy of the workspace.
+        let changes = steps.iter().any(|step| matches!(step, Step::Change(_)));
+        let sandbox = match changes.then(|| Sandbox::of(workspace)).transpose() {
+            Ok(sandbox) => sandbox,
+            Err(problem) => return Self::Broken(problem),
+        };
+        let folder = sandbox.as_ref().map(Sandbox::folder);
         let start = Start {
-            current_dir: samples().join(workspace),
+            current_dir: folder.map_or_else(|| samples().join(workspace), PathBuf::from),
             path: given(path),
             config: given(config),
             extra_path: example_binaries().into_iter().collect(),
@@ -299,8 +399,8 @@ impl Played {
             Ok(session) => session,
             Err(problem) => return Self::Refused(problem),
         };
-        let mut scenario = Scenario::start(session);
-        let played = Step::read_all(steps).and_then(|steps| scenario.play(&steps));
+        let mut scenario = Scenario::start(session, sandbox);
+        let played = scenario.play(&steps);
         match played {
             Ok(()) => Self::Finished(Box::new(scenario)),
             Err(problem) => Self::Broken(problem),
@@ -343,9 +443,40 @@ mod tests {
             "follow",
             "wait 3",
             "back up",
+            "write a.md",
+            "replace a.md by b.md",
+            "rename a.md",
+            "delete",
         ] {
             assert_eq!(Step::read(step), Err(format!("unknown step: {step}")));
         }
+    }
+
+    #[test]
+    fn steps_that_change_files() {
+        assert_eq!(
+            Step::read_all("write a/b.md from c.md, replace a.md with b.md"),
+            Ok(vec![
+                Step::Change(Change::Write {
+                    file: "a/b.md".into(),
+                    version: "c.md".into()
+                }),
+                Step::Change(Change::Replace {
+                    file: "a.md".into(),
+                    version: "b.md".into()
+                }),
+            ])
+        );
+        assert_eq!(
+            Step::read_all("delete a.md, rename a.md to b.md"),
+            Ok(vec![
+                Step::Change(Change::Delete("a.md".into())),
+                Step::Change(Change::Rename {
+                    from: "a.md".into(),
+                    to: "b.md".into()
+                }),
+            ])
+        );
     }
 
     #[test]

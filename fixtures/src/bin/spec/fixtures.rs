@@ -103,6 +103,11 @@ impl Core {
     }
 
     #[must_use]
+    pub fn headings(&self) -> String {
+        self.read(|scenario| list(&scenario.headings(), ", "))
+    }
+
+    #[must_use]
     pub fn problem(&self) -> String {
         if let Some(Played::Refused(problem)) = &self.played {
             return problem.clone();

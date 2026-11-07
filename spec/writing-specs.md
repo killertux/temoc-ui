@@ -64,13 +64,31 @@ nothing to see of a run in progress. `wait for row` is for looking at one.
 | ------------------- | ----------------------------------------------------------------------------------------------------------- |
 | `wait for row LINE` | Stop waiting for the run, and wait until that row is `running`. Later steps do not wait for the run either. |
 
+### Changing files
+
+These steps change the workspace on disk behind temoc-ui's back, the way an editor or
+`git` would, for [Reloading](reloading.md). A row that uses them works on a copy of its
+workspace, so that the samples never change. `VERSION` is a file in the workspace's
+hidden `.versions` folder.
+
+| Written as                  | Meaning                                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------- |
+| `write FILE from VERSION`   | Write the version over the file, in place. A missing file is created, with its folders.      |
+| `replace FILE with VERSION` | Write the version to a new file next to it, then rename that over the file, as many editors save. |
+| `delete FILE`               | Delete the file.                                                                             |
+| `rename FILE to NEW`        | Rename the file.                                                                             |
+
+Each of them waits until temoc-ui has seen the change before the next step, but not for
+a test run.
+
 ### Expected values
 
 | Column             | Meaning                                                                                |
 | ------------------ | -------------------------------------------------------------------------------------- |
 | `document?`        | Path of the open document within the workspace, or `none`.                             |
 | `anchor?`          | The heading the document was opened at, or `none`.                                     |
-| `problem?`         | Why temoc-ui did not start, why the last step was refused, or what stopped the last run, or `none`. |
+| `headings?`        | The headings of the open document in order, separated by commas, or `none`.            |
+| `problem?`         | Why temoc-ui did not start, why the last step was refused, what stopped the last run, or that the open document's file was deleted, or `none`. |
 | `results?`         | Search results in order, separated by commas, or `none`.                               |
 | `first result?`    | The top search result, or `none`.                                                      |
 | `tree?`            | The rows of the file tree in order. A folder ends with `/`.                            |
@@ -104,6 +122,7 @@ running the specification does not run them as tests too.
 | [`wide-blocks`](../samples/wide-blocks/README.md) | Content wider than the screen.  |
 | [`themes`](../samples/themes/README.md)       | One of each thing a theme colours. |
 | [`elements`](../samples/elements/README.md)   | Markdown only the GUI draws differently, and a wide test table. |
+| [`changing`](../samples/changing/README.md)   | Files that change on disk while open. |
 
 The `calculator` and `outcomes` workspaces run real temoc against a small Slim server
 built by the spec harness.

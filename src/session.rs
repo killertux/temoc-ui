@@ -2,8 +2,10 @@
 //! the runs of temoc.
 
 use crate::document::Document;
+use crate::reload::Version;
 use crate::run::{FileResults, NOT_RUN, Progress, Request, Run};
 use crate::temoc::{RunReport, TestFile, TestTable};
+use crate::watch::{Changes, Watcher};
 use crate::workspace::{self, Place};
 use std::collections::HashMap;
 use std::fmt::Display;
@@ -32,14 +34,17 @@ pub struct Opened {
     file: String,
     document: Document,
     tests: TestFile,
+    version: Version,
 }
 
 impl Opened {
-    /// A document that goes by this name in the workspace.
+    /// A document that goes by this name in the workspace, parsed from this
+    /// markdown.
     #[must_use]
-    pub fn new(file: String, document: Document) -> Self {
+    pub fn new(file: String, markdown: &str, document: Document) -> Self {
         let tests = document.tests();
         Self {
+            version: Version::of(&tests.tables, markdown),
             file,
             document,
             tests,
@@ -102,6 +107,20 @@ pub struct Session {
     results: HashMap<String, FileResults>,
     /// The arguments of the last temoc command.
     temoc_arguments: Option<Vec<String>>,
+    /// What notices the files that change, if the system lets it.
+    watcher: Option<Watcher>,
+    /// Why files are not watched, if they are not.
+    watch_problem: Option<String>,
+    /// The version of each file that its results are about.
+    versions: HashMap<String, Version>,
+    /// How many times files have changed.
+    changes_seen: u64,
+}
+
+/// What temoc-ui says about a file that was deleted.
+#[must_use]
+pub fn file_deleted(file: &str) -> String {
+    format!("File deleted: {file}")
 }
 
 impl Session {
@@ -112,7 +131,15 @@ impl Session {
     /// Fails with a message for the user when the path cannot be opened.
     pub fn start(start: &Start) -> Result<Self, String> {
         let opening = workspace::locate(&start.current_dir, start.path.as_deref())?;
+        let (watcher, watch_problem) = match Watcher::start(&opening.workspace) {
+            Ok(watcher) => (Some(watcher), None),
+            Err(problem) => (None, Some(problem)),
+        };
         Ok(Self {
+            watcher,
+            watch_problem,
+            versions: HashMap::new(),
+            changes_seen: 0,
             workspace: opening.workspace,
             first_file: opening.file,
             start_folder: start.current_dir.clone(),
@@ -146,7 +173,98 @@ impl Session {
         let refuse = |error: &dyn Display| format!("Cannot read {file}: {error}");
         let text = fs::read_to_string(self.workspace.join(file)).map_err(|e| refuse(&e))?;
         let document = Document::parse(&text).map_err(|e| refuse(&e))?;
-        Ok(Opened::new(file.to_owned(), document))
+        Ok(Opened::new(file.to_owned(), &text, document))
+    }
+
+    /// Reads a file of the workspace again, after it changed. A file that is
+    /// gone gives nothing.
+    ///
+    /// # Errors
+    ///
+    /// Fails with a message for the user when it is there but cannot be read.
+    pub fn reread(&self, file: &str) -> Result<Option<Opened>, String> {
+        if self.is_deleted(file) {
+            return Ok(None);
+        }
+        self.read(file).map(Some)
+    }
+
+    /// Whether a file that was opened is no longer there.
+    #[must_use]
+    pub fn is_deleted(&self, file: &str) -> bool {
+        !self.workspace.join(file).is_file()
+    }
+
+    /// Refuses a file that was opened but is no longer there.
+    ///
+    /// # Errors
+    ///
+    /// Says that the file was deleted.
+    pub fn still_there(&self, file: &str) -> Result<(), String> {
+        if self.is_deleted(file) {
+            return Err(file_deleted(file));
+        }
+        Ok(())
+    }
+
+    /// Why files are not watched for changes, if they are not.
+    #[must_use]
+    pub fn watch_problem(&self) -> Option<&str> {
+        self.watch_problem.as_deref()
+    }
+
+    /// Calls `wake` from another thread whenever a file changes, for an
+    /// interface that only looks at the session when asked to.
+    pub fn wake_with(&self, wake: impl Fn() + Send + Sync + 'static) {
+        if let Some(watcher) = &self.watcher {
+            watcher.wake_with(wake);
+        }
+    }
+
+    /// How many times files have changed since the session started.
+    #[must_use]
+    pub fn changes_seen(&self) -> u64 {
+        self.changes_seen
+    }
+
+    /// Whether a change has been noticed that is not reported yet.
+    #[must_use]
+    pub fn is_settling(&self) -> bool {
+        self.watcher.as_ref().is_some_and(Watcher::is_settling)
+    }
+
+    /// What changed on disk since the last look. The results of a file that
+    /// changed follow its tables, and the interface reads again what it shows.
+    pub fn changes(&mut self) -> Changes {
+        let changes = self.watcher.as_mut().and_then(Watcher::changes);
+        let Some(changes) = changes else {
+            return Changes::default();
+        };
+        self.changes_seen = self.changes_seen.saturating_add(1);
+        let files: Vec<String> = self.versions.keys().cloned().collect();
+        for file in files.iter().filter(|file| changes.covers(file)) {
+            self.follow_tables(file);
+        }
+        changes
+    }
+
+    /// Moves the results of a file to where its tables are now. A file that
+    /// is gone, or cannot be read for now, keeps them until it is back.
+    fn follow_tables(&mut self, file: &str) {
+        let newer = match self.reread(file) {
+            Ok(Some(opened)) => opened.version,
+            Ok(None) | Err(_) => return,
+        };
+        let Some(older) = self.versions.insert(file.to_owned(), newer.clone()) else {
+            return;
+        };
+        let moves = older.moves_to(&newer);
+        if let Some(results) = self.results.get_mut(file) {
+            results.moved(&moves);
+        }
+        if let Some(run) = self.run.as_mut().filter(|run| run.file() == file) {
+            run.moved(&moves);
+        }
     }
 
     /// Where a link in `document` leads.
@@ -219,6 +337,7 @@ impl Session {
         if self.run.is_some() {
             return Err("temoc is already running".into());
         }
+        self.still_there(&opened.file)?;
         let arguments = vec![
             "-c".into(),
             self.configuration()?,
@@ -227,6 +346,8 @@ impl Session {
             target,
         ];
         self.temoc_arguments = Some(arguments.clone());
+        let version = opened.version.clone();
+        self.versions.insert(opened.file.clone(), version);
         let results = self.results.entry(opened.file.clone()).or_default();
         results.begin(tables, row);
         let request = Request {
@@ -279,8 +400,13 @@ impl Session {
         let run = self.run.as_mut()?;
         let Progress { events, report } = run.progress();
         let results = self.results.entry(run.file().to_owned()).or_default();
+        // temoc speaks of the file as it was when the run started.
+        let moves = run.moves();
+        let tables = moves.tables(run.tables());
         for event in events {
-            results.apply(run.tables(), event);
+            if let Some(event) = moves.event(run.tables(), event) {
+                results.apply(&tables, event);
+            }
         }
         let report = report?;
         results.finish(&report);

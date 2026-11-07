@@ -56,6 +56,16 @@ Everything `Ctrl` does here is `Cmd` on macOS. Keys wait for any test run to fin
 | `Mouse back`, `Mouse forward`  | Press that button of the mouse.                                          |
 | `Close window`                 | Close the window the way the system does.                                |
 
+### Changing files
+
+Files are changed in the same column, as on the
+[terminal pages](../tui/writing-specs.md#changing-files), for [Reloading](reloading.md).
+
+| Written as                     | Meaning                                                                  |
+| ------------------------------ | ------------------------------------------------------------------------ |
+| `Write file "FILE" from "VERSION"` | Write the version from the workspace's `.versions` folder over the file. |
+| `Delete file "FILE"`           | Delete the file.                                                         |
+
 ### Expected values
 
 | Column                | Meaning                                                                       |

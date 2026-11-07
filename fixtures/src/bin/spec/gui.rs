@@ -1,10 +1,12 @@
 //! The `Gui` fixture: a fresh temoc-ui in a headless window, as described in
 //! `spec/gui/writing-specs.md`.
 
-use crate::keys::{Token, tokenize};
+use crate::disk::{Change, Sandbox, wait_for_change};
+use crate::keys::{self, Token, tokenize};
 use crate::session::{NOT_IMPLEMENTED, example_binaries, samples};
 use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::{Harness, Node};
+use std::path::{Path, PathBuf};
 use std::thread::sleep;
 use std::time::{Duration, Instant};
 use temoc_ui::app::Launch;
@@ -56,6 +58,8 @@ enum Action {
     Leave,
     WaitRow(String),
     CloseWindow,
+    /// Change a file of the workspace.
+    Change(Change),
 }
 
 impl Action {
@@ -123,6 +127,7 @@ impl Action {
                         _ => return Err(format!("unknown action in `{actions}`")),
                     },
                     "Leave" => Self::Leave,
+                    "Write" | "Delete" => Self::Change(keys::change(&word, &mut tokens)?),
                     "Wait" => match tokens.next() {
                         Some(Token::Word(word)) if word == "row" => {
                             Self::WaitRow(line(tokens.next(), "Wait row")?)
@@ -217,13 +222,32 @@ pub struct Scene {
     waits_for_runs: bool,
     /// The file last dragged in the graph, and where every file was before that.
     dragged: Option<(String, Vec<(String, Pos2)>)>,
+    /// The folder temoc-ui started in, which file changes are made in.
+    folder: PathBuf,
+    /// The copy of the workspace that actions change, if they change it. It
+    /// goes last, so that temoc-ui is gone before it is.
+    _sandbox: Option<Sandbox>,
 }
 
 impl Played {
     /// Starts temoc-ui in a sample workspace and takes the actions.
     pub fn of(workspace: &str, arguments: &str, actions: &str, system_mode: &str) -> Self {
+        let actions = match Action::read_all(actions) {
+            Ok(actions) => actions,
+            Err(problem) => return Self::Broken(problem),
+        };
+        // Actions that change files work on a copy of the workspace.
+        let changes = actions
+            .iter()
+            .any(|action| matches!(action, Action::Change(_)));
+        let sandbox = match changes.then(|| Sandbox::of(workspace)).transpose() {
+            Ok(sandbox) => sandbox,
+            Err(problem) => return Self::Broken(problem),
+        };
+        let folder = sandbox.as_ref().map(Sandbox::folder);
+        let folder = folder.map_or_else(|| samples().join(workspace), Path::to_path_buf);
         let launch = Launch {
-            current_dir: samples().join(workspace),
+            current_dir: folder.clone(),
             arguments: arguments.split_whitespace().map(String::from).collect(),
             extra_path: example_binaries().into_iter().collect(),
             ..Launch::default()
@@ -232,8 +256,7 @@ impl Played {
             Ok(window) => window,
             Err(message) => return Self::Refused(message),
         };
-        let played = Action::read_all(actions).and_then(|actions| {
-            let mut scene = Scene::open(window, system_mode)?;
+        let played = Scene::open(window, system_mode, folder, sandbox).and_then(|mut scene| {
             scene.play(&actions)?;
             Ok(scene)
         });
@@ -245,7 +268,12 @@ impl Played {
 }
 
 impl Scene {
-    fn open(window: Window, system_mode: &str) -> Result<Self, String> {
+    fn open(
+        window: Window,
+        system_mode: &str,
+        folder: PathBuf,
+        sandbox: Option<Sandbox>,
+    ) -> Result<Self, String> {
         let system = match system_mode {
             "" => None,
             "dark" => Some(Theme::Dark),
@@ -262,6 +290,8 @@ impl Scene {
             harness,
             waits_for_runs: true,
             dragged: None,
+            folder,
+            _sandbox: sandbox,
         };
         scene.settle()?;
         Ok(scene)
@@ -355,6 +385,14 @@ impl Scene {
                 let viewports = &mut self.harness.input_mut().viewports;
                 let root = viewports.entry(ViewportId::ROOT).or_default();
                 root.events.push(ViewportEvent::Close);
+            }
+            Action::Change(change) => {
+                let before = self.window().changes_seen();
+                change.apply(&self.folder)?;
+                wait_for_change(before, || {
+                    self.harness.step();
+                    Ok(self.window().changes_seen())
+                })?;
             }
         }
         Ok(())
