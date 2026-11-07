@@ -32,6 +32,26 @@ impl<Visit> History<Visit> {
         self.current.as_mut()
     }
 
+    /// Where going back would go.
+    #[must_use]
+    pub fn behind(&self) -> Option<&Visit> {
+        self.back.last()
+    }
+
+    /// Where going forward would go.
+    #[must_use]
+    pub fn ahead(&self) -> Option<&Visit> {
+        self.forward.last()
+    }
+
+    /// Every visit, the current one first, to change them.
+    pub fn visits_mut(&mut self) -> impl Iterator<Item = &mut Visit> {
+        let current = self.current.iter_mut();
+        current
+            .chain(self.back.iter_mut())
+            .chain(self.forward.iter_mut())
+    }
+
     /// Goes somewhere new, which clears the way forward.
     pub fn visit(&mut self, visit: Visit) {
         self.back.extend(self.current.replace(visit));
@@ -93,6 +113,27 @@ mod tests {
         assert_eq!(history.current(), Some(&"c"));
         history.back();
         assert_eq!(history.current(), Some(&"a"));
+    }
+
+    #[test]
+    fn the_way_back_and_forward_can_be_seen_without_going() {
+        let mut history = visited(&["a", "b", "c"]);
+        history.back();
+        assert_eq!(history.behind(), Some(&"a"));
+        assert_eq!(history.ahead(), Some(&"c"));
+        assert_eq!(history.current(), Some(&"b"));
+    }
+
+    #[test]
+    fn every_visit_can_be_changed() {
+        let mut history = visited(&["a", "b", "c"]);
+        history.back();
+        history.visits_mut().for_each(|visit| *visit = "z");
+        history.back();
+        assert_eq!(history.current(), Some(&"z"));
+        history.forward();
+        history.forward();
+        assert_eq!(history.current(), Some(&"z"));
     }
 
     #[test]

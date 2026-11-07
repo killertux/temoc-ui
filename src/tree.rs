@@ -96,6 +96,21 @@ impl FileTree {
         self.follow = true;
     }
 
+    /// Lists the workspace again, keeping the folders that are open and the
+    /// selected row, if it is still there.
+    pub fn reload(&mut self, workspace: &Path) {
+        self.relist(workspace::markdown_files(workspace));
+    }
+
+    fn relist(&mut self, files: Vec<String>) {
+        let selected = self.selection().map(|row| row.path.clone());
+        self.files = files;
+        self.rows = rows_of(&self.files, &self.open);
+        let found = selected.and_then(|path| self.rows.iter().position(|row| row.path == path));
+        let last = self.rows.len().saturating_sub(1);
+        self.selected = found.unwrap_or(self.selected).min(last);
+    }
+
     /// The rows, in order.
     #[must_use]
     pub fn rows(&self) -> &[Row] {
@@ -279,6 +294,25 @@ mod tests {
     }
 
     const NESTED: [&str; 4] = ["a/b/deep.md", "a/near.md", "c/other.md", "top.md"];
+
+    #[test]
+    fn listing_again_keeps_open_folders_and_the_selection() {
+        let mut tree = tree(&NESTED, Some("a/near.md"));
+        let mut files: Vec<String> = NESTED.iter().map(ToString::to_string).collect();
+        files.insert(0, "a/new.md".into());
+        files.retain(|file| file != "top.md");
+        tree.relist(files);
+        assert_eq!(labels(&tree), ["▾ a", "▸ b", "near.md", "new.md", "▸ c"]);
+        assert_eq!(tree.chosen_file(), Some("a/near.md"));
+    }
+
+    #[test]
+    fn a_selected_file_that_is_gone_leaves_the_selection_in_the_tree() {
+        let mut tree = tree(&NESTED, Some("top.md"));
+        tree.relist(vec!["a/near.md".into()]);
+        assert_eq!(labels(&tree), ["▸ a"]);
+        assert_eq!(tree.selected(), 0);
+    }
 
     #[test]
     fn revealing_a_document_opens_its_folders_and_selects_it() {

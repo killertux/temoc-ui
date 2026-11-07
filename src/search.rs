@@ -118,6 +118,20 @@ impl Search {
         self.only_tests
     }
 
+    /// Reads the workspace again, keeping what was typed and chosen.
+    pub fn reload(&mut self, workspace: &Path) {
+        let files = workspace::markdown_files(workspace).into_iter();
+        self.relist(files.map(|file| Entry::read(workspace, file)).collect());
+    }
+
+    fn relist(&mut self, entries: Vec<Entry>) {
+        let chosen = self.chosen().cloned();
+        self.entries = entries;
+        self.refresh();
+        let found = chosen.and_then(|chosen| self.results.iter().position(|hit| *hit == chosen));
+        self.selected = found.unwrap_or(0);
+    }
+
     /// Adds a typed character.
     pub fn type_character(&mut self, character: char) {
         self.query.push(character);
@@ -234,6 +248,36 @@ mod tests {
     #[test]
     fn a_letter_is_only_used_once() {
         assert!(!matches("aa", "a"));
+    }
+
+    #[test]
+    fn listing_again_keeps_the_query_and_the_chosen_result() {
+        let mut search = search();
+        typed(&mut search, "a");
+        search.choose_next();
+        assert_eq!(
+            search.chosen().map(ToString::to_string).as_deref(),
+            Some("beta.md")
+        );
+        search.relist(vec![
+            entry("aardvark.md", false, &[]),
+            entry("alpha.md", false, &["Beta"]),
+            entry("beta.md", true, &[]),
+        ]);
+        assert_eq!(search.query(), "a");
+        assert_eq!(labels(&search)[..3], ["aardvark.md", "alpha.md", "beta.md"]);
+        assert_eq!(
+            search.chosen().map(ToString::to_string).as_deref(),
+            Some("beta.md")
+        );
+    }
+
+    #[test]
+    fn a_chosen_result_that_is_gone_chooses_the_first() {
+        let mut search = search();
+        search.choose_next();
+        search.relist(vec![entry("alpha.md", false, &[])]);
+        assert_eq!(search.selected(), 0);
     }
 
     #[test]

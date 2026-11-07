@@ -38,6 +38,8 @@ pub struct Page {
     focused_link: Option<usize>,
     focus: Focus,
     selection: Option<Selection>,
+    /// Whether its file was deleted after it was read.
+    deleted: bool,
 }
 
 impl Page {
@@ -54,7 +56,31 @@ impl Page {
             left: 0,
             focused_link: None,
             selection: None,
+            deleted: false,
         }
+    }
+
+    /// Shows a newer version of the file, staying where the page was and
+    /// keeping the focus on the same table and row.
+    pub fn reload(&mut self, opened: Opened) {
+        self.focus = self.focus.carried(self.opened.tables(), opened.tables());
+        self.opened = opened;
+        self.deleted = false;
+        self.lay_out();
+        let links = self.rendered.links().len();
+        self.focused_link = self.focused_link.filter(|index| *index < links);
+        self.stay_on_the_page();
+    }
+
+    /// Notes that the file is gone. The page stays as it was last read.
+    pub fn mark_deleted(&mut self) {
+        self.deleted = true;
+    }
+
+    /// Whether the file was deleted after it was read.
+    #[must_use]
+    pub fn is_deleted(&self) -> bool {
+        self.deleted
     }
 
     /// The file behind this page.
@@ -413,7 +439,7 @@ mod tests {
 
     fn page(markdown: &str, width: u16, height: u16) -> Page {
         let document = Document::parse(markdown).unwrap();
-        let opened = Opened::new("a.md".into(), document);
+        let opened = Opened::new("a.md".into(), markdown, document);
         Page::new(opened, Size::new(width, height))
     }
 
@@ -425,6 +451,45 @@ mod tests {
     fn numbered(count: usize) -> String {
         let lines: Vec<String> = (1..=count).map(|n| format!("line{n}")).collect();
         lines.join("\n\n")
+    }
+
+    fn opened(markdown: &str) -> Opened {
+        Opened::new("a.md".into(), markdown, Document::parse(markdown).unwrap())
+    }
+
+    #[test]
+    fn a_reloaded_page_stays_where_it_was() {
+        let mut page = page(&numbered(10), 20, 3);
+        page.scroll_down(4);
+        page.reload(opened(&numbered(10).replace("line10", "last")));
+        assert_eq!(shown(&page), ["line3", "", "line4"]);
+    }
+
+    #[test]
+    fn a_page_that_got_shorter_shows_its_end() {
+        let mut page = page(&numbered(10), 20, 3);
+        page.bottom();
+        page.reload(opened(&numbered(2)));
+        assert_eq!(shown(&page), ["line1", "", "line2"]);
+    }
+
+    #[test]
+    fn a_reloaded_page_is_no_longer_deleted() {
+        let mut page = page("a", 20, 3);
+        page.mark_deleted();
+        assert!(page.is_deleted());
+        page.reload(opened("b"));
+        assert!(!page.is_deleted());
+        assert_eq!(shown(&page), ["b"]);
+    }
+
+    #[test]
+    fn a_focused_link_that_is_gone_is_forgotten() {
+        let mut page = page("[a](a.md) [b](b.md)", 40, 3);
+        page.next_link();
+        page.next_link();
+        page.reload(opened("[a](a.md)"));
+        assert_eq!(page.focused_link().map(|link| link.target.as_str()), None);
     }
 
     #[test]

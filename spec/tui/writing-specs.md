@@ -54,6 +54,17 @@ on screen, searching from the top, so that they do not depend on the layout.
 | `Shift-WheelDown`, `Shift-WheelUp` | Turn the mouse wheel one step while holding Shift.      |
 | `ClickOutside`               | Click a spot outside the open pop-up.                         |
 
+### Changing files
+
+Files are changed in the same column, as the core `write` and `delete` steps do, for
+[Reloading](reloading.md). A row that uses them works on a copy of its workspace, and
+each one waits until temoc-ui has seen the change.
+
+| Written as                     | Meaning                                                              |
+| ------------------------------ | -------------------------------------------------------------------- |
+| `Write file "FILE" from "VERSION"` | Write the version from the workspace's `.versions` folder over the file. |
+| `Delete file "FILE"`           | Delete the file.                                                     |
+
 ### Expected values
 
 | Column            | Meaning                                                       |

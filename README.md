@@ -225,6 +225,8 @@ by other rows, which temoc reports as an error in the row.
 - Running a whole file, a single table or a single row, and showing each row's result
   in place as soon as it is known
 - A file tree
+- Reloading pages that change on disk, with their test results kept where the tables
+  did not change
 - Mouse support
 - Selecting and copying text
 - A graph of how the pages link together

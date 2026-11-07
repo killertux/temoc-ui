@@ -9,9 +9,10 @@ use crate::page::Page;
 use crate::render::Motion;
 use crate::run::NOT_RUN;
 use crate::search::Search;
-use crate::session::{Outcome, Session, Start};
+use crate::session::{self, Outcome, Session, Start};
 use crate::theme::{Rgb, Theme};
 use crate::tree::{FileTree, Row};
+use crate::watch::Changes;
 use crossterm::event::{
     Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers, MouseButton, MouseEvent, MouseEventKind,
 };
@@ -165,6 +166,7 @@ impl App {
             extra_path: launch.extra_path.clone(),
         })?;
         let first_file = session.first_file().map(String::from);
+        let status = session.watch_problem().map(String::from);
         let mut app = Self {
             running: true,
             session,
@@ -175,7 +177,7 @@ impl App {
             help: None,
             only_tests: false,
             theme,
-            status: None,
+            status,
             page_size: Size::default(),
             screen: Rect::default(),
             pressed: None,
@@ -256,6 +258,24 @@ impl App {
         };
         self.graph = None;
         self.visit(&file, None)
+    }
+
+    /// Goes back, unless the file there was deleted.
+    fn go_back(&mut self) -> Result<(), String> {
+        if let Some(page) = self.pages.behind() {
+            self.session.still_there(page.file())?;
+        }
+        self.pages.back();
+        Ok(())
+    }
+
+    /// Goes forward, unless the file there was deleted.
+    fn go_forward(&mut self) -> Result<(), String> {
+        if let Some(page) = self.pages.ahead() {
+            self.session.still_there(page.file())?;
+        }
+        self.pages.forward();
+        Ok(())
     }
 
     /// Runs every table of the open file.
@@ -635,8 +655,14 @@ impl App {
                     page.clear_selection();
                 }
             }
-            KeyCode::Char('h') | KeyCode::Backspace => self.pages.back(),
-            KeyCode::Char('l') => self.pages.forward(),
+            KeyCode::Char('h') | KeyCode::Backspace => {
+                let result = self.go_back();
+                self.report(result);
+            }
+            KeyCode::Char('l') => {
+                let result = self.go_forward();
+                self.report(result);
+            }
             KeyCode::Enter => {
                 let result = self.follow_focused_link();
                 self.report(result);
@@ -680,11 +706,47 @@ impl App {
         Ok(())
     }
 
-    /// Picks up the progress of background work, such as a test run.
+    /// Picks up the progress of background work, such as a test run, and
+    /// files that changed on disk.
     pub fn update(&mut self) {
+        let changes = self.session.changes();
+        if !changes.is_empty() {
+            self.follow_changes(&changes);
+        }
         if let Some(message) = self.session.update() {
             self.status = Some(message);
         }
+    }
+
+    /// Shows the files as they are now: every page whose file changed, and
+    /// the lists of files.
+    fn follow_changes(&mut self, changes: &Changes) {
+        let session = &self.session;
+        let pages = self.pages.visits_mut();
+        for page in pages.filter(|page| changes.covers(page.file())) {
+            match session.reread(page.file()) {
+                Ok(Some(opened)) => page.reload(opened),
+                Ok(None) => page.mark_deleted(),
+                Err(message) => self.status = Some(message),
+            }
+        }
+        let workspace = self.session.workspace();
+        if let Some(search) = &mut self.search {
+            search.reload(workspace);
+        }
+        if let Some(tree) = &mut self.tree {
+            tree.reload(workspace);
+        }
+        if let Some(graph) = &self.graph {
+            let chosen = graph.chosen_file().map(String::from);
+            self.graph = Some(Graph::open(workspace, chosen.as_deref()));
+        }
+    }
+
+    /// How many times files have changed on disk since the start.
+    #[must_use]
+    pub fn changes_seen(&self) -> u64 {
+        self.session.changes_seen()
     }
 
     /// Whether the application is still open.
@@ -753,9 +815,12 @@ impl App {
                 "Move to the start, then press v"
             }
         });
+        let deleted = self.pages.current().filter(|page| page.is_deleted());
+        let deleted = deleted.map(|page| session::file_deleted(page.file()));
         let running = self.session.running_file();
         let running = running.map(|file| format!("Running {file}..."));
-        self.status.clone().or(hint.map(String::from)).or(running)
+        let status = self.status.clone().or(hint.map(String::from));
+        status.or(deleted).or(running)
     }
 
     /// The result of the open file, if it has tests.

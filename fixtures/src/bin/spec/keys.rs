@@ -1,5 +1,6 @@
 //! The keys notation described in `spec/tui/writing-specs.md`.
 
+use crate::disk::Change;
 use crossterm::event::{KeyCode, KeyModifiers, MouseEventKind};
 
 /// One action written in a `keys` column.
@@ -22,6 +23,8 @@ pub enum Input {
     ClickOutside,
     /// Stop waiting for the run, and wait until the text is on screen.
     Wait(String),
+    /// Change a file of the workspace.
+    Change(Change),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -49,6 +52,7 @@ pub fn parse(keys: &str) -> Result<Vec<Input>, String> {
                 },
                 "ClickOutside" => Input::ClickOutside,
                 "Wait" => Input::Wait(quoted(&mut tokens, "Wait")?),
+                "Write" | "Delete" => Input::Change(change(&word, &mut tokens)?),
                 _ => wheel(&word)
                     .or_else(|| key(&word))
                     .ok_or_else(|| format!("unknown key `{word}`"))?,
@@ -56,6 +60,24 @@ pub fn parse(keys: &str) -> Result<Vec<Input>, String> {
         });
     }
     Ok(inputs)
+}
+
+/// A change to a file: `Write file "FILE" from "VERSION"` or `Delete file "FILE"`.
+/// The GUI writes them the same way.
+pub fn change(action: &str, tokens: &mut impl Iterator<Item = Token>) -> Result<Change, String> {
+    let wrong = || format!("`{action}` needs `file` and a quoted file");
+    if tokens.next() != Some(Token::Word("file".into())) {
+        return Err(wrong());
+    }
+    let file = quoted(tokens, action).map_err(|_| wrong())?;
+    if action == "Delete" {
+        return Ok(Change::Delete(file));
+    }
+    if tokens.next() != Some(Token::Word("from".into())) {
+        return Err(format!("`{action}` needs `from` and a quoted version"));
+    }
+    let version = quoted(tokens, action)?;
+    Ok(Change::Write { file, version })
 }
 
 fn quoted(tokens: &mut impl Iterator<Item = Token>, action: &str) -> Result<String, String> {
@@ -226,6 +248,29 @@ mod tests {
             ]
         );
         assert_eq!(parse("Wait j").unwrap_err(), "`Wait` needs quoted text");
+    }
+
+    #[test]
+    fn files_change_in_the_same_column() {
+        assert_eq!(
+            parse(r#"G Write file "a.md" from "b.md" Delete file "c.md""#).unwrap(),
+            vec![
+                Input::Key(KeyCode::Char('G'), KeyModifiers::SHIFT),
+                Input::Change(Change::Write {
+                    file: "a.md".into(),
+                    version: "b.md".into()
+                }),
+                Input::Change(Change::Delete("c.md".into())),
+            ]
+        );
+        assert_eq!(
+            parse(r#"Delete "a.md""#).unwrap_err(),
+            "`Delete` needs `file` and a quoted file"
+        );
+        assert_eq!(
+            parse(r#"Write file "a.md" "b.md""#).unwrap_err(),
+            "`Write` needs `from` and a quoted version"
+        );
     }
 
     #[test]

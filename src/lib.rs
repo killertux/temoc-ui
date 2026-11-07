@@ -15,6 +15,7 @@ pub mod help;
 pub mod history;
 pub mod links;
 pub mod page;
+pub mod reload;
 pub mod render;
 pub mod run;
 pub mod search;
@@ -23,6 +24,7 @@ pub mod temoc;
 pub mod terminal;
 pub mod theme;
 pub mod tree;
+pub mod watch;
 pub mod workspace;
 
 /// A feature described by the specification that has not been built yet.

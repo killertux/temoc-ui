@@ -1,5 +1,6 @@
 //! Running temoc in the background, and keeping what it reports.
 
+use crate::reload::Moves;
 use crate::temoc::{Event, Failure, RunReport, RunResult, TestTable, Transcript};
 use std::collections::{BTreeMap, HashMap};
 use std::env;
@@ -65,6 +66,29 @@ impl TableRun {
     fn stop_running(&mut self) {
         self.running = false;
         self.rows.retain(|_, row| row.result != RunResult::Running);
+    }
+
+    /// The same, for the table with its directive on `line`, where it is now.
+    fn moved(self, line: usize, moves: &Moves) -> Option<Self> {
+        let failures = |failures: Vec<Failure>| -> Option<Vec<Failure>> {
+            let failures = failures.into_iter();
+            failures
+                .map(|failure| moves.failure(line, failure))
+                .collect()
+        };
+        let rows = self.rows.into_iter().map(|(row, result)| {
+            let kept = RowResult {
+                result: result.result,
+                failures: failures(result.failures)?,
+            };
+            Some((moves.line(line, row)?, kept))
+        });
+        Some(Self {
+            running: self.running,
+            finished: self.finished,
+            rows: rows.collect::<Option<_>>()?,
+            failures: failures(self.failures)?,
+        })
     }
 }
 
@@ -155,6 +179,16 @@ impl FileResults {
         }
     }
 
+    /// Follows the tables to where they are in a newer version of the file.
+    /// A table that is gone takes its results with it.
+    pub fn moved(&mut self, moves: &Moves) {
+        let tables = std::mem::take(&mut self.tables);
+        self.tables = tables
+            .into_iter()
+            .filter_map(|(line, run)| Some((moves.table(line)?, run.moved(line, moves)?)))
+            .collect();
+    }
+
     /// Closes a run with the way it ended.
     pub fn finish(&mut self, report: &RunReport) {
         self.running = false;
@@ -236,7 +270,7 @@ impl FileResults {
 
 /// The table a failure belongs to: the last one starting at or above its line.
 /// A line above every table, such as a failed import, goes to the first one.
-fn owner(ran: &[TestTable], line: usize) -> Option<&TestTable> {
+pub(crate) fn owner(ran: &[TestTable], line: usize) -> Option<&TestTable> {
     ran.iter()
         .rev()
         .find(|table| table.directive_line <= line)
@@ -272,6 +306,8 @@ pub struct Progress {
 pub struct Run {
     file: String,
     tables: Vec<TestTable>,
+    /// Where the tables are now, if the file changed since the run started.
+    moves: Moves,
     child: Child,
     /// The lines of temoc's output, as they arrive.
     lines: Receiver<String>,
@@ -320,6 +356,7 @@ impl Run {
         }
         Ok(Self {
             file: request.file,
+            moves: Moves::staying(&request.tables),
             tables: request.tables,
             stderr: child.stderr.take().map(read_in_background),
             transcript: Transcript::default(),
@@ -334,10 +371,22 @@ impl Run {
         &self.file
     }
 
-    /// The tables that are running.
+    /// The tables that are running, as they were when the run started.
     #[must_use]
     pub fn tables(&self) -> &[TestTable] {
         &self.tables
+    }
+
+    /// Where the tables that are running are now.
+    #[must_use]
+    pub fn moves(&self) -> &Moves {
+        &self.moves
+    }
+
+    /// Follows the tables to a newer version of the file. temoc goes on with
+    /// the version it read, so what it says has to be moved to this one.
+    pub fn moved(&mut self, moves: &Moves) {
+        self.moves = self.moves.then(moves);
     }
 
     /// What temoc has reported since the last look.
@@ -618,6 +667,43 @@ mod tests {
             results.by_row(),
             [(9, RunResult::Failed), (19, RunResult::Passed)]
         );
+    }
+
+    #[test]
+    fn results_follow_their_table_and_go_with_it() {
+        let mut results = results_with(&[
+            (5, 9, RunResult::Failed),
+            (5, 10, RunResult::Passed),
+            (15, 19, RunResult::Passed),
+        ]);
+        results.moved(&[(5, 7)].into_iter().collect());
+        assert_eq!(
+            results.by_row(),
+            [(11, RunResult::Failed), (12, RunResult::Passed)]
+        );
+        let newer = [table("One", 7, &[11, 12]), table("Two", 17, &[21])];
+        assert_eq!(results.failures(&newer), ["One line 11: wrong"]);
+        assert_eq!(results.summary(&newer), "failed");
+        let by_table = results.by_table(&newer);
+        assert_eq!(
+            by_table.get(1).map(|(_, result)| result.as_str()),
+            Some("not run")
+        );
+    }
+
+    #[test]
+    fn a_table_that_moved_keeps_running() {
+        let mut results = FileResults::default();
+        results.begin(&tables(), None);
+        results.apply(&tables(), Event::TableStarted { line: 5 });
+        results.moved(&[(5, 8), (15, 18)].into_iter().collect());
+        let newer = [table("One", 8, &[12, 13]), table("Two", 18, &[22])];
+        assert_eq!(results_of_tables(&results, &newer), ["running", "not run"]);
+    }
+
+    fn results_of_tables(results: &FileResults, tables: &[TestTable]) -> Vec<String> {
+        let by_table = results.by_table(tables);
+        by_table.iter().map(|(_, result)| result.clone()).collect()
     }
 
     #[test]

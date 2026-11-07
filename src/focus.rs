@@ -21,6 +21,30 @@ impl Focus {
         }
     }
 
+    /// The same focus once the page has changed from `before` to `after`: the
+    /// table of the same name, and the row in the same place of it. Without
+    /// that table, it is as when the page opens.
+    #[must_use]
+    pub fn carried(&self, before: &[TestTable], after: &[TestTable]) -> Self {
+        let (Some(index), Some(focused)) = (self.table, self.table(before)) else {
+            return Self::first_of(after);
+        };
+        // Tables of the same name are told apart by their order.
+        let alike = before.iter().take(index);
+        let earlier = alike.filter(|table| table.name == focused.name).count();
+        let mut named = after
+            .iter()
+            .enumerate()
+            .filter(|(_, table)| table.name == focused.name);
+        let Some((index, table)) = named.nth(earlier) else {
+            return Self::first_of(after);
+        };
+        Self {
+            table: Some(index),
+            row: self.row.filter(|row| *row < table.rows.len()),
+        }
+    }
+
     /// The focused table.
     #[must_use]
     pub fn table<'tables>(&self, tables: &'tables [TestTable]) -> Option<&'tables TestTable> {
@@ -156,6 +180,60 @@ mod tests {
         assert_eq!(focus.row(&tables), Some(7));
         focus.next_table(&tables);
         assert_eq!(focus.row(&tables), None);
+    }
+
+    #[test]
+    fn focus_follows_a_table_and_row_that_moved() {
+        let before = tables();
+        let mut after = vec![table(7, &[9, 10]), table(14, &[16])];
+        for (moved, was) in after.iter_mut().zip(&before) {
+            moved.name.clone_from(&was.name);
+        }
+        let mut focus = Focus::first_of(&before);
+        focus.next_row(&before);
+        focus.next_row(&before);
+        let carried = focus.carried(&before, &after);
+        assert_eq!(carried.row(&after), Some(10));
+    }
+
+    #[test]
+    fn focus_finds_its_table_by_name() {
+        let before = tables();
+        let mut after = vec![table(3, &[4]), table(12, &[14]), table(5, &[7, 8])];
+        if let Some(first) = after.first_mut() {
+            first.name = "New".into();
+        }
+        let mut focus = Focus::first_of(&before);
+        focus.next_table(&before);
+        focus.next_row(&before);
+        let carried = focus.carried(&before, &after);
+        assert_eq!(carried.table_index(), Some(1));
+        assert_eq!(carried.row(&after), Some(14));
+    }
+
+    #[test]
+    fn a_row_that_is_gone_leaves_its_table_focused() {
+        let before = tables();
+        let after = vec![table(5, &[7])];
+        let mut focus = Focus::first_of(&before);
+        focus.previous_row(&before);
+        let carried = focus.carried(&before, &after);
+        assert_eq!(carried.table_index(), Some(0));
+        assert_eq!(carried.row(&after), None);
+    }
+
+    #[test]
+    fn without_its_table_focus_starts_over() {
+        let before = tables();
+        let after = vec![table(20, &[22])];
+        let mut focus = Focus::first_of(&before);
+        focus.next_table(&before);
+        let carried = focus.carried(&before, &after);
+        assert_eq!(carried, Focus::first_of(&after));
+        assert_eq!(
+            Focus::first_of(&before).carried(&before, &[]).table_index(),
+            None
+        );
     }
 
     #[test]

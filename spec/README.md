@@ -24,6 +24,7 @@ What temoc-ui does whatever its interface is.
 - [Search](search.md): finding a file or heading, and showing only test files.
 - [File tree](viewer/file-tree.md): the files of the workspace, as a tree.
 - [Graph](viewer/graph.md): how every page links together.
+- [Reloading](reloading.md): keeping up with files that change on disk.
 
 ### Running tests
 
@@ -46,6 +47,7 @@ What only the terminal does. Start with
 - [Search](tui/search.md): the search box.
 - [File tree](tui/file-tree.md): browsing the workspace in a pop-up.
 - [Graph view](tui/graph.md): the screen that draws the graph.
+- [Reloading](tui/reloading.md): where the page stays, and a deleted file.
 - [Running tests](tui/running.md): choosing what to run, and results on the page.
 - [Row results](tui/row-results.md): marks, colours and notes.
 - [Mouse](tui/mouse.md): scrolling, links, tables, the file tree, and the graph.
@@ -66,6 +68,7 @@ the [design](gui/design/README.md) shows how it should look.
 - [Search](gui/search.md): the search box.
 - [File tree](gui/file-tree.md): browsing the workspace in a side panel.
 - [Graph view](gui/graph.md): a graph that lays itself out.
+- [Reloading](gui/reloading.md): where the page stays, and a deleted file.
 - [Running tests](gui/running.md): buttons, keys, and the tests panel.
 - [Row results](gui/row-results.md): marks and notes.
 - [Selecting text](gui/selecting-text.md): selecting with the mouse and copying.
@@ -78,5 +81,5 @@ These are planned for later, and none of them are specified yet:
 
 - **Symbols across rows and tables.** A table or row run alone cannot see `$V`
   symbols set by another one.
-- **Cancelling a run**, and **reloading a page** that changed on disk.
+- **Cancelling a run**.
 - **Respecting `.gitignore`** when listing files.

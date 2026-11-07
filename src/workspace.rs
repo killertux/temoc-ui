@@ -92,15 +92,27 @@ fn is_skipped_folder(folder: &Path) -> bool {
     folder
         .file_name()
         .map(|name| name.to_string_lossy())
-        .is_some_and(|name| name.starts_with('.') || SKIPPED_FOLDERS.contains(&name.as_ref()))
+        .is_some_and(|name| is_skipped_name(&name))
 }
 
-fn is_markdown(file: &Path) -> bool {
+fn is_skipped_name(name: &str) -> bool {
+    name.starts_with('.') || SKIPPED_FOLDERS.contains(&name)
+}
+
+/// Whether a path inside the workspace is out of sight: hidden, or in a folder
+/// that is never listed.
+pub(crate) fn is_hidden(inside: &Path) -> bool {
+    inside
+        .components()
+        .any(|part| is_skipped_name(&part.as_os_str().to_string_lossy()))
+}
+
+pub(crate) fn is_markdown(file: &Path) -> bool {
     file.extension()
         .is_some_and(|extension| extension.eq_ignore_ascii_case("md"))
 }
 
-fn relative_name(path: &Path) -> String {
+pub(crate) fn relative_name(path: &Path) -> String {
     path.to_string_lossy().into_owned()
 }
 

@@ -1,6 +1,7 @@
 //! Running one scenario: a fresh temoc-ui in an in-memory terminal.
 
 use crate::clipboard;
+use crate::disk::{Sandbox, wait_for_change};
 use crate::keys::{self, Input};
 use crate::screen::{self, Found};
 use crossterm::event::{Event, KeyEvent, KeyModifiers, MouseButton, MouseEvent, MouseEventKind};
@@ -42,6 +43,11 @@ pub struct Session {
     output: Vec<u8>,
     /// Whether keys wait for a test run to finish.
     patient: bool,
+    /// The folder temoc-ui started in, which file changes are made in.
+    folder: PathBuf,
+    /// The copy of the workspace that keys change, if they change it. It goes
+    /// last, so that temoc-ui is gone before it is.
+    _sandbox: Option<Sandbox>,
 }
 
 /// What the pretend terminal says about itself.
@@ -54,8 +60,20 @@ pub struct FakeTerminal {
 impl Outcome {
     /// Starts temoc-ui in a sample workspace and presses the keys.
     pub fn of(workspace: &str, arguments: &str, keys: &str, terminal: FakeTerminal) -> Self {
+        let inputs = match keys::parse(keys) {
+            Ok(inputs) => inputs,
+            Err(problem) => return Self::Broken(problem),
+        };
+        // Keys that change files work on a copy of the workspace.
+        let changes = inputs.iter().any(|input| matches!(input, Input::Change(_)));
+        let sandbox = match changes.then(|| Sandbox::of(workspace)).transpose() {
+            Ok(sandbox) => sandbox,
+            Err(problem) => return Self::Broken(problem),
+        };
+        let folder = sandbox.as_ref().map(Sandbox::folder);
+        let folder = folder.map_or_else(|| samples().join(workspace), Path::to_path_buf);
         let launch = Launch {
-            current_dir: samples().join(workspace),
+            current_dir: folder.clone(),
             arguments: arguments.split_whitespace().map(String::from).collect(),
             extra_path: example_binaries().into_iter().collect(),
             color_term: terminal.color_term,
@@ -63,7 +81,7 @@ impl Outcome {
         };
         match App::start(&launch) {
             Err(message) => Self::Refused(message),
-            Ok(app) => match Session::play(app, keys) {
+            Ok(app) => match Session::play(app, &inputs, folder, sandbox) {
                 Ok(session) => Self::Finished(Box::new(session)),
                 Err(problem) => Self::Broken(problem),
             },
@@ -81,16 +99,22 @@ pub fn example_binaries() -> Option<PathBuf> {
 }
 
 impl Session {
-    fn play(app: App, keys: &str) -> Result<Self, String> {
+    fn play(
+        app: App,
+        inputs: &[Input],
+        folder: PathBuf,
+        sandbox: Option<Sandbox>,
+    ) -> Result<Self, String> {
         let terminal = Terminal::new(TestBackend::new(WIDTH, HEIGHT)).map_err(|e| e.to_string())?;
         let mut session = Self {
             app,
             terminal,
             output: Vec::new(),
             patient: true,
+            folder,
+            _sandbox: sandbox,
         };
         session.settle()?;
-        let inputs = keys::parse(keys)?;
         let mut inputs = inputs.iter().peekable();
         while let Some(input) = inputs.next() {
             // `Wait` is there to see a run in progress, so that the key that
@@ -129,6 +153,15 @@ impl Session {
                 self.drag(start, end)
             }
             Input::Wait(text) => self.wait_for(text),
+            Input::Change(change) => {
+                let before = self.app.changes_seen();
+                change.apply(&self.folder)?;
+                wait_for_change(before, || {
+                    self.app.update();
+                    Ok(self.app.changes_seen())
+                })?;
+                self.settle()
+            }
         }
     }
 
