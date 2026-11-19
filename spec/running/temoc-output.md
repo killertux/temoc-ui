@@ -2,7 +2,7 @@
 
 Back to the [specification index](../README.md).
 
-temoc-ui needs temoc 0.10 or later. It runs temoc with `--output jsonl`, which prints
+temoc-ui needs temoc 0.12 or later. It runs temoc with `--output jsonl`, which prints
 one JSON object per line while the tests run. temoc-ui reads each line as it arrives,
 and that is how a row can show its [result](row-results.md) before the run is over.
 temoc's [readme](https://github.com/killertux/temoc#machine-readable-output) describes
@@ -40,8 +40,8 @@ says what happened. Only the first line of `stderr` is shown.
 
 | # situation       | events                              | stderr                                        | exit code | result? | message?                                                                       |
 | ----------------- | ----------------------------------- | --------------------------------------------- | --------- | ------- | ------------------------------------------------------------------------------ |
-| An older temoc    |                                     | `error: unexpected argument '--output' found` | 2         | error   | temoc-ui needs temoc 0.10 or later: error: unexpected argument '--output' found |
-| Silent and failed |                                     |                                               | 1         | error   | temoc-ui needs temoc 0.10 or later                                             |
+| An older temoc    |                                     | `error: unexpected argument '--output' found` | 2         | error   | temoc-ui needs temoc 0.12 or later: error: unexpected argument '--output' found |
+| Silent and failed |                                     |                                               | 1         | error   | temoc-ui needs temoc 0.12 or later                                             |
 | temoc crashed     | `{"type":"run_started","schema":1}` | `thread 'main' panicked`                      | 101       | error   | temoc stopped before finishing: thread 'main' panicked                         |
 | Crash in silence  | `{"type":"run_started","schema":1}` |                                               | -1        | error   | temoc stopped before finishing                                                 |
 | A newer format    | `{"type":"run_started","schema":2}` |                                               | 0         | error   | temoc-ui reads schema 1 of temoc's output, but this temoc uses schema 2        |
@@ -68,6 +68,7 @@ failure.
 | Several lines   | `{"type":"row_finished","table":15,"line":20,"status":"error","checks":[{"role":"getter","method":"mul","status":"error","expected":"5","actual":{"kind":"exception","message":"boom\u000aat line 1"}}]}` | line 20: mul expected 5, got exception boom              |
 | A failing setter | `{"type":"row_finished","table":15,"line":20,"status":"error","checks":[{"role":"setter","method":"setA","status":"error","value":"x","actual":{"kind":"exception","message":"bad"}}]}`                | line 20: setA got exception bad                           |
 | Unknown symbol  | `{"type":"row_finished","table":15,"line":20,"status":"error","checks":[{"role":"setter","method":"setA","status":"error","value":"$NOPE","actual":{"kind":"missing_symbol","symbol":"NOPE"}}]}`        | line 20: setA got unknown symbol $NOPE                    |
+| Other server    | `{"type":"row_finished","table":15,"line":20,"status":"error","checks":[{"role":"setter","method":"setA","status":"error","value":"$ID","actual":{"kind":"symbol_from_other_server","symbol":"ID","server":"machines","message":"Symbol $ID was set on server machines and cannot be used on server default in a.md:20:7"}}]}` | line 20: setA got symbol $ID from server machines |
 | Bad response    | `{"type":"row_finished","table":15,"line":20,"status":"error","checks":[{"role":"getter","method":"mul","status":"error","expected":"5","actual":{"kind":"protocol_error","message":"Different ID"}}]}`  | line 20: mul expected 5, got protocol error Different ID  |
 | Snoozed         | `{"type":"row_finished","table":15,"line":20,"status":"snoozed","checks":[{"role":"getter","method":"mul","status":"snoozed","expected":"5","actual":{"kind":"value","value":"4"},"snoozed_until":"2099-12-31"}]}` | line 20: mul expected 5, got 4 (snoozed until 2099-12-31) |
 | Expired snooze  | `{"type":"row_finished","table":15,"line":20,"status":"failed","checks":[{"role":"getter","method":"mul","status":"failed","expected":"5","actual":{"kind":"value","value":"4"},"snoozed_until":"2020-01-01"}]}` | line 20: mul expected 5, got 4                       |

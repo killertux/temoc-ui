@@ -35,7 +35,7 @@ cannot draw, such as pictures, alerts and a graph of your pages that you can dra
 
 ## Getting started
 
-You need [temoc](https://github.com/killertux/temoc/releases) 0.10 or later on your
+You need [temoc](https://github.com/killertux/temoc/releases) 0.12 or later on your
 `PATH` to run tests. Install the latest temoc-ui release on Apple silicon Macs and on
 Linux, on x86-64 or ARM:
 

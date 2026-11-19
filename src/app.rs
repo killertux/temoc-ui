@@ -1749,7 +1749,7 @@ mod tests {
         settle(&mut app);
         assert_eq!(
             app.state().status.as_deref(),
-            Some("temoc failed: temoc-ui needs temoc 0.10 or later")
+            Some("temoc failed: temoc-ui needs temoc 0.12 or later")
         );
     }
 

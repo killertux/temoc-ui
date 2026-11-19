@@ -364,6 +364,12 @@ enum Actual {
     MissingSymbol {
         symbol: String,
     },
+    /// A symbol that only another server has set.
+    SymbolFromOtherServer {
+        symbol: String,
+        /// The server that set it.
+        server: String,
+    },
     ProtocolError {
         message: String,
     },
@@ -382,6 +388,9 @@ impl Display for Actual {
             }
             Self::Exception { message } => write!(f, "exception {}", first_line(message)),
             Self::MissingSymbol { symbol } => write!(f, "unknown symbol ${symbol}"),
+            Self::SymbolFromOtherServer { symbol, server } => {
+                write!(f, "symbol ${symbol} from server {server}")
+            }
             Self::ProtocolError { message } => write!(f, "protocol error {}", first_line(message)),
             Self::Other => f.write_str("an answer temoc-ui does not know"),
         }
@@ -546,7 +555,7 @@ impl Transcript {
             None if self.started || exit_code == 0 => {
                 RunReport::stopped(with_stderr("temoc stopped before finishing", stderr))
             }
-            None => RunReport::stopped(with_stderr("temoc-ui needs temoc 0.10 or later", stderr)),
+            None => RunReport::stopped(with_stderr("temoc-ui needs temoc 0.12 or later", stderr)),
         }
     }
 }
@@ -737,6 +746,17 @@ Not the table.
     }
 
     #[test]
+    fn a_symbol_from_another_server_names_that_server() {
+        let line = r#"{"type":"row_finished","table":1,"line":2,"status":"error","checks":[{"method":"m","status":"error","value":"$ID","actual":{"kind":"symbol_from_other_server","symbol":"ID","server":"machines","message":"Symbol `$ID` was set on server `machines` and cannot be used on server `default` in a.md:2:7"}}]}"#;
+        let found = events(&[line]);
+        let failures = found.first().map_or(&[][..], Event::failures);
+        assert_eq!(
+            failures.first().map(Failure::note).as_deref(),
+            Some("m got symbol $ID from server machines")
+        );
+    }
+
+    #[test]
     fn a_row_can_fail_a_check_and_lose_the_connection() {
         let line = r#"{"type":"row_finished","table":1,"line":2,"status":"error","checks":[{"method":"m","status":"failed","expected":"1","actual":{"kind":"void"}}],"message":"Gone\nfor good"}"#;
         let found = events(&[line]);
@@ -820,7 +840,7 @@ Not the table.
         );
         assert_eq!(
             transcript.report("", 2).message.as_deref(),
-            Some("temoc-ui needs temoc 0.10 or later")
+            Some("temoc-ui needs temoc 0.12 or later")
         );
     }
 
