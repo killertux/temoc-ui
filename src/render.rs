@@ -1514,7 +1514,7 @@ mod tests {
         let rendered = document.render(20, &HashMap::new());
         assert_eq!(rendered.link_at(0, 15, 0), None);
         let line = rendered.lines(Theme::DARK, 0, 1, 16, Marks::default());
-        let text = line.first().map(ToString::to_string).unwrap_or_default();
+        let text = line.first().map_or_default(ToString::to_string);
         let column = text.chars().position(|c| c == 'f').unwrap();
         assert_eq!(rendered.link_at(0, column, 16), Some(0));
     }
@@ -1964,7 +1964,7 @@ mod tests {
         let rendered = with_rows(markdown, 10, &rows);
         assert_eq!(rendered.last_left(), 5);
         let lines = rendered.lines(Theme::DARK, 2, 1, 5, Marks::default());
-        let text = lines.first().map(ToString::to_string).unwrap_or_default();
+        let text = lines.first().map_or_default(ToString::to_string);
         assert!(text.ends_with('✓'), "{text}");
     }
 
@@ -1974,7 +1974,7 @@ mod tests {
         let rows = BTreeMap::from([(3, row(RunResult::Failed, Vec::new()))]);
         let rendered = with_rows(markdown, 10, &rows);
         let lines = rendered.lines(Theme::DARK, 2, 1, 0, Marks::default());
-        let text = lines.first().map(ToString::to_string).unwrap_or_default();
+        let text = lines.first().map_or_default(ToString::to_string);
         assert!(!text.contains('✗'), "{text}");
         assert_eq!(row_color(&rendered, 2), Some(Theme::DARK.failed));
     }

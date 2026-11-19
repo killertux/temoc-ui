@@ -105,7 +105,8 @@ impl Session {
         folder: PathBuf,
         sandbox: Option<Sandbox>,
     ) -> Result<Self, String> {
-        let terminal = Terminal::new(TestBackend::new(WIDTH, HEIGHT)).map_err(|e| e.to_string())?;
+        // A test backend cannot fail: its error type is `Infallible`.
+        let Ok(terminal) = Terminal::new(TestBackend::new(WIDTH, HEIGHT));
         let mut session = Self {
             app,
             terminal,
@@ -219,9 +220,7 @@ impl Session {
             self.app.update();
         }
         self.output.append(&mut self.app.take_output());
-        self.terminal
-            .draw(|frame| self.app.draw(frame))
-            .map_err(|e| e.to_string())?;
+        let Ok(_) = self.terminal.draw(|frame| self.app.draw(frame));
         Ok(())
     }
 
