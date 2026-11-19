@@ -903,7 +903,7 @@ mod tests {
         let mut run = start("echo 'no such option' >&2; exit 2");
         assert_eq!(
             wait_for(&mut run).1.message.as_deref(),
-            Some("temoc-ui needs temoc 0.10 or later: no such option")
+            Some("temoc-ui needs temoc 0.12 or later: no such option")
         );
     }
 

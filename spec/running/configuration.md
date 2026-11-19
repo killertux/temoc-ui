@@ -10,7 +10,7 @@ temoc-ui uses the file it was given, or else `temoc.toml` at the root of the
 temoc-ui passes the file along without reading it.
 
 temoc itself is found through your `PATH`, and runs with the workspace as its
-current folder. It must be [version 0.10 or later](temoc-output.md). A relative
+current folder. It must be [version 0.12 or later](temoc-output.md). A relative
 configuration path starts from the folder temoc-ui was started in, and temoc-ui passes
 it along so that temoc finds the same file.
 

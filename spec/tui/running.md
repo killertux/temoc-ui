@@ -190,6 +190,6 @@ status bar.
 
 [//]: # "decisionTable Tui"
 
-| # situation         | workspace | arguments | keys | file result? | status?                                                                 |
-| ------------------- | --------- | --------- | ---- | ------------ | ----------------------------------------------------------------------- |
-| Server stops midway | outcomes  | dying.md  | `R`  | error        | temoc failed: Missing message length terminator (server exit status: 3) |
+| # situation         | workspace | arguments | keys | file result? | status?                                                                                                                         |
+| ------------------- | --------- | --------- | ---- | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Server stops midway | outcomes  | dying.md  | `R`  | error        | ``temoc failed: Server `default` (`calculator-server %p`) was lost: Missing message length terminator (server exit status: 3)`` |

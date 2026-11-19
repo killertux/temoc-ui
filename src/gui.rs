@@ -407,7 +407,7 @@ impl Gui {
     #[must_use]
     pub fn graph_lit_files(&self) -> Vec<String> {
         let graph = self.graph.as_ref();
-        graph.map(GraphView::lit_files).unwrap_or_default()
+        graph.map_or_default(GraphView::lit_files)
     }
 
     /// How many arrowheads the graph shows.

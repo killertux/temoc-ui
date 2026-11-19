@@ -82,11 +82,11 @@ That is an error, not a test failure, and temoc's message is shown.
 
 [//]: # "decisionTable Core"
 
-| # situation           | workspace      | path      | steps      | file result? | problem?                                                                                                 |
-| --------------------- | -------------- | --------- | ---------- | ------------ | -------------------------------------------------------------------------------------------------------- |
-| Malformed file        | calculator     | broken.md | `run file` | error        | ``temoc failed: Expected a test table. Got `This paragraph should have been a table.` at broken.md:9:1`` |
-| Server will not start | server-failure | tests.md  | `run file` | error        | temoc failed: failed to fill whole buffer (server exit status: 1)                                        |
-| Server stops midway   | outcomes       | dying.md  | `run file` | error        | temoc failed: Missing message length terminator (server exit status: 3)                                  |
+| # situation           | workspace      | path      | steps      | file result? | problem?                                                                                                                        |
+| --------------------- | -------------- | --------- | ---------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------- |
+| Malformed file        | calculator     | broken.md | `run file` | error        | ``temoc failed: Expected a test table. Got `This paragraph should have been a table.` at broken.md:9:1``                        |
+| Server will not start | server-failure | tests.md  | `run file` | error        | ``temoc failed: Server `default` (`false`) failed to start: failed to fill whole buffer (server exit status: 1)``               |
+| Server stops midway   | outcomes       | dying.md  | `run file` | error        | ``temoc failed: Server `default` (`calculator-server %p`) was lost: Missing message length terminator (server exit status: 3)`` |
 
 What ran before that keeps its result, and temoc reports the rest as `skipped`. A
 file that could not be read never started, so its tables have no result, whatever
